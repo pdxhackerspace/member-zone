@@ -26,6 +26,13 @@ export default class extends Controller {
 
   #ask() {
     const modalElement = this.#modalElement()
+
+    // The modal and its two buttons are shared by every form on the page. A second submit
+    // arriving while a prompt is already open must not stack another pair of click
+    // listeners, or one answer would submit the training more than once.
+    if (modalElement.dataset.prompting === "true") return
+
+    modalElement.dataset.prompting = "true"
     modalElement.querySelector("[data-role='names']").textContent = this.#subject()
 
     const modal = window.bootstrap.Modal.getOrCreateInstance(modalElement)
@@ -39,6 +46,7 @@ export default class extends Controller {
     // Cleanup runs on cancel too, so a dismissed modal leaves no listener behind that a
     // later form on the same page would trip over.
     const cleanup = () => {
+      delete modalElement.dataset.prompting
       notify.removeEventListener("click", onNotify)
       skip.removeEventListener("click", onSkip)
       modalElement.removeEventListener("hidden.bs.modal", cleanup)
