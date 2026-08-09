@@ -81,7 +81,9 @@ class TrainingRequestsController < AuthenticatedController
       training_topic: topic,
       trainee_ids: [trainee.id.to_s],
       trainer: true_user,
-      trained_at: Time.current
+      trained_at: Time.current,
+      # The member asked for this training, so they hear about it even if their membership lapsed.
+      notify_inactive: true
     ).call
 
     if result.recorded_count.positive?

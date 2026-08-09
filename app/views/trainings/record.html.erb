@@ -10,7 +10,8 @@
   <div class="mb-3">
     <h1 class="h-page-title mb-0">Record training</h1>
     <div class="text-13 text-secondary mt-1">
-      Add one member or a whole class. Already-trained or inactive members are skipped automatically.
+      Add one member or a whole class. Already-trained members are skipped automatically. Inactive members
+      can be trained; you'll be asked whether to email them.
     </div>
   </div>
 
@@ -19,7 +20,12 @@
       No training topics are available for you to record.
     </div>
   <% else %>
-    <%= form_with url: record_training_path, method: :post, local: true, id: "record-training-form" do %>
+    <%= form_with url: record_training_path,
+                  method: :post,
+                  local: true,
+                  id: "record-training-form",
+                  data: { controller: "inactive-training-notice",
+                          action: "submit->inactive-training-notice#confirm" } do %>
       <%= hidden_field_tag :training_topic_id, nil, id: "record-training-topic-id" %>
 
       <div class="form-section mb-2" id="record-topic-picker">
@@ -288,10 +294,13 @@
         if ((user.trained_topic_ids || []).map(String).indexOf(String(selectedTopicId)) !== -1) {
           return { key: 'skip', text: 'Already trained - skip' };
         }
-        if (user.banned || !user.active) {
-          return { key: 'skip', text: 'Cannot train - inactive' };
+        if (user.banned) {
+          return { key: 'skip', text: 'Banned - cannot train' };
         }
-        return { key: 'add', text: 'Will be trained' };
+        if (!user.active) {
+          return { key: 'add', tone: 'skip', text: 'Inactive - will be trained' };
+        }
+        return { key: 'add', tone: 'add', text: 'Will be trained' };
       }
 
       function hideResults() {
@@ -343,17 +352,20 @@
         traineeList.innerHTML = '';
         var effectiveCount = 0;
         var skipCount = 0;
+        var inactiveNames = [];
 
         selectedMembers.forEach(function(user) {
           var status = memberStatus(user);
           if (status.key === 'add') {
             effectiveCount += 1;
+            if (!user.active) inactiveNames.push(user.name);
           } else {
             skipCount += 1;
           }
 
           var row = document.createElement('div');
-          row.className = 'trainee-row' + (status.key === 'skip' ? ' trainee-row-warning' : '');
+          var isInactive = status.key === 'add' && !user.active;
+          row.className = 'trainee-row' + (status.key === 'skip' || isInactive ? ' trainee-row-warning' : '');
 
           var hiddenInput = document.createElement('input');
           hiddenInput.type = 'hidden';
@@ -379,7 +391,7 @@
           row.appendChild(info);
 
           var statusEl = document.createElement('span');
-          statusEl.className = 'trainee-status status-' + status.key;
+          statusEl.className = 'trainee-status status-' + (status.tone || status.key);
           statusEl.textContent = status.text;
           row.appendChild(statusEl);
 
@@ -404,25 +416,31 @@
 
         addedCount.textContent = selectedMembers.size;
         submit.disabled = effectiveCount === 0;
+        form.dataset.inactiveTrainingNoticeNamesValue = JSON.stringify(inactiveNames);
+
+        var notes = [];
+        if (skipCount > 0) {
+          notes.push(skipCount + ' already-trained or banned ' + (skipCount === 1 ? 'member' : 'members') + ' will be skipped.');
+        }
+        if (inactiveNames.length > 0) {
+          notes.push(inactiveNames.length + ' inactive ' + (inactiveNames.length === 1 ? 'member' : 'members') + " will be trained; you'll be asked whether to email them.");
+        }
 
         if (!selectedTopicId) {
           summary.textContent = 'Pick a topic to start adding members.';
-          detail.classList.add('d-none');
         } else if (selectedMembers.size === 0) {
           summary.textContent = 'Add members trained in ' + selectedTopicName + '.';
-          detail.classList.add('d-none');
         } else if (effectiveCount === 0) {
           summary.textContent = 'All selected members will be skipped.';
-          detail.textContent = skipCount + ' already-trained or inactive ' + (skipCount === 1 ? 'member' : 'members') + ' selected.';
-          detail.classList.remove('d-none');
         } else {
           summary.innerHTML = 'Record <strong>' + effectiveCount + ' training ' + (effectiveCount === 1 ? 'event' : 'events') + '</strong> for <strong>' + selectedTopicName + '</strong>.';
-          if (skipCount > 0) {
-            detail.textContent = skipCount + ' already-trained or inactive ' + (skipCount === 1 ? 'member' : 'members') + ' will be skipped.';
-            detail.classList.remove('d-none');
-          } else {
-            detail.classList.add('d-none');
-          }
+        }
+
+        if (notes.length > 0 && selectedTopicId && selectedMembers.size > 0) {
+          detail.textContent = notes.join(' ');
+          detail.classList.remove('d-none');
+        } else {
+          detail.classList.add('d-none');
         }
 
         syncTrainerReturnState();

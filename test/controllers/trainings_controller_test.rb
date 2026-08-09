@@ -188,6 +188,61 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to user_path(trainee.id, anchor: 'training-access-section')
   end
 
+  test 'add_training records an inactive member without emailing them' do
+    sign_in_as_admin
+    trainee = make_inactive(users(:three))
+
+    assert_difference 'Training.count', 1 do
+      assert_no_difference 'training_completed_mail_count(trainee)' do
+        post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile')
+      end
+    end
+
+    assert_match 'no notification was sent', flash[:notice]
+  end
+
+  test 'add_training emails an inactive member when the trainer asked for it' do
+    sign_in_as_admin
+    trainee = make_inactive(users(:three))
+
+    assert_difference 'training_completed_mail_count(trainee)', 1 do
+      post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile'),
+           params: { notify_inactive: '1' }
+    end
+
+    assert_match 'notification was sent anyway', flash[:notice]
+  end
+
+  test 'add_training refuses a banned member' do
+    sign_in_as_admin
+    trainee = users(:three)
+    trainee.update!(membership_status: 'banned')
+
+    assert_no_difference 'Training.count' do
+      post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile')
+    end
+
+    assert_match 'banned', flash[:alert]
+  end
+
+  test 'bulk record trains inactive members and reports how they were notified' do
+    trainer = sign_in_as_trainer
+    inactive = make_inactive(users(:three))
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    assert_difference 'Training.count', 1 do
+      post record_training_path, params: {
+        training_topic_id: @laser_topic.id,
+        trained_at: Date.current.iso8601,
+        trainee_ids: [inactive.id],
+        notify_inactive: '1'
+      }
+    end
+
+    assert Training.exists?(trainee: inactive, training_topic: @laser_topic)
+    assert_match '1 inactive member trained and notified.', flash[:notice]
+  end
+
   test 'remove_training with return_to profile redirects to the member profile training section' do
     sign_in_as_admin
     trainee = users(:no_email)
@@ -220,6 +275,16 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def make_inactive(user)
+    Membership::ActiveStatus.assign_and_save!(user, membership_status: 'paying', dues_status: 'lapsed')
+    assert_not user.reload.active?
+    user
+  end
+
+  def training_completed_mail_count(user)
+    QueuedMail.where(recipient: user, mailer_action: 'training_completed').count
+  end
 
   def sign_in_as_admin
     account = local_accounts(:active_admin)
