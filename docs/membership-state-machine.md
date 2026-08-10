@@ -229,7 +229,7 @@ queue unless its template opts out of review.
 | --- | --- | --- |
 | Entering `cancelled_member` | `membership_cancelled` | Once, guarded by `membership_cancelled_email_sent_at` |
 | `ban!` | `membership_banned` | Once per ban |
-| Entering `inactive_member` | `membership_lapsed` | Once per lapse |
+| Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled** |
 | Being in `overdue_member` | `payment_past_due` | Weekly, while the reminder is enabled |
 | `mark_deceased!` | — | No email |
 
@@ -246,6 +246,26 @@ file that has not been reconciled yet (see below).
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
 address.
+
+### A cancellation outlives `cancelled_member`
+
+`cancelled_member` is a waiting room. When the paid-through date passes, the member becomes
+`inactive_member` — the same state as someone who quietly stopped paying — and the state
+alone can no longer tell the two apart. Left there, the lapse email chases someone who
+chose to leave, told us so, and was already told their access ran to a date that has now
+arrived.
+
+So the fact is kept separately from the state, on `users.membership_cancelled_at`:
+
+- `record_cancellation!(cancelled_at:)` stamps it alongside the transition.
+- `note_cancellation!(cancelled_at:)` stamps it for a member whose standing has nowhere to
+  go — already lapsed, banned, dead. Nothing moves.
+- `cancellation_on_file?` is the question everything else asks. `notify_membership_lapsed`
+  and `PaymentOverdueEligibility` both check it.
+- Entering `current_member` clears it, along with `membership_cancelled_email_sent_at`. A
+  member who came back is not a member who left, so a later lapse reads as a lapse and a
+  second cancellation mails them again. The clearing is bookkeeping rather than mail, so it
+  happens even under `Current.skip_membership_state_email`.
 
 ---
 
@@ -276,9 +296,14 @@ they already replaced says nothing about where they stand — and:
 - Suppresses state-entry email for the whole run via `Current.skip_membership_state_email`.
   Nobody should get "sorry to see you go" about a subscription they ended two years ago.
 
-It leaves alone anyone who paid or opened a new subscription after cancelling, anyone
-already `cancelled_member` or `inactive_member`, service accounts, and the states a person
-chose deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
+Members who lapsed long before anyone processed their notice have no state left to move —
+`inactive_member` is where the cancellation would have put them anyway. They still get
+`membership_cancelled_at` recorded, which is the whole point: it is the only thing that
+stops the lapse email finding them.
+
+It leaves alone anyone who paid or opened a new subscription after cancelling, anyone whose
+cancellation is already on record, service accounts, and the states a person chose
+deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
 
 The live path draws the same line. `Recharge::SubscriptionCancellation` files the payment
 event — the subscription really did end at Recharge — but returns `:state_locked` without a

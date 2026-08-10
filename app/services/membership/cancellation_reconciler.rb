@@ -10,6 +10,12 @@ module Membership
   # instead of treating a two-year-old cancellation as today's news. State-entry mail is
   # suppressed for the same reason, and past-due reminders already waiting for review are
   # withdrawn.
+  #
+  # Members who lapsed long before anyone processed their notice are already where the
+  # cancellation would have put them, so there is no state left to move. They still get the
+  # date recorded: a member who cancelled and a member who quietly stopped paying look
+  # identical in inactive_member, and only one of them should hear that their membership
+  # lapsed.
   class CancellationReconciler
     # States a filed cancellation must not disturb. A ban, a death, and a sponsorship were
     # each decided by a person, and a guest was never on a subscription to cancel.
@@ -19,10 +25,15 @@ module Membership
     # rather than reviving the cancelled one, so a later start is a return, not a duplicate.
     RETURN_EVENT_TYPES = %w[payment subscription_started subscription_resumed].freeze
 
+    # Nowhere left to go. inactive_member is where a cancellation ends up anyway, and a
+    # cancelled_member missing its date only needs the date.
+    NOTE_ONLY_STATES = %w[cancelled_member inactive_member].freeze
+
     WITHDRAWABLE_REMINDER_STATUSES = %w[pending approved].freeze
 
     Result = Struct.new(:user, :status, :cancelled_at, :from_state, :to_state, :reason, :withdrawn_reminders) do
       def applied? = status == :applied
+      def noted? = status == :noted
       def skipped? = status == :skipped
     end
 
@@ -66,6 +77,7 @@ module Membership
     def evaluate(user, cancelled_at)
       reason = skip_reason(user, cancelled_at)
       return skipped(user, cancelled_at, reason) if reason
+      return note(user, cancelled_at) if user.membership_state.in?(NOTE_ONLY_STATES)
       return preview(user, cancelled_at) if @dry_run
 
       apply(user, cancelled_at)
@@ -73,8 +85,7 @@ module Membership
 
     def skip_reason(user, cancelled_at)
       return 'service account' if user.service_account?
-      return 'cancellation already recorded' if user.cancelled_member?
-      return 'already inactive' if user.inactive_member?
+      return 'cancellation already on record' if user.cancellation_on_file?
       return 'paid or resubscribed since cancelling' if returned_after?(user, cancelled_at)
 
       "#{user.membership_state.humanize.downcase} set deliberately" if user.membership_state.in?(PROTECTED_STATES)
@@ -94,16 +105,24 @@ module Membership
     def apply(user, cancelled_at)
       from_state = user.membership_state
       user.backdated_membership_state_entered_at = cancelled_at
-      user.record_cancellation!
+      user.record_cancellation!(cancelled_at: cancelled_at)
       play_forward(user)
 
       Result.new(user: user, status: :applied, cancelled_at: cancelled_at, from_state: from_state,
-                 to_state: user.membership_state, withdrawn_reminders: withdraw_overdue_reminders(user))
+                 to_state: user.membership_state, withdrawn_reminders: settle_reminders(user))
+    end
+
+    # Their standing already reflects the cancellation; only the reason for it was missing.
+    def note(user, cancelled_at)
+      user.note_cancellation!(cancelled_at: cancelled_at) unless @dry_run
+
+      Result.new(user: user, status: :noted, cancelled_at: cancelled_at, from_state: user.membership_state,
+                 to_state: user.membership_state, withdrawn_reminders: settle_reminders(user))
     end
 
     def preview(user, cancelled_at)
       Result.new(user: user, status: :applied, cancelled_at: cancelled_at, from_state: user.membership_state,
-                 to_state: projected_state(user), withdrawn_reminders: overdue_reminders(user).count)
+                 to_state: projected_state(user), withdrawn_reminders: settle_reminders(user))
     end
 
     def skipped(user, cancelled_at, reason)
@@ -129,9 +148,9 @@ module Membership
     # Reminders queued while we still believed they owed us. Nobody should have to review a
     # past-due notice for a member who cancelled, and an approved one is a send waiting to
     # happen — QueuedMailDeliveryJob re-checks the status, so rejecting stops it.
-    def withdraw_overdue_reminders(user)
+    def settle_reminders(user)
       reminders = overdue_reminders(user).to_a
-      reminders.each { |mail| mail.reject!(nil) }
+      reminders.each { |mail| mail.reject!(nil) } unless @dry_run
       reminders.size
     end
 

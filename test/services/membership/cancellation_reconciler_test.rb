@@ -17,6 +17,21 @@ module Membership
       assert_predicate result, :applied?
       assert_equal 'cancelled_member', user.reload.membership_state
       assert_equal cancelled_at.to_i, user.membership_state_entered_at.to_i
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+    end
+
+    # The cancellation has to survive the expiry that follows it, or the lapse email finds
+    # them on the way through.
+    test 'a cancellation played all the way to inactive is still on record' do
+      cancelled_at = 9.months.ago
+      user = member(dues_due_at: 8.months.ago)
+      file_cancellation(user, at: cancelled_at)
+
+      reconcile_for(user)
+
+      user.reload
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
     end
 
     test 'a cancellation that outlived its paid-through date lands the member inactive' do
@@ -75,19 +90,46 @@ module Membership
       result = reconcile_for(user)
 
       assert_predicate result, :skipped?
-      assert_equal 'cancellation already recorded', result.reason
+      assert_equal 'cancellation already on record', result.reason
       assert_equal entered_at.to_i, user.reload.membership_state_entered_at.to_i
     end
 
-    test 'a member who already fell inactive is left where they are' do
+    # Nothing left to move, but "they cancelled" is the whole point: without it they are
+    # indistinguishable from someone who quietly stopped paying.
+    test 'a member who already fell inactive has the cancellation recorded anyway' do
+      cancelled_at = 8.months.ago
       user = member(dues_due_at: 2.months.from_now)
-      file_cancellation(user, at: 8.months.ago)
+      file_cancellation(user, at: cancelled_at)
       user.update_columns(membership_state: 'inactive_member')
 
       result = reconcile_for(user.reload)
 
-      assert_predicate result, :skipped?
-      assert_equal 'already inactive', result.reason
+      assert_predicate result, :noted?
+      assert_equal 'inactive_member', user.reload.membership_state
+      assert_predicate user, :cancellation_on_file?
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+    end
+
+    test 'a cancelled member missing the date gets it filled in without moving' do
+      cancelled_at = 3.days.ago
+      user = member(dues_due_at: 2.months.from_now)
+      file_cancellation(user, at: cancelled_at)
+      user.update_columns(membership_state: 'cancelled_member', membership_cancelled_at: nil)
+
+      result = reconcile_for(user.reload)
+
+      assert_predicate result, :noted?
+      assert_equal 'cancelled_member', user.reload.membership_state
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+    end
+
+    test 'a dry run does not record the date for an already-inactive member' do
+      user = member(dues_due_at: 2.months.from_now)
+      file_cancellation(user, at: 8.months.ago)
+      user.update_columns(membership_state: 'inactive_member')
+
+      assert_predicate reconcile_for(user.reload, dry_run: true), :noted?
+      assert_not_predicate user.reload, :cancellation_on_file?
     end
 
     test 'service accounts are left alone' do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_09_195000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_10_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -1130,6 +1130,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_195000) do
     t.datetime "mailing_geocoded_at"
     t.decimal "mailing_latitude", precision: 10, scale: 6
     t.decimal "mailing_longitude", precision: 10, scale: 6
+    t.datetime "membership_cancelled_at"
     t.datetime "membership_cancelled_email_sent_at"
     t.date "membership_ended_date"
     t.bigint "membership_plan_id"
@@ -1166,6 +1167,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_195000) do
     t.index ["key_access_paused"], name: "index_users_on_key_access_paused"
     t.index ["legacy"], name: "index_users_on_legacy"
     t.index ["login_token"], name: "index_users_on_login_token", unique: true
+    t.index ["membership_cancelled_at"], name: "index_users_on_membership_cancelled_at"
     t.index ["membership_plan_id"], name: "index_users_on_membership_plan_id"
     t.index ["membership_state", "membership_state_entered_at"], name: "idx_on_membership_state_membership_state_entered_at_31ea7f1f2e"
     t.index ["membership_state"], name: "index_users_on_membership_state"

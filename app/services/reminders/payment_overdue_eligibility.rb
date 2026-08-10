@@ -74,14 +74,16 @@ module Reminders
       return false if user.email.blank?
       return false unless user.effective_membership_state == 'overdue_member'
 
-      !unreconciled_cancellation?(user)
+      !cancellation_on_file?(user)
     end
 
-    # A cancellation notice the state machine has not caught up with. Membership::
-    # CancellationReconciler moves these members out of the reminder pool for good; until
-    # it runs — or if a webhook goes missing between runs — the filed notice on its own is
-    # reason enough not to chase them for a membership they ended.
-    def self.unreconciled_cancellation?(user)
+    # Someone who told us they were leaving is not someone to chase for a payment. The
+    # stamp answers for cancellations we have processed; the payment event ledger catches
+    # the ones Membership::CancellationReconciler has not reached, or a webhook that went
+    # missing after the subscription sync's lookback window had closed.
+    def self.cancellation_on_file?(user)
+      return true if user.cancellation_on_file?
+
       cancelled_at = PaymentEvent.for_user(user).by_type('subscription_cancelled').maximum(:occurred_at)
       return false if cancelled_at.blank?
 
@@ -89,6 +91,6 @@ module Reminders
       last_paid.blank? || last_paid <= cancelled_at.to_date
     end
 
-    private_class_method :base_user?, :unreconciled_cancellation?
+    private_class_method :base_user?, :cancellation_on_file?
   end
 end

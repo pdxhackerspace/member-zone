@@ -31,10 +31,30 @@ module MembershipTransitions
 
   # A cancellation notice. The member keeps access until their paid-through date;
   # Membership::TickJob moves them to inactive when it passes.
-  def record_cancellation!
+  #
+  # The date is kept on its own column as well as in the state, because the fact outlives
+  # cancelled_member: once they expire into inactive_member they look exactly like someone
+  # who quietly stopped paying, and we would mail them a lapse notice for a decision they
+  # made deliberately and already told us about.
+  def record_cancellation!(cancelled_at: Time.current)
     return false if terminal_membership_state? || cancelled_member?
 
-    transition_to!('cancelled_member')
+    transition_to!('cancelled_member', membership_cancelled_at: cancelled_at)
+  end
+
+  # The same fact for a member whose standing has nowhere to go — they lapsed months before
+  # anyone processed the notice, or a ban outranks it. Nothing moves; we just stop treating
+  # them as someone who forgot to pay.
+  def note_cancellation!(cancelled_at: Time.current)
+    return false if membership_cancelled_at.present?
+
+    update!(membership_cancelled_at: cancelled_at)
+  end
+
+  # Did this member tell us they were leaving? True through cancelled_member and onwards
+  # into the inactive state it expires to, until a payment brings them back.
+  def cancellation_on_file?
+    membership_cancelled_at.present?
   end
 
   def ban!
