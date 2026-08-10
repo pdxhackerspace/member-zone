@@ -78,7 +78,8 @@ class SheetEntriesControllerTest < ActionDispatch::IntegrationTest
   test 'sync_to_user links matching member without copying sheet data' do
     user = users(:one)
     @sheet_entry.update_columns(user_id: nil, rfid: 'RFID-SHOULD-NOT-COPY', status: '')
-    user.update_columns(active: true, payment_type: 'paypal', membership_status: 'paying', notes: nil)
+    user.update_columns(active: true, payment_type: 'paypal', membership_state: 'current_member',
+                        membership_status: 'paying', notes: nil)
 
     post sync_to_user_sheet_entry_path(@sheet_entry)
 

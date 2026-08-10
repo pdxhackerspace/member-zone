@@ -65,7 +65,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
   test 'index does not show request training button when only trainers are inactive' do
     TrainerCapability.where(training_topic: [@laser_topic, @woodworking_topic]).delete_all
     inactive_trainer = users(:two)
-    inactive_trainer.update!(active: false)
+    inactive_trainer.update!(membership_state: 'inactive_member')
     TrainerCapability.find_or_create_by!(user: inactive_trainer, training_topic: @laser_topic)
 
     sign_in_as_member
@@ -183,7 +183,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
   test 'show lists inactive trainers for admins but not for members' do
     active_trainer   = users(:one)
     inactive_trainer = users(:two)
-    inactive_trainer.update!(active: false)
+    inactive_trainer.update!(membership_state: 'inactive_member')
     TrainerCapability.find_or_create_by!(user: active_trainer,   training_topic: @laser_topic)
     TrainerCapability.find_or_create_by!(user: inactive_trainer, training_topic: @laser_topic)
 
@@ -206,7 +206,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
   test 'show marks inactive trained members for admins' do
     trainer = users(:one)
     inactive_trainee = users(:two)
-    inactive_trainee.update!(active: false)
+    inactive_trainee.update!(membership_state: 'inactive_member')
     TrainerCapability.find_or_create_by!(user: trainer, training_topic: @laser_topic)
     Training.find_or_create_by!(trainee: inactive_trainee, training_topic: @laser_topic) do |t|
       t.trainer = trainer
@@ -224,9 +224,9 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
   test 'admin index shows trainer and trained counts split by active status' do
     active_trainer = users(:one)
     inactive_trainer = users(:two)
-    inactive_trainer.update!(active: false)
+    inactive_trainer.update!(membership_state: 'inactive_member')
     inactive_trainee = users(:no_email)
-    inactive_trainee.update!(active: false)
+    inactive_trainee.update!(membership_state: 'inactive_member')
 
     TrainerCapability.find_or_create_by!(user: active_trainer, training_topic: @laser_topic)
     TrainerCapability.find_or_create_by!(user: inactive_trainer, training_topic: @laser_topic)
@@ -248,7 +248,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
 
   test 'needs trainers filter ignores topics with only inactive trainers' do
     inactive_trainer = users(:two)
-    inactive_trainer.update!(active: false)
+    inactive_trainer.update!(membership_state: 'inactive_member')
     TrainerCapability.where(training_topic: @laser_topic).delete_all
     TrainerCapability.find_or_create_by!(user: inactive_trainer, training_topic: @laser_topic)
 
@@ -261,7 +261,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
 
   test 'show does not display request training button when only trainers are inactive' do
     inactive_trainer = users(:two)
-    inactive_trainer.update!(active: false)
+    inactive_trainer.update!(membership_state: 'inactive_member')
     TrainerCapability.where(training_topic: @laser_topic).delete_all
     TrainerCapability.find_or_create_by!(user: inactive_trainer, training_topic: @laser_topic)
 

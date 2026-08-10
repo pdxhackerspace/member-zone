@@ -1,74 +1,22 @@
 require 'test_helper'
 
 module Membership
+  # The rules themselves are covered by MembershipStateTest; this only checks that the
+  # adapter still forwards to the state machine for callers that pre-date it.
   class ActiveStatusTest < ActiveSupport::TestCase
-    test 'priority: banned beats sponsored' do
-      user = build_user(membership_status: 'banned', is_sponsored: true, dues_status: 'current')
-
-      assert_not ActiveStatus.compute(user)
+    test 'compute follows the membership state' do
+      assert ActiveStatus.compute(build_user(membership_state: 'current_member'))
+      assert_not ActiveStatus.compute(build_user(membership_state: 'inactive_member'))
     end
 
-    test 'priority: deceased beats sponsored' do
-      user = build_user(membership_status: 'deceased', is_sponsored: true, dues_status: 'current')
-
-      assert_not ActiveStatus.compute(user)
-    end
-
-    test 'priority: sponsored beats lapsed dues' do
-      user = build_user(membership_status: 'paying', is_sponsored: true, dues_status: 'lapsed')
-
-      assert ActiveStatus.compute(user)
-    end
-
-    test 'priority: sponsored beats expired limited access timestamp' do
-      user = build_user(membership_status: 'sponsored', dues_due_at: 1.day.ago, dues_status: 'inactive')
-
-      assert ActiveStatus.compute(user)
-    end
-
-    test 'priority: is_sponsored flag stays active with expired limited access timestamp' do
-      user = build_user(
-        membership_status: 'paying',
-        is_sponsored: true,
-        dues_due_at: 1.hour.ago,
-        dues_status: 'current'
-      )
-
-      assert ActiveStatus.compute(user)
-    end
-
-    test 'priority: payment_type sponsored stays active with lapsed dues' do
-      user = build_user(membership_status: 'unknown', payment_type: 'sponsored', dues_status: 'lapsed')
-
-      assert ActiveStatus.compute(user)
-    end
-
-    test 'priority: lapsed paying member without sponsorship is inactive' do
-      user = build_user(membership_status: 'paying', dues_status: 'lapsed')
-
-      assert_not ActiveStatus.compute(user)
-    end
-
-    test 'priority: current paying member is active' do
-      user = build_user(membership_status: 'paying', dues_status: 'current')
-
-      assert ActiveStatus.compute(user)
-    end
-
-    test 'guest with expired limited access is inactive' do
-      user = build_user(membership_status: 'guest', dues_due_at: 1.day.ago)
-
-      assert_not ActiveStatus.compute(user)
-    end
-
-    test 'guest without end date is active' do
-      user = build_user(membership_status: 'guest', dues_status: 'unknown')
-
-      assert ActiveStatus.compute(user)
+    test 'terminal_membership? recognises bans and deaths' do
+      assert ActiveStatus.terminal_membership?(build_user(membership_state: 'banned_member'))
+      assert ActiveStatus.terminal_membership?(build_user(membership_state: 'deceased_member'))
+      assert_not ActiveStatus.terminal_membership?(build_user(membership_state: 'overdue_member'))
     end
 
     test 'apply_to sets deceased payment type inactive' do
-      user = build_user(membership_status: 'deceased', payment_type: 'paypal')
+      user = build_user(membership_state: 'deceased_member', payment_type: 'paypal')
       user.save!
 
       ActiveStatus.apply_to(user)
@@ -77,8 +25,8 @@ module Membership
       assert_equal 'inactive', user.payment_type
     end
 
-    test 'reconcile activates sponsored member marked inactive' do
-      user = build_user(membership_status: 'sponsored', dues_status: 'lapsed')
+    test 'reconcile activates a member whose cached flag drifted' do
+      user = build_user(membership_state: 'sponsored_member')
       user.save!
       user.update_columns(active: false)
 
@@ -86,13 +34,60 @@ module Membership
       assert user.reload.active
     end
 
-    test 'assign_and_save recomputes active from membership inputs' do
-      user = build_user(membership_status: 'paying', dues_status: 'lapsed')
+    test 'reconcile materializes a deadline that has already passed' do
+      user = build_user(membership_state: 'guest_member', dues_due_at: 1.day.from_now)
+      user.save!
+      user.update_columns(dues_due_at: 1.day.ago)
+
+      assert ActiveStatus.reconcile!(user)
+
+      user.reload
+      assert_equal 'inactive_member', user.membership_state
+      assert_not user.active
+    end
+
+    test 'reconcile leaves a member who is already correct alone' do
+      user = build_user(membership_state: 'current_member')
       user.save!
 
-      ActiveStatus.assign_and_save!(user, dues_status: 'current')
+      assert_not ActiveStatus.reconcile!(user)
+    end
+
+    test 'assign_and_save recomputes active from the new state' do
+      user = build_user(membership_state: 'inactive_member')
+      user.save!
+
+      ActiveStatus.assign_and_save!(user, membership_state: 'current_member')
 
       assert user.reload.active
+    end
+
+    test 'assign_and_save lifts the transition guard for bulk backfills' do
+      user = build_user(membership_state: 'current_member')
+      user.save!
+
+      ActiveStatus.assign_and_save!(user, membership_state: 'unknown')
+
+      assert_equal 'unknown', user.reload.membership_state
+    end
+
+    test 'record_linked_payment skips payment-immune states' do
+      user = build_user(membership_state: 'sponsored_member', is_sponsored: true, payment_type: 'sponsored')
+      user.save!
+
+      assert_not ActiveStatus.record_linked_payment!(user, last_payment_date: Date.current)
+
+      assert_equal 'sponsored_member', user.reload.membership_state
+    end
+
+    test 'record_linked_payment moves a lapsed member back when their payment still covers them' do
+      user = build_user(membership_state: 'inactive_member', last_payment_date: 1.year.ago.to_date)
+      user.save!
+
+      assert ActiveStatus.record_linked_payment!(user, last_payment_date: Date.current, payment_type: 'paypal')
+
+      assert_equal 'current_member', user.reload.membership_state
+      assert user.active?
     end
 
     test 'service account active flag is not recomputed' do
@@ -101,77 +96,11 @@ module Membership
         full_name: 'Service Account',
         service_account: true,
         active: false,
-        membership_status: 'unknown',
-        dues_status: 'unknown',
         payment_type: 'unknown'
       )
 
       assert_not ActiveStatus.reconcile!(user)
       assert_not user.reload.active
-    end
-
-    test 'restore_sponsored_membership fixes is_sponsored member after recalculate reset' do
-      user = User.create!(
-        authentik_id: 'recalc-sponsored-flag',
-        full_name: 'Sponsored Flag Member',
-        is_sponsored: true,
-        membership_status: 'paying',
-        dues_status: 'current',
-        payment_type: 'paypal'
-      )
-      ActiveStatus.assign_and_save!(
-        user,
-        membership_status: 'unknown',
-        dues_status: 'unknown',
-        membership_plan_id: nil
-      )
-
-      assert ActiveStatus.recalculate_sponsored_candidate?(user.reload)
-
-      ActiveStatus.restore_sponsored_membership!(user)
-
-      user.reload
-      assert_equal 'sponsored', user.membership_status
-      assert_equal 'current', user.dues_status
-      assert_equal 'sponsored', user.payment_type
-      assert user.active?
-    end
-
-    test 'restore_sponsored_membership fixes payment_type sponsored after recalculate reset' do
-      user = User.create!(
-        authentik_id: 'recalc-payment-sponsored',
-        full_name: 'Payment Sponsored Member',
-        membership_status: 'paying',
-        dues_status: 'current',
-        payment_type: 'sponsored'
-      )
-      ActiveStatus.assign_and_save!(
-        user,
-        membership_status: 'unknown',
-        dues_status: 'unknown',
-        membership_plan_id: nil
-      )
-
-      assert ActiveStatus.recalculate_sponsored_candidate?(user.reload)
-
-      ActiveStatus.restore_sponsored_membership!(user)
-
-      user.reload
-      assert_equal 'sponsored', user.membership_status
-      assert_equal 'current', user.dues_status
-      assert user.active?
-    end
-
-    test 'recalculate_sponsored_candidate rejects banned members even with is_sponsored' do
-      user = build_user(membership_status: 'banned', is_sponsored: true, active: false)
-
-      assert_not ActiveStatus.recalculate_sponsored_candidate?(user)
-    end
-
-    test 'recalculate_sponsored_candidate rejects deceased members even with payment_type sponsored' do
-      user = build_user(membership_status: 'deceased', payment_type: 'sponsored', active: false)
-
-      assert_not ActiveStatus.recalculate_sponsored_candidate?(user)
     end
 
     private
@@ -180,8 +109,6 @@ module Membership
       defaults = {
         authentik_id: SecureRandom.hex(4),
         full_name: 'Active Status Test',
-        membership_status: 'unknown',
-        dues_status: 'unknown',
         payment_type: 'unknown'
       }
       User.new(defaults.merge(attrs))

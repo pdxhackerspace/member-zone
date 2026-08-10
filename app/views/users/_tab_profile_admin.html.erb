@@ -214,7 +214,7 @@
                           add_training_path(user_id: user.id, topic_id: topic.id, return_to: 'profile'),
                           method: :post,
                           class: "dropdown-item text-13",
-                          form: { data: { turbo: false } } %>
+                          form: { data: { turbo: false }.merge(inactive_training_notice_data(user)) } %>
                     </li>
                   <% end %>
                 </ul>

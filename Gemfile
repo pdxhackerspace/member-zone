@@ -43,7 +43,7 @@ gem 'jbuilder'
 
 # Use Redis adapter to run Action Cable in production
 # Stay below 6.0 — it switches to RESP3 by default, changing reply types
-gem 'redis', '>= 4.0.1', '< 6.0'
+gem 'redis', '>= 4.0.1', '< 7.0'
 
 # Use Kredis to get higher-level data types in Redis [https://github.com/rails/kredis]
 # gem "kredis"
@@ -66,9 +66,9 @@ gem 'rqrcode', '~> 3.2'
 gem 'bcrypt', '~> 3.1'
 
 # Error tracking
-gem 'sentry-rails', '~> 6.6'
-gem 'sentry-ruby', '~> 6.6'
-gem 'sentry-sidekiq', '~> 6.6'
+gem 'sentry-rails', '~> 6.7'
+gem 'sentry-ruby', '~> 6.7'
+gem 'sentry-sidekiq', '~> 6.7'
 gem 'stackprof'
 
 # SSH client for Ruby scripts

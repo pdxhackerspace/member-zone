@@ -144,8 +144,7 @@ class AccessLogsController < AuthenticatedController
     # Create a new user from the access log name
     user = User.new(
       full_name: @log.name,
-      active: true,
-      membership_status: 'unknown',
+      membership_state: User.initial_membership_state,
       payment_type: 'unknown'
     )
 

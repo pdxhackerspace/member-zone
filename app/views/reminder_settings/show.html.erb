@@ -20,6 +20,13 @@
           · <span class="text-secondary"><%= @application_link_awaiting_count %> awaiting application total</span>
         <% end %>
       </div>
+    <% elsif @reminder_setting.key == 'payment_overdue' %>
+      <div class="text-13 text-secondary mt-1">
+        <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span> would be emailed on the next run
+        <% if @payment_overdue_total_count > @payment_overdue_due_count %>
+          · <span class="text-secondary"><%= @payment_overdue_total_count %> overdue total</span>
+        <% end %>
+      </div>
     <% end %>
   </div>
   <div class="d-flex gap-2">
@@ -104,6 +111,47 @@
         <% end %>
       <% else %>
         <p class="text-secondary text-13 mb-0 p-3">No application links are due for a reminder right now.</p>
+      <% end %>
+    </div>
+  </div>
+<% elsif @reminder_setting.key == 'payment_overdue' %>
+  <div class="alert alert-secondary text-13 py-2 mb-3">
+    Members who have told us they are cancelling are not reminded — they keep access until their paid-through date and
+    then become inactive.
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <% if @due_users.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Overdue since</th>
+                <th>Last reminder</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @due_users.each do |user| %>
+                <tr>
+                  <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
+                  <td><%= admin_profile_time(user.dues_paid_through_at, empty: 'Unknown') %></td>
+                  <td><%= admin_profile_time(user.payment_overdue_reminder_sent_at) %></td>
+                  <td class="text-secondary"><%= user.email %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <% if @pagy.pages > 1 %>
+          <div class="p-3 border-top">
+            <%== pagy_bootstrap_nav(@pagy) %>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-secondary text-13 mb-0 p-3">No members are due for this reminder right now.</p>
       <% end %>
     </div>
   </div>

@@ -32,12 +32,14 @@ class UserProfileVisibilityTest < ActionDispatch::IntegrationTest
     assert_match @public_user.display_name, response.body
     assert_match @public_user.bio, response.body if @public_user.bio.present?
 
-    # Should NOT see membership status info
-    assert_no_match(/Active.*Inactive/i, response.body) # status panel
-    assert_no_match(/Payment Type/i, response.body)
-    assert_no_match(/Membership Status/i, response.body)
-    assert_no_match(/Trained on/i, response.body)
-    assert_no_match(/Can train/i, response.body)
+    # Should NOT see membership status info. Scoped to the rendered page because the
+    # <head> carries asset filenames that happen to contain these words.
+    page = css_select('main').to_s
+    assert_no_match(/Active.*Inactive/i, page) # status panel
+    assert_no_match(/Payment Type/i, page)
+    assert_no_match(/Membership Status/i, page)
+    assert_no_match(/Trained on/i, page)
+    assert_no_match(/Can train/i, page)
   end
 
   test 'anonymous user cannot view private profile' do

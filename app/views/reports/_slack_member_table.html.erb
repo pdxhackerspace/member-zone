@@ -35,8 +35,8 @@
             <% end %>
           </td>
           <td>
-            <span class="badge text-bg-<%= membership_status_badge_class(user.membership_status) %>">
-              <%= membership_status_label(user.membership_status) %>
+            <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+              <%= membership_state_label(user.membership_state) %>
             </span>
             <% if user.legacy? %>
               <span class="badge text-bg-secondary-subtle fw-normal">Legacy</span>

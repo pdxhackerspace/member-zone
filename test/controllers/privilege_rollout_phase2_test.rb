@@ -60,13 +60,13 @@ class PrivilegeRolloutPhase2Test < ActionDispatch::IntegrationTest
     assert_response :redirect
   end
 
-  test 'members.edit_membership saves membership status' do
+  test 'members.edit_membership saves membership state' do
     member = users(:one)
     holder('members.edit_membership')
 
-    patch user_path(member), params: { user: { membership_status: 'guest' } }
+    patch user_path(member), params: { user: { membership_state: 'guest_member' } }
 
-    assert_equal 'guest', member.reload.membership_status
+    assert_equal 'guest_member', member.reload.membership_state
   end
 
   # The permit list is the gate for fields, so a holder of the membership privilege must
@@ -82,24 +82,24 @@ class PrivilegeRolloutPhase2Test < ActionDispatch::IntegrationTest
     assert_not_predicate member, :is_admin?
   end
 
-  test 'members.edit_membership cannot ban through membership status patch' do
+  test 'members.edit_membership cannot ban through a membership state patch' do
     member = users(:one)
-    member.update!(membership_status: 'paying')
+    member.update!(membership_state: 'current_member')
     holder('members.edit_membership')
 
-    patch user_path(member), params: { user: { membership_status: 'banned' } }
+    patch user_path(member), params: { user: { membership_state: 'banned_member' } }
 
-    assert_equal 'paying', member.reload.membership_status
+    assert_equal 'current_member', member.reload.membership_state
   end
 
-  test 'members.edit_membership cannot mark deceased through membership status patch' do
+  test 'members.edit_membership cannot mark deceased through a membership state patch' do
     member = users(:one)
-    member.update!(membership_status: 'paying')
+    member.update!(membership_state: 'current_member')
     holder('members.edit_membership')
 
-    patch user_path(member), params: { user: { membership_status: 'deceased' } }
+    patch user_path(member), params: { user: { membership_state: 'deceased_member' } }
 
-    assert_equal 'paying', member.reload.membership_status
+    assert_equal 'current_member', member.reload.membership_state
   end
 
   test 'members.edit_profile edit form shows contact fields but not notes or membership' do

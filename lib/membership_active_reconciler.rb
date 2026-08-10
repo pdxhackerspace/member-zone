@@ -1,6 +1,6 @@
 # rubocop:disable Rails/Output
 class MembershipActiveReconciler
-  def initialize(dry_run:, scope: User.all)
+  def initialize(dry_run:, scope: User.non_service_accounts)
     @dry_run = dry_run
     @scope = scope
     @checked = 0
@@ -8,16 +8,17 @@ class MembershipActiveReconciler
   end
 
   def run
-    puts(@dry_run ? 'PREVIEW — no changes will be made' : 'Reconciling user active flags')
+    puts(@dry_run ? 'PREVIEW — no changes will be made' : 'Running membership state tick')
     puts '=' * 60
 
     @scope.find_each do |user|
       @checked += 1
-      next unless Membership::ActiveStatus.needs_reconciliation?(user)
+      tick = Membership::StateTick.new(user)
+      next unless tick.stale?
 
       @stale << user
-      puts stale_line(user)
-      Membership::ActiveStatus.reconcile!(user) unless @dry_run
+      puts "  #{tick.summary_line}"
+      tick.call unless @dry_run
     end
 
     puts ''
@@ -28,15 +29,6 @@ class MembershipActiveReconciler
     else
       puts 'Done.'
     end
-  end
-
-  private
-
-  def stale_line(user)
-    computed = Membership::ActiveStatus.compute(user)
-    parts = ["#{user.display_name} (id #{user.id}): active #{user.active} -> #{computed}"]
-    parts << 'payment_type -> inactive' if user.deceased? && user.payment_type != 'inactive'
-    "  #{parts.join(', ')}"
   end
 end
 # rubocop:enable Rails/Output

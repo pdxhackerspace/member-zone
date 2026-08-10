@@ -31,6 +31,13 @@ class MembershipSettingsController < AuthenticatedController
                                          slack_signup_reminder_repeat_delay_days
                                          slack_signup_reminder_max_account_age_months
                                          application_link_reminder_delay_days
-                                         application_link_reminder_max_count])
+                                         application_link_reminder_max_count
+                                         new_member_grace_period_days
+                                         new_member_expiry_days
+                                         overdue_grace_period_days
+                                         payment_overdue_reminder_repeat_days
+                                         planless_payment_window_days
+                                         payment_currency_buffer_days
+                                         building_access_training_topic_id])
   end
 end

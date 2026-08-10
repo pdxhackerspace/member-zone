@@ -1,155 +1,131 @@
 require 'test_helper'
 
+# `active` is a projection of membership_state, rewritten on every save. These tests pin
+# down which states open the door.
 class UserComputeActiveTest < ActiveSupport::TestCase
-  # ─── compute_active_status callback ────────────────────────────────
+  ACTIVE_STATES = %w[new_member provisional_member current_member overdue_member
+                     cancelled_member guest_member sponsored_member].freeze
+  INACTIVE_STATES = %w[unknown inactive_member banned_member deceased_member].freeze
 
-  test 'paying member with current dues is active' do
-    user = build_user(membership_status: 'paying', dues_status: 'current')
-    user.save!
-    assert user.active?, 'paying + current should be active'
+  ACTIVE_STATES.each do |state|
+    test "#{state} is active" do
+      user = build_user(membership_state: state)
+      user.save!
+      assert user.active?, "#{state} should be active"
+    end
   end
 
-  test 'paying member with lapsed dues is inactive' do
-    user = build_user(membership_status: 'paying', dues_status: 'lapsed')
-    user.save!
-    assert_not user.active?, 'paying + lapsed should be inactive'
+  INACTIVE_STATES.each do |state|
+    test "#{state} is inactive" do
+      user = build_user(membership_state: state)
+      user.save!
+      assert_not user.active?, "#{state} should be inactive"
+    end
   end
 
-  test 'paying member with unknown dues is inactive' do
-    user = build_user(membership_status: 'paying', dues_status: 'unknown')
+  test 'guest membership ends when its access window closes' do
+    access_end = 2.days.ago.beginning_of_day
+    user = build_user(membership_state: 'guest_member', dues_due_at: access_end)
     user.save!
-    assert_not user.active?, 'paying + unknown should be inactive'
+
+    assert_not user.active?
+    assert_equal 'inactive_member', user.membership_state
+    assert_equal access_end.to_i, user.membership_state_entered_at.to_i
   end
 
-  test 'sponsored member without end date is active' do
-    user = build_user(membership_status: 'sponsored', dues_status: 'inactive')
+  test 'sponsored membership has no access window to run out' do
+    user = build_user(membership_state: 'sponsored_member', dues_due_at: 1.day.ago)
     user.save!
-    assert user.active?, 'sponsored without dues_due_at should be active'
-  end
 
-  test 'sponsored member with expired limited access stays active' do
-    user = build_user(membership_status: 'sponsored', dues_status: 'current', dues_due_at: 1.day.ago)
-    user.save!
-    assert user.active?, 'sponsored membership should stay active even when access end date passed'
-  end
-
-  test 'guest member without end date is active' do
-    user = build_user(membership_status: 'guest', dues_status: 'unknown')
-    user.save!
-    assert user.active?, 'guest without dues_due_at should be active'
-  end
-
-  test 'guest member with expired limited access is inactive' do
-    user = build_user(membership_status: 'guest', dues_status: 'unknown', dues_due_at: 2.days.ago)
-    user.save!
-    assert_not user.active?, 'guest with past dues_due_at should be inactive'
-  end
-
-  test 'is_sponsored flag stays active with expired limited access timestamp' do
-    user = build_user(
-      membership_status: 'paying',
-      dues_status: 'current',
-      is_sponsored: true,
-      dues_due_at: 1.hour.ago
-    )
-    user.save!
-    assert user.active?, 'sponsored flag should stay active even when access end date passed'
-  end
-
-  test 'banned member is always inactive' do
-    user = build_user(membership_status: 'banned', dues_status: 'current')
-    user.save!
-    assert_not user.active?, 'banned should always be inactive'
-  end
-
-  test 'deceased member is always inactive' do
-    user = build_user(membership_status: 'deceased', dues_status: 'current')
-    user.save!
-    assert_not user.active?, 'deceased should always be inactive'
+    assert user.active?
+    assert_equal 'sponsored_member', user.membership_state
   end
 
   test 'deceased member gets payment_type set to inactive' do
-    user = build_user(membership_status: 'deceased', payment_type: 'paypal')
+    user = build_user(membership_state: 'deceased_member', payment_type: 'paypal')
     user.save!
+
     assert_equal 'inactive', user.payment_type
   end
 
-  test 'banned member stays inactive with emergency active override' do
-    user = build_user(membership_status: 'banned', dues_status: 'current', emergency_active_override: true)
+  # ─── Emergency override ────────────────────────────────────────────
+
+  test 'emergency override activates a member who has lapsed' do
+    user = build_user(membership_state: 'inactive_member', emergency_active_override: true)
     user.save!
+
+    assert user.active?
+  end
+
+  test 'banned member stays inactive with emergency active override' do
+    user = build_user(membership_state: 'banned_member', emergency_active_override: true)
+    user.save!
+
     assert_not user.active?, 'banned should stay inactive even with emergency override'
   end
 
   test 'deceased member stays inactive with emergency active override' do
-    user = build_user(membership_status: 'deceased', dues_status: 'current', emergency_active_override: true)
+    user = build_user(membership_state: 'deceased_member', emergency_active_override: true)
     user.save!
+
     assert_not user.active?, 'deceased should stay inactive even with emergency override'
-  end
-
-  test 'applicant member is always inactive' do
-    user = build_user(membership_status: 'applicant', dues_status: 'current')
-    user.save!
-    assert_not user.active?, 'applicant should always be inactive'
-  end
-
-  test 'cancelled member with current dues is active' do
-    user = build_user(membership_status: 'cancelled', dues_status: 'current')
-    user.save!
-    assert user.active?, 'cancelled + current should be active'
-  end
-
-  test 'cancelled member with lapsed dues is inactive' do
-    user = build_user(membership_status: 'cancelled', dues_status: 'lapsed')
-    user.save!
-    assert_not user.active?, 'cancelled + lapsed should be inactive'
-  end
-
-  test 'unknown membership with current dues is active' do
-    user = build_user(membership_status: 'unknown', dues_status: 'current')
-    user.save!
-    assert user.active?, 'unknown + current should be active'
-  end
-
-  test 'unknown membership with unknown dues is inactive' do
-    user = build_user(membership_status: 'unknown', dues_status: 'unknown')
-    user.save!
-    assert_not user.active?, 'unknown + unknown should be inactive'
   end
 
   # ─── Service account exemption ─────────────────────────────────────
 
-  test 'service account active flag is not overridden by compute_active_status' do
-    user = build_user(membership_status: 'unknown', dues_status: 'unknown', service_account: true, active: true)
+  test 'service account active flag is not overridden' do
+    user = build_user(membership_state: 'unknown', service_account: true, active: true)
     user.save!
+
     assert user.active?, 'service account active flag should not be overridden'
   end
 
-  test 'service account can be set to inactive regardless of status' do
-    user = build_user(membership_status: 'paying', dues_status: 'current', service_account: true, active: false)
+  test 'service account can be set to inactive regardless of state' do
+    user = build_user(membership_state: 'current_member', service_account: true, active: false)
     user.save!
+
     assert_not user.active?, 'service account inactive flag should be preserved'
   end
 
-  # ─── Transition scenarios ──────────────────────────────────────────
+  test 'service account keeps its legacy status columns untouched' do
+    user = build_user(membership_state: 'unknown', service_account: true, active: true,
+                      membership_status: 'guest', dues_status: 'current')
+    user.save!
 
-  test 'changing membership status from paying to banned deactivates user' do
-    user = build_user(membership_status: 'paying', dues_status: 'current')
+    assert_equal 'guest', user.membership_status
+    assert_equal 'current', user.dues_status
+  end
+
+  # ─── Legacy projections ────────────────────────────────────────────
+
+  test 'membership_status and dues_status follow the state' do
+    user = build_user(membership_state: 'overdue_member')
+    user.save!
+
+    assert_equal 'paying', user.membership_status
+    assert_equal 'lapsed', user.dues_status
+  end
+
+  test 'banning deactivates a current member' do
+    user = build_user(membership_state: 'current_member')
     user.save!
     assert user.active?
 
-    user.membership_status = 'banned'
-    user.save!
-    assert_not user.active?, 'banning should deactivate'
+    user.ban!
+
+    assert_not user.active?
+    assert_equal 'banned', user.membership_status
   end
 
-  test 'changing dues from lapsed to current activates paying member' do
-    user = build_user(membership_status: 'paying', dues_status: 'lapsed')
+  test 'a payment reactivates a lapsed member' do
+    user = build_user(membership_state: 'inactive_member')
     user.save!
     assert_not user.active?
 
-    user.dues_status = 'current'
-    user.save!
-    assert user.active?, 'becoming current should activate paying member'
+    user.record_payment!(last_payment_date: Date.current)
+
+    assert user.active?
+    assert_equal 'current_member', user.membership_state
   end
 
   private
@@ -158,9 +134,8 @@ class UserComputeActiveTest < ActiveSupport::TestCase
     defaults = {
       authentik_id: "test-#{SecureRandom.hex(4)}",
       full_name: "Test User #{SecureRandom.hex(4)}",
-      payment_type: attrs[:payment_type] || 'unknown',
-      membership_status: 'unknown',
-      dues_status: 'unknown',
+      payment_type: 'unknown',
+      membership_state: 'unknown',
       service_account: false,
       active: false,
       profile_visibility: 'members'

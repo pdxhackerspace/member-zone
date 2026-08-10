@@ -16,39 +16,80 @@ class UserSponsoredTest < ActiveSupport::TestCase
     assert_not user.is_sponsored?
   end
 
-  # ─── compute_active_status ─────────────────────────────────────────
+  # ─── Access ────────────────────────────────────────────────────────
+  #
+  # Sponsorship is a membership state, not a flag layered over one. mark_sponsored! sets
+  # both, so the flag and the state move together.
 
-  test 'sponsored member is always active regardless of dues status' do
-    user = create_user(is_sponsored: true, membership_status: 'unknown', dues_status: 'unknown')
-    assert user.active?, 'sponsored member should always be active'
+  test 'sponsoring a member activates them whatever their dues history' do
+    user = create_user(membership_state: 'inactive_member')
+
+    user.mark_sponsored!
+
+    assert user.active?
+    assert user.is_sponsored?
+    assert_equal 'sponsored_member', user.membership_state
   end
 
-  test 'sponsored member stays active even with lapsed dues' do
-    user = create_user(is_sponsored: true, membership_status: 'paying', dues_status: 'lapsed')
-    assert user.active?, 'sponsored member should stay active even with lapsed dues'
+  test 'a sponsored member has no dues to fall behind on' do
+    user = create_user(membership_state: 'sponsored_member', last_payment_date: 3.years.ago.to_date)
+
+    assert user.active?
+    assert_equal 'current', user.dues_status
   end
 
-  test 'sponsored member stays active even with inactive dues' do
-    user = create_user(is_sponsored: true, membership_status: 'unknown', dues_status: 'inactive')
-    assert user.active?, 'sponsored member should stay active even with inactive dues'
-  end
-
-  test 'non-sponsored member with unknown status and unknown dues is inactive' do
-    user = create_user(is_sponsored: false, membership_status: 'unknown', dues_status: 'unknown')
-    assert_not user.active?, 'non-sponsored member with unknown status should be inactive'
-  end
-
-  test 'removing sponsored flag re-evaluates active status' do
-    user = create_user(is_sponsored: true, membership_status: 'unknown', dues_status: 'unknown')
+  test 'ending a sponsorship re-evaluates access' do
+    user = create_user(membership_state: 'sponsored_member')
     assert user.active?
 
-    user.update!(is_sponsored: false)
-    assert_not user.active?, 'removing sponsored should re-evaluate active status'
+    user.unmark_sponsored!
+
+    assert_not user.active?, 'with no payment history there is nothing left to keep them active'
+    assert_not user.is_sponsored?
   end
 
-  test 'deceased sponsored member is inactive and payment_type is set to inactive' do
-    user = create_user(is_sponsored: true, membership_status: 'deceased', payment_type: 'paypal')
-    user.save!
+  test 'ending a sponsorship keeps a member whose payments are current' do
+    user = create_user(membership_state: 'sponsored_member', last_payment_date: Date.current)
+
+    user.unmark_sponsored!
+
+    assert user.active?
+    assert_equal 'current_member', user.membership_state
+  end
+
+  # Somebody else covers a sponsored member, so 'sponsored' is their payment type rather
+  # than a gap in our records. Leaving it unknown put them in the report for members
+  # nobody is billing by accident.
+  test 'a sponsored member pays by sponsorship' do
+    user = create_user(membership_state: 'sponsored_member')
+
+    assert_equal 'sponsored', user.payment_type
+  end
+
+  test 'the payment type follows the state even when set by hand' do
+    user = create_user(membership_state: 'sponsored_member')
+
+    user.update!(payment_type: 'unknown')
+
+    assert_equal 'sponsored', user.reload.payment_type
+  end
+
+  # A sponsored member turning up in a PayPal sync has not started paying their own
+  # dues — the sponsorship is still what covers them.
+  test 'a linked payment does not take the sponsorship over' do
+    user = create_user(membership_state: 'sponsored_member')
+    user.paypal_payments.create!(paypal_id: "PP-#{SecureRandom.hex(4)}", transaction_time: 1.day.ago,
+                                 amount: 40.0, currency: 'USD', status: 'Completed')
+
+    assert_equal 'sponsored', user.reload.payment_type
+    assert_equal 'sponsored_member', user.membership_state
+  end
+
+  test 'a deceased member is inactive even when sponsored' do
+    user = create_user(membership_state: 'sponsored_member', payment_type: 'paypal')
+
+    user.mark_deceased!
+
     assert_not user.active?, 'deceased member should be inactive even when sponsored'
     assert_equal 'inactive', user.payment_type
   end
@@ -81,9 +122,7 @@ class UserSponsoredTest < ActiveSupport::TestCase
     defaults = {
       authentik_id: "sponsored-test-#{SecureRandom.hex(4)}",
       full_name: "Sponsored Test #{SecureRandom.hex(4)}",
-      payment_type: attrs[:payment_type] || 'unknown',
-      membership_status: attrs[:membership_status] || 'unknown',
-      dues_status: attrs[:dues_status] || 'unknown',
+      payment_type: 'unknown',
       is_sponsored: false
     }
     User.create!(defaults.merge(attrs))

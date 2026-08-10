@@ -38,7 +38,7 @@ class MemberMapsControllerTest < ActionDispatch::IntegrationTest
   test 'excludes inactive mapped members by default' do
     users(:one).update_columns(
       active: false,
-      membership_status: 'paying',
+      membership_state: 'current_member',
       mailing_latitude: 45.582,
       mailing_longitude: -122.682,
       mailing_geocoded_at: Time.current
@@ -56,7 +56,7 @@ class MemberMapsControllerTest < ActionDispatch::IntegrationTest
   test 'includes inactive mapped members when requested' do
     users(:one).update_columns(
       active: false,
-      membership_status: 'paying',
+      membership_state: 'current_member',
       mailing_latitude: 45.582,
       mailing_longitude: -122.682,
       mailing_geocoded_at: Time.current
@@ -72,7 +72,7 @@ class MemberMapsControllerTest < ActionDispatch::IntegrationTest
   test 'excludes banned mapped members even when inactive members are included' do
     users(:one).update_columns(
       active: false,
-      membership_status: 'banned',
+      membership_state: 'banned_member',
       mailing_latitude: 45.582,
       mailing_longitude: -122.682,
       mailing_geocoded_at: Time.current

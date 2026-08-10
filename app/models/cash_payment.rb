@@ -2,7 +2,7 @@ class CashPayment < ApplicationRecord
   belongs_to :user
   belongs_to :membership_plan
   belongs_to :recorded_by, class_name: 'User', optional: true
-  has_many :payment_events, dependent: :nullify
+  has_many :payment_events, dependent: :destroy
 
   validates :amount, presence: true, numericality: { greater_than: 0 }
   validates :paid_on, presence: true

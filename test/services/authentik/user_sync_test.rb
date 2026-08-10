@@ -129,7 +129,8 @@ module Authentik
     test 'sync_to_authentik sends inactive users as active when setting enabled' do
       DefaultSetting.instance.update!(authentik_sync_inactive_as_active: true)
       user = users(:two)
-      user.update_columns(authentik_id: 'authentik-inactive-active-test', active: false)
+      user.update_columns(authentik_id: 'authentik-inactive-active-test', active: false,
+                          membership_state: 'inactive_member')
 
       captured_attrs = nil
       client = Class.new do
@@ -148,7 +149,8 @@ module Authentik
     test 'sync_to_authentik sends inactive users as inactive when setting disabled' do
       DefaultSetting.instance.update!(authentik_sync_inactive_as_active: false)
       user = users(:two)
-      user.update_columns(authentik_id: 'authentik-inactive-inactive-test', active: false)
+      user.update_columns(authentik_id: 'authentik-inactive-inactive-test', active: false,
+                          membership_state: 'inactive_member')
 
       captured_attrs = nil
       client = Class.new do

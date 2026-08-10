@@ -1,4 +1,8 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+#
+# membership_state is the source of truth; membership_status, dues_status, and active are
+# projections of it. Fixtures are inserted without callbacks, so they must be written
+# consistently or the first save of a record will appear to change it.
 
 one:
   authentik_id: authentik-user-1
@@ -6,6 +10,9 @@ one:
   full_name: Example User One
   username: exampleuserone
   active: true
+  membership_state: current_member
+  membership_status: paying
+  dues_status: current
   profile_visibility: members
   bio: "This is my bio"
   last_synced_at: 2025-11-14 10:03:05
@@ -19,6 +26,9 @@ two:
   full_name: Example User Two
   username: exampleusertwo
   active: true
+  membership_state: current_member
+  membership_status: paying
+  dues_status: current
   profile_visibility: members
   last_synced_at: 2025-11-14 10:03:05
   authentik_attributes:
@@ -30,6 +40,9 @@ three:
   full_name:
   username: betauser
   active: true
+  membership_state: current_member
+  membership_status: paying
+  dues_status: current
   profile_visibility: members
   last_synced_at: 2025-11-14 10:05:05
   authentik_attributes: {}
@@ -40,6 +53,9 @@ no_email:
   full_name: No Email User
   username: noemailuser
   active: true
+  membership_state: current_member
+  membership_status: paying
+  dues_status: current
   profile_visibility: members
   last_synced_at: 2025-11-15 00:00:00
   authentik_attributes:
@@ -53,7 +69,9 @@ public_profile_user:
   active: true
   profile_visibility: public
   bio: "I have a public profile"
+  membership_state: current_member
   membership_status: paying
+  dues_status: current
   payment_type: paypal
   last_synced_at: 2025-11-14 10:03:05
   authentik_attributes: {}
@@ -66,7 +84,9 @@ private_profile_user:
   active: true
   profile_visibility: private
   bio: "This should be hidden"
+  membership_state: current_member
   membership_status: paying
+  dues_status: current
   payment_type: paypal
   last_synced_at: 2025-11-14 10:03:05
   authentik_attributes: {}
@@ -78,6 +98,7 @@ cash_payer:
   username: cashpayeruser
   active: true
   profile_visibility: members
+  membership_state: current_member
   membership_status: paying
   payment_type: cash
   dues_status: current
@@ -93,7 +114,9 @@ member_with_local_account:
   active: true
   profile_visibility: members
   bio: "I am a regular member"
+  membership_state: current_member
   membership_status: paying
+  dues_status: current
   payment_type: paypal
   last_synced_at: 2025-11-14 10:03:05
   authentik_attributes: {}

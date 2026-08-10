@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_06_171000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_195000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -612,17 +612,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_171000) do
     t.integer "application_link_reminder_max_count", default: 3, null: false
     t.integer "application_review_time_cap_days", default: 15, null: false
     t.integer "application_verification_expiry_hours", default: 24, null: false
+    t.bigint "building_access_training_topic_id"
     t.datetime "created_at", null: false
     t.integer "invitation_expiry_hours", default: 72, null: false
     t.integer "login_link_expiry_hours", default: 180, null: false
     t.integer "manual_payment_due_soon_days", default: 7, null: false
+    t.integer "new_member_expiry_days", default: 90, null: false
+    t.integer "new_member_grace_period_days", default: 14, null: false
+    t.integer "overdue_grace_period_days", default: 30, null: false
+    t.integer "payment_currency_buffer_days", default: 2, null: false
     t.integer "payment_grace_period_days", default: 14, null: false
-    t.integer "reactivation_grace_period_months", default: 3, null: false
+    t.integer "payment_overdue_reminder_repeat_days", default: 7, null: false
+    t.integer "planless_payment_window_days", default: 32, null: false
+    t.integer "reactivation_grace_period_months", default: 12, null: false
     t.integer "slack_signup_reminder_initial_delay_days", default: 7, null: false
     t.integer "slack_signup_reminder_max_account_age_months", default: 6, null: false
     t.integer "slack_signup_reminder_repeat_delay_days", default: 14, null: false
     t.datetime "updated_at", null: false
     t.boolean "use_builtin_membership_application", default: true, null: false
+    t.index ["building_access_training_topic_id"], name: "index_membership_settings_on_building_access_training_topic_id"
   end
 
   create_table "messages", force: :cascade do |t|
@@ -1122,11 +1130,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_171000) do
     t.datetime "mailing_geocoded_at"
     t.decimal "mailing_latitude", precision: 10, scale: 6
     t.decimal "mailing_longitude", precision: 10, scale: 6
+    t.datetime "membership_cancelled_email_sent_at"
     t.date "membership_ended_date"
     t.bigint "membership_plan_id"
     t.date "membership_start_date"
+    t.string "membership_state", default: "unknown", null: false
+    t.datetime "membership_state_entered_at"
     t.string "membership_status", default: "unknown"
     t.text "notes"
+    t.datetime "payment_overdue_reminder_sent_at"
     t.string "payment_type", default: "unknown"
     t.string "paypal_account_id"
     t.string "phone_number"
@@ -1155,6 +1167,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_171000) do
     t.index ["legacy"], name: "index_users_on_legacy"
     t.index ["login_token"], name: "index_users_on_login_token", unique: true
     t.index ["membership_plan_id"], name: "index_users_on_membership_plan_id"
+    t.index ["membership_state", "membership_state_entered_at"], name: "idx_on_membership_state_membership_state_entered_at_31ea7f1f2e"
+    t.index ["membership_state"], name: "index_users_on_membership_state"
     t.index ["paypal_account_id"], name: "index_users_on_paypal_account_id"
     t.index ["recharge_customer_id"], name: "index_users_on_recharge_customer_id"
     t.index ["slack_signup_reminder_sent_at"], name: "index_users_on_slack_signup_reminder_sent_at"
@@ -1205,6 +1219,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_171000) do
   add_foreign_key "membership_applications", "users"
   add_foreign_key "membership_applications", "users", column: "reviewed_by_id"
   add_foreign_key "membership_plans", "users"
+  add_foreign_key "membership_settings", "training_topics", column: "building_access_training_topic_id"
   add_foreign_key "messages", "users", column: "recipient_id"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "parking_notice_events", "parking_notices"

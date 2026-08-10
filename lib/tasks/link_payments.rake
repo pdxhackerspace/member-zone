@@ -203,7 +203,6 @@ namespace :payments do
   # Helper method to update user payment type, membership status, and dues status
   def update_user_statuses
     users_updated = 0
-    cutoff_date = 32.days.ago.to_date
 
     # Find all users with linked payments
     user_ids_with_payments = (
@@ -212,7 +211,7 @@ namespace :payments do
     ).uniq
 
     User.where(id: user_ids_with_payments).find_each do |user|
-      next if Membership::ActiveStatus.sponsored?(user)
+      next if user.sponsored?
 
       updates = {}
 
@@ -232,31 +231,19 @@ namespace :payments do
       # Find the absolute most recent payment date
       most_recent = [latest_paypal, latest_recharge].compact.max
 
-      if most_recent.present?
-        most_recent_date = most_recent.to_date
+      payment_attrs = {}
+      payment_attrs[:payment_type] = updates[:payment_type] if updates.key?(:payment_type)
+      payment_attrs[:last_payment_date] = most_recent.to_date if most_recent.present?
 
-        # If payment is within 32 days, user should be active with current dues
-        if most_recent_date >= cutoff_date
-          updates[:membership_status] = 'paying' unless user.membership_status == 'paying'
-          updates[:dues_status] = 'current' unless user.dues_status == 'current'
-        elsif user.dues_status == 'current'
-          # Payment is older than 32 days - mark as lapsed if currently showing as current
-          updates[:dues_status] = 'lapsed'
-        end
-      end
-
-      # Only update if there are changes
-      if updates.any?
-        # Remove no-op updates
-        updates.delete(:payment_type) if updates[:payment_type] == user.payment_type
-        updates.delete(:membership_status) if updates[:membership_status] == user.membership_status
-        updates.delete(:dues_status) if updates[:dues_status] == user.dues_status
-
-        if updates.any?
-          Membership::ActiveStatus.assign_and_save!(user, updates)
+      if payment_attrs[:last_payment_date].present?
+        if Membership::ActiveStatus.record_linked_payment!(user, **payment_attrs)
           users_updated += 1
-          puts "  #{user.display_name}: #{updates.map { |k, v| "#{k}=#{v}" }.join(', ')}"
+          puts "  #{user.display_name}: #{payment_attrs.map { |k, v| "#{k}=#{v}" }.join(', ')}"
         end
+      elsif payment_attrs[:payment_type].present? && payment_attrs[:payment_type] != user.payment_type
+        user.update!(payment_type: payment_attrs[:payment_type])
+        users_updated += 1
+        puts "  #{user.display_name}: payment_type=#{payment_attrs[:payment_type]}"
       end
     end
 
@@ -306,8 +293,8 @@ namespace :payments do
       latest_paypal = paypal_dates.last
       latest_recharge = recharge_dates.last
 
-      # Determine membership_ended_date:
-      # Set to 1 month after the last payment, unless the last payment is within 32 days of now
+      # Determine membership_ended_date from the member's own payment window rather than a
+      # hardcoded day count.
       latest_payment = if latest_paypal.present? && latest_recharge.present?
                          [latest_paypal, latest_recharge].max
                        else
@@ -315,18 +302,15 @@ namespace :payments do
                        end
 
       if latest_payment.present?
-        # Only set membership_ended_date if last payment is older than 32 days
-        if latest_payment.to_date < 32.days.ago.to_date
-          ended_date = (latest_payment + 1.month).to_date
-          updates[:membership_ended_date] = ended_date
+        window = user.payment_currency_window
+        if window && latest_payment.to_date < window.ago.to_date
+          updates[:membership_ended_date] = (latest_payment + 1.month).to_date
         elsif user.membership_ended_date.present?
-          # Clear membership_ended_date if there's a recent payment
           updates[:membership_ended_date] = nil
         end
 
         plan = user.membership_plan
-        if plan.present? && user.membership_status.present? &&
-           !user.membership_status.in?(%w[guest sponsored])
+        if plan.present? && !user.membership_state.in?(%w[guest_member sponsored_member])
           at = User.dues_due_at_from_payment_cycle(latest_payment.to_date, plan)
           updates[:dues_due_at] = at if at
         end

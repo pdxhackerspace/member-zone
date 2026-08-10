@@ -110,6 +110,10 @@ jobs:
           # No standalone type checker (e.g. tsc) in this repo; Rails + Ruby only.
           echo "Type check skipped — not applicable."
 
+      - name: Run JavaScript tests
+        if: steps.version_only_main.outputs.skip != 'true'
+        run: yarn test:js
+
       - name: Prepare database
         if: steps.version_only_main.outputs.skip != 'true'
         run: bin/rails db:test:prepare

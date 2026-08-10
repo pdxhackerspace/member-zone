@@ -562,7 +562,9 @@ class MemberMailer < ApplicationMailer
       member_username: user.username || 'Not set',
       organization_name: organization_name,
       date: Date.current.strftime('%B %d, %Y'),
-      app_url: ENV.fetch('APP_BASE_URL', 'http://localhost:3000')
+      app_url: ENV.fetch('APP_BASE_URL', 'http://localhost:3000'),
+      support_email: support_email,
+      reactivation_months: MembershipSetting.reactivation_grace_period_months
     }
   end
 

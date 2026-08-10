@@ -1,21 +1,17 @@
 namespace :users do
-  desc 'Update users with recent payments (within 32 days) to current dues and paying status when unknown'
+  desc 'Move users with a recent linked payment to current_member'
   task update_recent_payments: :environment do
-    cutoff_date = 32.days.ago.to_date
+    # The window comes from the member's plan rather than a hardcoded 32 days; User
+    # resolves a payment that no longer covers them back to overdue on save.
     updated_count = 0
 
-    User.where.not(last_payment_date: nil)
-        .where(last_payment_date: cutoff_date..)
-        .find_each do |user|
-      updates = {}
-      updates[:dues_status] = 'current' unless user.dues_status == 'current'
-      updates[:membership_status] = 'paying' if user.membership_status == 'unknown'
+    User.where.not(last_payment_date: nil).find_each do |user|
+      next if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES) || user.current_member?
+      next if user.dues_paid_through_at.present? && user.dues_paid_through_at <= Time.current
 
-      next if updates.empty?
-
-      Membership::ActiveStatus.assign_and_save!(user, updates)
+      user.record_payment!
       updated_count += 1
-      puts "Updated #{user.display_name}: #{updates.inspect}"
+      puts "Updated #{user.display_name}: #{user.membership_state}"
     end
 
     puts "\nTotal users updated: #{updated_count}"

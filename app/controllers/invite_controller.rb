@@ -13,9 +13,8 @@ class InviteController < ApplicationController
 
     @user = User.new(user_params)
     @user.email = @invitation.email
-    @user.active = true
-    @user.membership_status = 'unknown'
-    @user.dues_status = 'unknown'
+    # Invitation#accept! moves them to their sponsored or guest state once saved.
+    @user.membership_state = User.initial_membership_state
 
     if @user.full_name.blank?
       @user.errors.add(:full_name, "can't be blank")

@@ -9,3 +9,7 @@ woodworking:
 electronics:
   name: Electronics
   offered_to_members: false
+
+building_access:
+  name: Building Access
+  offered_to_members: true

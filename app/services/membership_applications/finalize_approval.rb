@@ -82,6 +82,9 @@ module MembershipApplications
         admin_notes: @notes,
         user_id: user.id
       )
+      # Approval makes them a member straight away; they stay active while they arrange
+      # building access training. A no-op for anyone who is already a member.
+      user.approve_application!
       Journal.record_application_event!(
         application: @application,
         action: 'application_approved',
@@ -124,8 +127,6 @@ module MembershipApplications
         full_name: derived_full_name,
         mailing_address: mailing_address_from_application,
         phone_number: phone_number_from_application,
-        membership_status: 'applicant',
-        active: false,
         service_account: false
       }
       pn = answer_for_label('Pronouns')

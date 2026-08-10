@@ -63,10 +63,10 @@ class TrainingRecorderTest < ActiveSupport::TestCase
     assert_equal @trainer, request.responded_by
   end
 
-  test 'skips already trained inactive and missing trainees' do
+  test 'skips already trained banned and missing trainees' do
     already_trained = users(:two)
-    inactive = users(:three)
-    inactive.update_columns(active: false)
+    banned = users(:three)
+    banned.ban!
     Training.create!(
       trainee: already_trained,
       trainer: @trainer,
@@ -78,7 +78,7 @@ class TrainingRecorderTest < ActiveSupport::TestCase
       result = TrainingRecorder.new(
         current_user: @trainer,
         training_topic: @topic,
-        trainee_ids: [already_trained.id.to_s, inactive.id.to_s, @trainee.id.to_s, '999999'],
+        trainee_ids: [already_trained.id.to_s, banned.id.to_s, @trainee.id.to_s, '999999'],
         trainer: @trainer,
         trained_at: @trained_at
       ).call
@@ -88,7 +88,100 @@ class TrainingRecorderTest < ActiveSupport::TestCase
     end
 
     assert_equal 1, Training.where(trainee: already_trained, training_topic: @topic).count
-    assert_not Training.exists?(trainee: inactive, training_topic: @topic)
+    assert_not Training.exists?(trainee: banned, training_topic: @topic)
     assert Training.exists?(trainee: @trainee, training_topic: @topic)
+  end
+
+  test 'records training for an inactive member' do
+    inactive = inactive_user
+
+    assert_difference 'Training.count', 1 do
+      result = TrainingRecorder.new(
+        current_user: @trainer,
+        training_topic: @topic,
+        trainee_ids: [inactive.id.to_s],
+        trainer: @trainer,
+        trained_at: @trained_at
+      ).call
+
+      assert_equal 1, result.recorded_count
+      assert_equal 0, result.skipped_count
+      assert_equal 1, result.inactive_count
+    end
+
+    assert Training.exists?(trainee: inactive, training_topic: @topic)
+  end
+
+  test 'does not notify an inactive member unless asked to' do
+    inactive = inactive_user
+
+    assert_no_difference 'training_completed_mail_count(inactive)' do
+      TrainingRecorder.new(
+        current_user: @trainer,
+        training_topic: @topic,
+        trainee_ids: [inactive.id.to_s],
+        trainer: @trainer,
+        trained_at: @trained_at
+      ).call
+    end
+  end
+
+  test 'notifies an inactive member when notify_inactive is set' do
+    inactive = inactive_user
+
+    assert_difference 'training_completed_mail_count(inactive)', 1 do
+      TrainingRecorder.new(
+        current_user: @trainer,
+        training_topic: @topic,
+        trainee_ids: [inactive.id.to_s],
+        trainer: @trainer,
+        trained_at: @trained_at,
+        notify_inactive: true
+      ).call
+    end
+  end
+
+  test 'notifies an active member without being asked' do
+    active = users(:two)
+
+    assert_difference 'training_completed_mail_count(active)', 1 do
+      TrainingRecorder.new(
+        current_user: @trainer,
+        training_topic: @topic,
+        trainee_ids: [active.id.to_s],
+        trainer: @trainer,
+        trained_at: @trained_at
+      ).call
+    end
+  end
+
+  test 'inactive_count only counts members who were actually trained' do
+    inactive = inactive_user
+    Training.create!(trainee: inactive, trainer: @trainer, training_topic: @topic, trained_at: 1.week.ago)
+
+    result = TrainingRecorder.new(
+      current_user: @trainer,
+      training_topic: @topic,
+      trainee_ids: [inactive.id.to_s, @trainee.id.to_s],
+      trainer: @trainer,
+      trained_at: @trained_at
+    ).call
+
+    assert_equal 1, result.recorded_count
+    assert_equal 1, result.skipped_count
+    assert_equal 0, result.inactive_count
+  end
+
+  private
+
+  def inactive_user
+    user = users(:two)
+    user.update!(membership_state: 'inactive_member')
+    assert_not user.reload.active?
+    user
+  end
+
+  def training_completed_mail_count(user)
+    QueuedMail.where(recipient: user, mailer_action: 'training_completed').count
   end
 end

@@ -25,8 +25,7 @@ module Reports
     private
 
     def candidates
-      @candidates ||= User.where(dues_status: 'lapsed')
-                          .where.not(membership_status: %w[banned deceased])
+      @candidates ||= User.dues_lapsed
                           .non_service_accounts
                           .non_legacy
                           .joins(:slack_user)

@@ -93,13 +93,13 @@ class PrivilegeRolloutPhase3Test < ActionDispatch::IntegrationTest
   # ─── The per-attribute split on update ────────────────────────────────
 
   test 'members.edit_notes saves notes but not membership' do
-    @member.update!(notes: 'before', membership_status: 'paying')
+    @member.update!(notes: 'before', membership_state: 'current_member')
     holder('members.edit_notes')
 
-    patch user_path(@member), params: { user: { notes: 'after', membership_status: 'guest' } }
+    patch user_path(@member), params: { user: { notes: 'after', membership_state: 'guest_member' } }
 
     assert_equal 'after', @member.reload.notes
-    assert_equal 'paying', @member.membership_status
+    assert_equal 'current_member', @member.membership_state
   end
 
   test 'members.edit_profile saves contact details but not notes' do
@@ -112,13 +112,13 @@ class PrivilegeRolloutPhase3Test < ActionDispatch::IntegrationTest
     assert_equal 'untouched', @member.notes
   end
 
-  test 'members.edit_membership cannot unban through membership status patch' do
-    @member.update!(membership_status: 'banned')
+  test 'members.edit_membership cannot unban through a membership state patch' do
+    @member.update!(membership_state: 'banned_member')
     holder('members.edit_membership')
 
-    patch user_path(@member), params: { user: { membership_status: 'paying' } }
+    patch user_path(@member), params: { user: { membership_state: 'current_member' } }
 
-    assert_equal 'banned', @member.reload.membership_status
+    assert_equal 'banned_member', @member.reload.membership_state
   end
 
   test 'members.grant_admin is the only way to set is_admin' do

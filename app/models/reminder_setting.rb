@@ -9,6 +9,11 @@ class ReminderSetting < ApplicationRecord
       name: 'Application link reminder',
       description: 'Reminder when someone requested a membership application link but has not submitted yet.',
       enabled: false
+    },
+    'payment_overdue' => {
+      name: 'Overdue payment reminder',
+      description: 'Weekly reminder to members whose dues are past due. Members who have cancelled are not reminded.',
+      enabled: false
     }
   }.freeze
 

@@ -34,7 +34,7 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'training request only emails trainers whose membership is active' do
-    users(:two).update!(active: false)
+    users(:two).update!(membership_state: 'inactive_member')
 
     sign_in_as_member
 
@@ -55,8 +55,8 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'topic whose only trainer is inactive is not requestable' do
-    users(:one).update!(active: false)
-    users(:two).update!(active: false)
+    users(:one).update!(membership_state: 'inactive_member')
+    users(:two).update!(membership_state: 'inactive_member')
 
     assert_not TrainingTopic.available_for_member_requests.exists?(id: @topic.id)
   end

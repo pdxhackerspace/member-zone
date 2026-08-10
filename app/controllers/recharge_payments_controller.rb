@@ -96,9 +96,7 @@ class RechargePaymentsController < AuthenticatedController
       email: @payment.customer_email,
       recharge_customer_id: @payment.customer_id,
       payment_type: 'recharge',
-      membership_status: 'unknown',
-      dues_status: 'unknown',
-      active: false
+      membership_state: User.initial_membership_state
     )
 
     if user.save
