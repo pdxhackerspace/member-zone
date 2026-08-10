@@ -57,8 +57,10 @@ class CashPaymentsController < AuthenticatedController
   end
 
   def destroy
-    user_name = @cash_payment.user.display_name
+    user = @cash_payment.user
+    user_name = user.display_name
     @cash_payment.destroy
+    recalculate_user_cash_dues!(user)
     redirect_to cash_payments_path, notice: "Cash payment for #{user_name} deleted."
   end
 
@@ -116,13 +118,49 @@ class CashPaymentsController < AuthenticatedController
 
   def recalculate_user_cash_dues!(user)
     latest_payment = user.cash_payments.order(paid_on: :desc, created_at: :desc).first
-    return if latest_payment.blank?
+    if latest_payment.blank?
+      recalculate_user_without_cash_payments!(user)
+      return
+    end
 
     due_at = User.dues_due_at_from_payment_cycle(latest_payment.paid_on, latest_payment.membership_plan)
+    apply_cash_payment_membership_update!(user, paid_on: latest_payment.paid_on, due_at: due_at)
+  end
+
+  def recalculate_user_without_cash_payments!(user)
+    return if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+
+    last_paid = latest_payment_date_from_sources(user)
+    if last_paid.blank?
+      user.update!(last_payment_date: nil, dues_due_at: nil)
+      user.transition_to!('inactive_member') unless user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+      return
+    end
+
+    attrs = { last_payment_date: last_paid }
+    if last_paid.present? && user.membership_plan.present?
+      attrs[:dues_due_at] = User.dues_due_at_from_payment_cycle(last_paid, user.membership_plan)
+    else
+      attrs[:dues_due_at] = nil
+    end
+
+    user.update!(attrs)
+    user.expire_membership_state! if user.membership_state_expired?
+  end
+
+  def latest_payment_date_from_sources(user)
+    [
+      user.paypal_payments.maximum(:transaction_time),
+      user.recharge_payments.maximum(:processed_at),
+      user.cash_payments.maximum(:paid_on)
+    ].compact.map(&:to_date).max
+  end
+
+  def apply_cash_payment_membership_update!(user, paid_on:, due_at:)
     unless user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
       user.record_payment!(
         payment_type: 'cash',
-        last_payment_date: latest_payment.paid_on,
+        last_payment_date: paid_on,
         dues_due_at: due_at
       )
       user.update!(membership_ended_date: nil) if user.membership_ended_date.present?
@@ -131,7 +169,7 @@ class CashPaymentsController < AuthenticatedController
 
     user.update!(
       payment_type: 'cash',
-      last_payment_date: latest_payment.paid_on,
+      last_payment_date: paid_on,
       dues_due_at: due_at
     )
   end

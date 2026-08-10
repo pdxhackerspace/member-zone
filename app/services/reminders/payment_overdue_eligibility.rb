@@ -19,12 +19,12 @@ module Reminders
 
     DELIVERABLE_EMAIL_SQL = "users.email IS NOT NULL AND users.email ~ '\\S'".freeze
 
+    REMINDER_CANDIDATE_STATES = %w[current_member provisional_member overdue_member].freeze
+
     def self.due(now: Time.current)
-      base_scope
-        .where('payment_overdue_reminder_sent_at IS NULL OR payment_overdue_reminder_sent_at <= ?',
-               repeat_cutoff(now: now))
-        .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-        .order(:full_name)
+      ids = []
+      candidates(now: now).find_each { |user| ids << user.id if due?(user, now: now) }
+      User.where(id: ids).order(:full_name)
     end
 
     def self.count_due(now: Time.current)
@@ -32,7 +32,12 @@ module Reminders
     end
 
     def self.total_overdue
-      base_scope.count
+      count = 0
+      User.non_service_accounts
+          .where(membership_state: REMINDER_CANDIDATE_STATES)
+          .where(DELIVERABLE_EMAIL_SQL)
+          .find_each { |user| count += 1 if base_user?(user) }
+      count
     end
 
     def self.due?(user, now: Time.current)
@@ -50,10 +55,16 @@ module Reminders
       now - MembershipSetting.payment_overdue_reminder_repeat_days.days
     end
 
-    def self.base_scope
+    # Members whose stored state might still read current while effective resolution
+    # already has them overdue. NotifyPaymentOverdue re-checks due? on each row.
+    def self.candidates(now: Time.current)
       User.non_service_accounts
-          .where(membership_state: 'overdue_member')
+          .where(membership_state: REMINDER_CANDIDATE_STATES)
           .where(DELIVERABLE_EMAIL_SQL)
+          .where('payment_overdue_reminder_sent_at IS NULL OR payment_overdue_reminder_sent_at <= ?',
+                 repeat_cutoff(now: now))
+          .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+          .order(:full_name)
     end
 
     # Reads the resolved state rather than the column: a member whose overdue grace ran
@@ -64,6 +75,6 @@ module Reminders
         user.effective_membership_state == 'overdue_member'
     end
 
-    private_class_method :base_scope, :base_user?
+    private_class_method :base_user?
   end
 end

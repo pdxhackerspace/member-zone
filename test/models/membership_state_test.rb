@@ -287,6 +287,17 @@ class MembershipStateTest < ActiveSupport::TestCase
     assert_not user.expire_membership_state!
   end
 
+  test 'materializing overdue from a past-due current member anchors grace at paid-through' do
+    paid_through = 5.days.ago.beginning_of_day
+    user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
+    user.update_columns(membership_state: 'current_member', dues_due_at: paid_through, membership_state_entered_at: 60.days.ago)
+
+    user.save!
+
+    assert_equal 'overdue_member', user.membership_state
+    assert_equal paid_through.to_i, user.membership_state_entered_at.to_i
+  end
+
   test 'entering a state stamps when it happened' do
     user = create_member(state: 'new_member')
     original = user.membership_state_entered_at

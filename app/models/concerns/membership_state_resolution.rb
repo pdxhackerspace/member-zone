@@ -72,7 +72,36 @@ module MembershipStateResolution
     [last_payment_date, recharge_most_recent_payment_date&.to_date].compact.max
   end
 
+  # The `entered` timestamp after applying elapsed deadlines — the anchor the resolved
+  # state should carry, not necessarily when the row was last saved.
+  def resolved_membership_state_entered_at(from_state: membership_state)
+    state = from_state
+    entered = membership_state_entered_at_for(state)
+
+    MAX_EXPIRY_HOPS.times do
+      deadline = membership_state_deadline(state, entered)
+      break if deadline.nil? || deadline > Time.current
+
+      target = EXPIRY_TARGETS[state]
+      break if target.nil? || target == state
+
+      state = target
+      entered = deadline
+      break if state == membership_state
+    end
+
+    entered
+  end
+
   private
+
+  def membership_state_entered_at_for(state)
+    if state == membership_state_was
+      membership_state_entered_at_was || created_at || Time.current
+    else
+      membership_state_anchor
+    end
+  end
 
   def membership_state_deadline(state, entered)
     case state
@@ -97,6 +126,19 @@ module MembershipStateResolution
   def stamp_membership_state_entered_at
     return unless will_save_change_to_membership_state? || membership_state_entered_at.blank?
 
-    self.membership_state_entered_at = Time.current
+    self.membership_state_entered_at = if expiry_driven_state_change?
+                                         resolved_membership_state_entered_at(from_state: membership_state_was)
+                                       else
+                                         Time.current
+                                       end
+  end
+
+  def expiry_driven_state_change?
+    return false unless will_save_change_to_membership_state?
+    return false if membership_state_was.blank?
+
+    entered = membership_state_entered_at_was || created_at || Time.current
+    deadline = membership_state_deadline(membership_state_was, entered)
+    deadline.present? && deadline <= Time.current
   end
 end

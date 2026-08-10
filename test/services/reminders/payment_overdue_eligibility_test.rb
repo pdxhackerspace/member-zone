@@ -88,6 +88,23 @@ module Reminders
       assert_not PaymentOverdueEligibility.due?(user, now: @now)
     end
 
+    test 'due includes a current member whose paid-through date has passed' do
+      travel_to @now do
+        user = User.create!(
+          email: 'past-due-current@example.com',
+          full_name: 'Past Due Current',
+          service_account: false,
+          membership_state: 'current_member',
+          payment_type: 'cash',
+          dues_due_at: @now - 3.days
+        )
+        user.update_columns(membership_state: 'current_member', membership_state_entered_at: @now - 60.days)
+
+        assert PaymentOverdueEligibility.due?(user, now: @now)
+        assert_includes PaymentOverdueEligibility.due(now: @now), user
+      end
+    end
+
     test 'total_overdue counts every overdue member regardless of reminder history' do
       overdue_user(email: 'overdue-a@example.com')
       reminded = overdue_user(email: 'overdue-b@example.com')

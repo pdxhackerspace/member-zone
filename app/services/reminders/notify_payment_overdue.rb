@@ -19,7 +19,9 @@ module Reminders
     def call
       return unless ReminderSetting.enabled?('payment_overdue')
 
-      PaymentOverdueEligibility.due(now: @now).find_each { |user| notify_user(user) }
+      PaymentOverdueEligibility.candidates(now: @now).find_each do |user|
+        notify_user(user) if PaymentOverdueEligibility.due?(user, now: @now)
+      end
     end
 
     private
