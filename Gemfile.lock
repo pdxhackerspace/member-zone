@@ -525,7 +525,7 @@ DEPENDENCIES
   ruby-vips (~> 2.2)
   selenium-webdriver
   sentry-rails (~> 6.7)
-  sentry-ruby (~> 6.6)
+  sentry-ruby (~> 6.7)
   sentry-sidekiq (~> 6.7)
   sidekiq (~> 8.1)
   sidekiq-cron (~> 2.4)
