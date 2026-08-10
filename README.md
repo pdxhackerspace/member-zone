@@ -291,6 +291,13 @@ With Docker (includes dedicated Postgres and Redis):
 docker compose -f docker-compose.test.yml run --rm test
 ```
 
+Stimulus controllers with logic worth pinning down have Node tests under `test/javascript/`,
+run against jsdom. CI runs these alongside the Rails suite:
+
+```bash
+yarn test:js
+```
+
 ## Next Steps
 
 - Configure a scheduler (cron/ActiveJob) to run `Authentik::GroupSyncJob` periodically.

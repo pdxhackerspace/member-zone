@@ -34,7 +34,8 @@ class TrainingsController < AuthenticatedController
       training_topic: training_topic,
       trainee_ids: trainee_ids,
       trainer: trainer,
-      trained_at: trained_at
+      trained_at: trained_at,
+      notify_inactive: notify_inactive?
     ).call
 
     if result.recorded_count.zero?
@@ -48,7 +49,7 @@ class TrainingsController < AuthenticatedController
     event_label = 'event'.pluralize(result.recorded_count)
     redirect_to training_catalog_path,
                 notice: "Recorded #{result.recorded_count} training #{event_label} " \
-                        "for #{training_topic.name}.#{skipped_message}"
+                        "for #{training_topic.name}.#{skipped_message}#{bulk_inactive_note(result)}"
   rescue ActiveRecord::RecordNotFound
     redirect_to record_training_path, alert: 'Training topic not found.'
   end
@@ -72,12 +73,17 @@ class TrainingsController < AuthenticatedController
       training_topic: @training_topic,
       trainee_ids: [@trainee.id.to_s],
       trainer: true_user,
-      trained_at: Time.current
+      trained_at: Time.current,
+      notify_inactive: notify_inactive?
     ).call
 
     if result.recorded_count.positive?
       redirect_to redirect_back_path(user_id: @trainee.id),
-                  notice: "#{@trainee.display_name} has been marked as trained in #{@training_topic.name}."
+                  notice: "#{@trainee.display_name} has been marked as trained in " \
+                          "#{@training_topic.name}.#{single_inactive_note(result)}"
+    elsif @trainee.banned?
+      redirect_to redirect_back_path(user_id: @trainee.id),
+                  alert: "#{@trainee.display_name} is banned and cannot be trained."
     else
       redirect_to redirect_back_path(user_id: @trainee.id),
                   alert: "Failed to add training for #{@trainee.display_name}."
@@ -135,6 +141,30 @@ class TrainingsController < AuthenticatedController
     return if current_user.can?(:'training.grant_trainer')
 
     redirect_to root_path, alert: "You don't have permission to train members."
+  end
+
+  # The record-training UI asks the trainer whether an inactive member should hear about it;
+  # absent an answer we record the training and stay quiet.
+  def notify_inactive?
+    ActiveModel::Type::Boolean.new.cast(params[:notify_inactive]) || false
+  end
+
+  def bulk_inactive_note(result)
+    return '' unless result.inactive_count.to_i.positive?
+
+    label = 'inactive member'.pluralize(result.inactive_count)
+    state = notify_inactive? ? 'notified' : 'not notified'
+    " #{result.inactive_count} #{label} trained and #{state}."
+  end
+
+  def single_inactive_note(result)
+    return '' unless result.inactive_count.to_i.positive?
+
+    if notify_inactive?
+      ' Their membership is inactive; a training notification was sent anyway.'
+    else
+      ' Their membership is inactive, so no notification was sent.'
+    end
   end
 
   def set_trainee
