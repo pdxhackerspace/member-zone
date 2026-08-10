@@ -38,6 +38,32 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
     assert_equal 'inactive_member', user.reload.membership_state
   end
 
+  # The tick job walks members through overdue_member to inactive_member without passing
+  # cancelled_member, so a notice nobody has processed yet has to be enough on its own.
+  test 'a filed cancellation nobody has processed still suppresses the lapse email' do
+    user = member(state: 'overdue_member', email: 'filed-not-stamped@example.com')
+    file_cancellation(user, at: 2.months.ago)
+
+    assert_not_predicate user, :cancellation_recorded?
+    assert_predicate user, :cancellation_on_file?
+
+    assert_no_difference -> { lapsed_mail_count(user) } do
+      user.transition_to!('inactive_member')
+    end
+  end
+
+  test 'a filed cancellation the member has since paid past does not suppress the lapse email' do
+    user = member(state: 'overdue_member', email: 'filed-then-paid@example.com')
+    file_cancellation(user, at: 1.year.ago)
+    user.update_columns(last_payment_date: 2.months.ago.to_date)
+
+    assert_not_predicate user.reload, :cancellation_on_file?
+
+    assert_difference -> { lapsed_mail_count(user) }, 1 do
+      user.transition_to!('inactive_member')
+    end
+  end
+
   test 'a member who simply stops paying is still told their membership lapsed' do
     user = member(state: 'overdue_member', email: 'quietly-lapsed@example.com')
 
@@ -98,6 +124,18 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
 
   def lapsed_mail_count(user)
     QueuedMail.where(recipient: user, mailer_action: 'membership_lapsed').count
+  end
+
+  def file_cancellation(user, at:)
+    PaymentEvent.create!(
+      user: user,
+      event_type: 'subscription_cancelled',
+      source: 'recharge',
+      occurred_at: at,
+      external_id: "recharge-sub-#{SecureRandom.hex(4)}-subscription_cancelled",
+      details: 'Recharge subscription cancelled'
+    )
+    user.reload
   end
 
   def member(state:, email: nil, **attrs)

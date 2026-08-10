@@ -54,22 +54,31 @@ class MembershipCancellationReport
     puts "Left alone (#{@skipped.size}):"
     @skipped.group_by(&:reason).sort_by { |_reason, group| -group.size }.each do |reason, group|
       puts "  #{reason} (#{group.size}):"
-      group.each { |result| puts "    #{result.user.display_name} (id #{result.user.id})" }
+      group.each { |result| puts "    #{result.user.display_name} (id #{result.user.id})#{reminder_note(result)}" }
     end
   end
 
+  # Their standing did not change, but their past-due mail still did.
+  def reminder_note(result)
+    return '' if result.withdrawn_reminders.zero?
+
+    verb = @dry_run ? 'would withdraw' : 'withdrew'
+    " — #{verb} #{result.withdrawn_reminders} past-due #{'reminder'.pluralize(result.withdrawn_reminders)}"
+  end
+
   def print_summary
-    withdrawn = (@applied + @noted).sum(&:withdrawn_reminders)
+    withdrawn = (@applied + @noted + @skipped).sum(&:withdrawn_reminders)
     puts ''
     puts "Cancellations on file: #{@applied.size + @noted.size + @skipped.size}"
-    puts "#{record_verb} and moved: #{@applied.size}"
-    puts "#{record_verb} only: #{@noted.size}"
+    puts "#{@dry_run ? 'Would move' : 'Moved'}: #{@applied.size}"
+    puts "#{@dry_run ? 'Would date only' : 'Dated only'}: #{@noted.size}"
     puts "Left alone: #{@skipped.size}"
     puts "Past-due reminders #{@dry_run ? 'to withdraw' : 'withdrawn'}: #{withdrawn}"
     puts ''
 
     if @dry_run
-      puts "Run 'rake membership:process_cancellations' to apply changes." if @applied.any? || @noted.any?
+      changes = @applied.any? || @noted.any? || withdrawn.positive?
+      puts "Run 'rake membership:process_cancellations' to apply changes." if changes
     else
       puts 'Done.'
     end

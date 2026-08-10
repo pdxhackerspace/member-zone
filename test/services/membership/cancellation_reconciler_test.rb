@@ -90,8 +90,72 @@ module Membership
       result = reconcile_for(user)
 
       assert_predicate result, :skipped?
-      assert_equal 'cancellation already on record', result.reason
+      assert_equal 'cancellation already recorded', result.reason
       assert_equal entered_at.to_i, user.reload.membership_state_entered_at.to_i
+    end
+
+    # Nothing about their standing changes, but the reminders queued before anyone noticed
+    # the cancellation are the whole reason this pass exists.
+    test 'a member skipped because their cancellation is already recorded still has reminders withdrawn' do
+      user = member(dues_due_at: 2.months.from_now, email: 'already-recorded@example.com')
+      file_cancellation(user, at: 2.days.ago)
+      user.record_cancellation!
+      reminder = queue_overdue_reminder(user)
+
+      result = reconcile_for(user)
+
+      assert_predicate result, :skipped?
+      assert_equal 1, result.withdrawn_reminders
+      assert_predicate reminder.reload, :rejected?
+    end
+
+    test 'a banned member left alone still has past-due reminders withdrawn' do
+      user = member(dues_due_at: 2.months.from_now, email: 'banned-reminder@example.com')
+      file_cancellation(user, at: 2.days.ago)
+      user.update_columns(membership_state: 'banned_member')
+      reminder = queue_overdue_reminder(user)
+
+      assert_equal 1, reconcile_for(user.reload).withdrawn_reminders
+      assert_predicate reminder.reload, :rejected?
+    end
+
+    # They came back. They may genuinely owe us again, so the reminder is not ours to drop.
+    test 'a member who resubscribed keeps their past-due reminders' do
+      user = member(dues_due_at: 2.months.from_now, email: 'resubscribed-reminder@example.com')
+      file_cancellation(user, at: 6.months.ago)
+      user.update_columns(last_payment_date: 1.month.ago.to_date)
+      reminder = queue_overdue_reminder(user)
+
+      result = reconcile_for(user.reload)
+
+      assert_predicate result, :skipped?
+      assert_equal 0, result.withdrawn_reminders
+      assert_predicate reminder.reload, :pending?
+    end
+
+    # A date-only payment column against a timestamped notice cannot say which came first.
+    test 'a payment on the cancellation date is left for an admin rather than guessed at' do
+      cancelled_at = 3.months.ago
+      user = member(dues_due_at: 2.months.from_now)
+      file_cancellation(user, at: cancelled_at)
+      user.update_columns(last_payment_date: cancelled_at.to_date)
+
+      result = reconcile_for(user.reload)
+
+      assert_predicate result, :skipped?
+      assert_match(/check by hand/, result.reason)
+      assert_equal 'current_member', user.reload.membership_state
+      assert_not_predicate user, :cancellation_recorded?
+    end
+
+    # Skipping them must not leave them exposed: the mail guards read the ledger directly.
+    test 'a member left for an admin is still shielded from dues mail' do
+      cancelled_at = 3.months.ago
+      user = member(dues_due_at: 2.months.from_now, email: 'same-day@example.com')
+      file_cancellation(user, at: cancelled_at)
+      user.update_columns(last_payment_date: cancelled_at.to_date)
+
+      assert_predicate user.reload, :cancellation_on_file?
     end
 
     # Nothing left to move, but "they cancelled" is the whole point: without it they are
@@ -106,7 +170,7 @@ module Membership
 
       assert_predicate result, :noted?
       assert_equal 'inactive_member', user.reload.membership_state
-      assert_predicate user, :cancellation_on_file?
+      assert_predicate user, :cancellation_recorded?
       assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
     end
 
@@ -129,7 +193,7 @@ module Membership
       user.update_columns(membership_state: 'inactive_member')
 
       assert_predicate reconcile_for(user.reload, dry_run: true), :noted?
-      assert_not_predicate user.reload, :cancellation_on_file?
+      assert_not_predicate user.reload, :cancellation_recorded?
     end
 
     test 'service accounts are left alone' do

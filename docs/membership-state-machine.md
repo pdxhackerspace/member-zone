@@ -260,8 +260,14 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
 - `record_cancellation!(cancelled_at:)` stamps it alongside the transition.
 - `note_cancellation!(cancelled_at:)` stamps it for a member whose standing has nowhere to
   go — already lapsed, banned, dead. Nothing moves.
-- `cancellation_on_file?` is the question everything else asks. `notify_membership_lapsed`
-  and `PaymentOverdueEligibility` both check it.
+- `cancellation_recorded?` asks whether the stamp is set — the question for code deciding
+  whether there is bookkeeping left to do.
+- `cancellation_on_file?` is the broader question, and the one anything about to mail a
+  member asks. It is true for the stamp **or** for an unprocessed `subscription_cancelled`
+  payment event newer than the member's last payment. `notify_membership_lapsed` and
+  `PaymentOverdueEligibility` both use it, because `Membership::TickJob` walks members from
+  `overdue_member` to `inactive_member` without passing through `cancelled_member` — a
+  filed notice nobody has reconciled yet has to be enough on its own.
 - Entering `current_member` clears it, along with `membership_cancelled_email_sent_at`. A
   member who came back is not a member who left, so a later lapse reads as a lapse and a
   second cancellation mails them again. The clearing is bookkeeping rather than mail, so it
@@ -302,8 +308,19 @@ Members who lapsed long before anyone processed their notice have no state left 
 stops the lapse email finding them.
 
 It leaves alone anyone who paid or opened a new subscription after cancelling, anyone whose
-cancellation is already on record, service accounts, and the states a person chose
+cancellation is already recorded, service accounts, and the states a person chose
 deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
+
+Leaving a member's standing alone is not the same as deciding the notice was wrong, and the
+two have different consequences for queued past-due mail. A member who came back keeps
+their reminders — they may genuinely owe us again. Everyone else loses them: the
+cancellation stands, there is simply no state left to change.
+
+One case is deliberately not guessed at. `last_payment_on` is a date and the notice is a
+timestamp, so a payment on the same calendar day is either a same-day resubscribe or the
+renewal they cancelled straight afterwards, and the records cannot say which. Those members
+are listed in the report for an admin to sort out by hand. Nothing chases them in the
+meantime, because the mail guards read the payment event ledger directly.
 
 The live path draws the same line. `Recharge::SubscriptionCancellation` files the payment
 event — the subscription really did end at Recharge — but returns `:state_locked` without a

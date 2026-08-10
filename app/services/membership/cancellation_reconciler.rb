@@ -31,6 +31,12 @@ module Membership
 
     WITHDRAWABLE_REMINDER_STATUSES = %w[pending approved].freeze
 
+    SAME_DAY_PAYMENT_REASON = 'paid on the cancellation date; check by hand'.freeze
+
+    # A reason to leave the member's standing alone, and whether the notice stands despite
+    # it — which is what decides if their queued past-due mail goes.
+    Skip = Struct.new(:reason, :cancellation_stands)
+
     Result = Struct.new(:user, :status, :cancelled_at, :from_state, :to_state, :reason, :withdrawn_reminders) do
       def applied? = status == :applied
       def noted? = status == :noted
@@ -75,24 +81,32 @@ module Membership
     end
 
     def evaluate(user, cancelled_at)
-      reason = skip_reason(user, cancelled_at)
-      return skipped(user, cancelled_at, reason) if reason
+      skip = skip_decision(user, cancelled_at)
+      return skipped(user, cancelled_at, skip) if skip
       return note(user, cancelled_at) if user.membership_state.in?(NOTE_ONLY_STATES)
       return preview(user, cancelled_at) if @dry_run
 
       apply(user, cancelled_at)
     end
 
-    def skip_reason(user, cancelled_at)
-      return 'service account' if user.service_account?
-      return 'cancellation already on record' if user.cancellation_on_file?
-      return 'paid or resubscribed since cancelling' if returned_after?(user, cancelled_at)
+    # Whether to leave a member's standing alone, and whether the notice still stands
+    # anyway. The distinction decides their queued past-due mail: a member who came back
+    # may genuinely owe us again, so their reminders stay; for everyone else the
+    # cancellation holds even though there is nothing left to change, and chasing them for
+    # a membership they ended is the thing this whole pass exists to stop.
+    def skip_decision(user, cancelled_at)
+      return Skip.new('service account', false) if user.service_account?
+      return Skip.new('paid or resubscribed since cancelling', false) if returned_after?(user, cancelled_at)
+      return Skip.new(SAME_DAY_PAYMENT_REASON, false) if paid_on_cancellation_date?(user, cancelled_at)
+      return Skip.new('cancellation already recorded', true) if user.cancellation_recorded?
+      return unless user.membership_state.in?(PROTECTED_STATES)
 
-      "#{user.membership_state.humanize.downcase} set deliberately" if user.membership_state.in?(PROTECTED_STATES)
+      Skip.new("#{user.membership_state.humanize.downcase} set deliberately", true)
     end
 
     # Columns first, because a payment recorded straight onto the member never becomes a
-    # payment event; then the event ledger, which is where a fresh subscription shows up.
+    # payment event; then the event ledger, which is where a fresh subscription shows up
+    # and where the timestamps are precise enough to order same-day activity.
     def returned_after?(user, cancelled_at)
       last_paid = user.last_payment_on
       return true if last_paid.present? && last_paid > cancelled_at.to_date
@@ -100,6 +114,14 @@ module Membership
       PaymentEvent.for_user(user)
                   .where(event_type: RETURN_EVENT_TYPES)
                   .exists?(['payment_events.occurred_at > ?', cancelled_at])
+    end
+
+    # last_payment_on is a date and the notice is a timestamp, so a payment on the same day
+    # is either a same-day resubscribe or the renewal they cancelled straight afterwards,
+    # and the records cannot say which. A bulk pass should not guess; the mail guards read
+    # the ledger directly, so nobody gets chased while an admin sorts it out.
+    def paid_on_cancellation_date?(user, cancelled_at)
+      user.last_payment_on.present? && user.last_payment_on == cancelled_at.to_date
     end
 
     def apply(user, cancelled_at)
@@ -125,9 +147,10 @@ module Membership
                  to_state: projected_state(user), withdrawn_reminders: settle_reminders(user))
     end
 
-    def skipped(user, cancelled_at, reason)
+    def skipped(user, cancelled_at, skip)
       Result.new(user: user, status: :skipped, cancelled_at: cancelled_at, from_state: user.membership_state,
-                 to_state: user.membership_state, reason: reason, withdrawn_reminders: 0)
+                 to_state: user.membership_state, reason: skip.reason,
+                 withdrawn_reminders: skip.cancellation_stands ? settle_reminders(user) : 0)
     end
 
     # Where a cancellation recorded today leaves the member: still covered by their last

@@ -57,7 +57,7 @@
 
     <%# Cancellation outlives cancelled_member: once they expire to inactive nothing else
         on this panel distinguishes them from someone who quietly stopped paying. %>
-    <% if user.cancellation_on_file? %>
+    <% if user.cancellation_recorded? %>
       <div class="mb-3 text-12 text-secondary">
         <i class="bi bi-slash-circle me-1"></i>
         Cancelled <%= user.membership_cancelled_at.strftime('%B %-d, %Y') %>

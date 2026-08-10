@@ -46,15 +46,37 @@ module MembershipTransitions
   # anyone processed the notice, or a ban outranks it. Nothing moves; we just stop treating
   # them as someone who forgot to pay.
   def note_cancellation!(cancelled_at: Time.current)
-    return false if membership_cancelled_at.present?
+    return false if cancellation_recorded?
 
     update!(membership_cancelled_at: cancelled_at)
   end
 
-  # Did this member tell us they were leaving? True through cancelled_member and onwards
-  # into the inactive state it expires to, until a payment brings them back.
-  def cancellation_on_file?
+  # Have we processed a cancellation for this member? The stamp is what
+  # Membership::CancellationReconciler writes and what a payment clears, so this is the
+  # question to ask when deciding whether there is bookkeeping left to do.
+  def cancellation_recorded?
     membership_cancelled_at.present?
+  end
+
+  # Did this member tell us they were leaving? The broader question, and the one anything
+  # about to mail them should ask. The stamp covers cancellations we have processed; the
+  # payment event ledger covers a notice nobody has reached yet, or a webhook that went
+  # missing after the subscription sync's lookback window closed. True through
+  # cancelled_member and onwards into the inactive state it expires to.
+  def cancellation_on_file?
+    return true if cancellation_recorded?
+
+    filed_at = filed_cancellation_at
+    return false if filed_at.blank?
+
+    # A payment after the notice means they came back and the notice is stale history.
+    last_paid = last_payment_on
+    last_paid.blank? || last_paid <= filed_at.to_date
+  end
+
+  # The most recent cancellation notice in the payment event ledger, processed or not.
+  def filed_cancellation_at
+    payment_events.by_type('subscription_cancelled').maximum(:occurred_at)
   end
 
   def ban!

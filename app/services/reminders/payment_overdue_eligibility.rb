@@ -74,23 +74,11 @@ module Reminders
       return false if user.email.blank?
       return false unless user.effective_membership_state == 'overdue_member'
 
-      !cancellation_on_file?(user)
+      # Someone who told us they were leaving is not someone to chase for a payment,
+      # whether or not the notice has been processed yet.
+      !user.cancellation_on_file?
     end
 
-    # Someone who told us they were leaving is not someone to chase for a payment. The
-    # stamp answers for cancellations we have processed; the payment event ledger catches
-    # the ones Membership::CancellationReconciler has not reached, or a webhook that went
-    # missing after the subscription sync's lookback window had closed.
-    def self.cancellation_on_file?(user)
-      return true if user.cancellation_on_file?
-
-      cancelled_at = PaymentEvent.for_user(user).by_type('subscription_cancelled').maximum(:occurred_at)
-      return false if cancelled_at.blank?
-
-      last_paid = user.last_payment_on
-      last_paid.blank? || last_paid <= cancelled_at.to_date
-    end
-
-    private_class_method :base_user?, :cancellation_on_file?
+    private_class_method :base_user?
   end
 end
