@@ -112,8 +112,12 @@ module MembershipStateResolution
     return if service_account?
 
     if new_record?
-      next_state = next_expiry_membership_state
-      self.membership_state = next_state if next_state != membership_state
+      from_state = membership_state
+      next_state = next_expiry_membership_state(from_state: from_state)
+      if next_state != from_state
+        self.expiry_materialized_from_state = from_state
+        self.membership_state = next_state
+      end
       return
     end
 

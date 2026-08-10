@@ -9,20 +9,31 @@ module MembershipStateEnteredAt
   def stamp_membership_state_entered_at
     return unless will_save_change_to_membership_state? || membership_state_entered_at.blank?
 
+    from_state = expiry_materialized_from_state || membership_state_was
     self.membership_state_entered_at = if expiry_driven_state_change?
-                                         resolved_membership_state_entered_at(from_state: membership_state_was)
+                                         resolved_membership_state_entered_at(from_state: from_state)
                                        else
                                          Time.current
                                        end
+  ensure
+    self.expiry_materialized_from_state = nil
   end
 
   def expiry_driven_state_change?
     return false unless will_save_change_to_membership_state?
-    return false if membership_state_was.blank?
 
-    entered = membership_state_entered_at_was || created_at || Time.current
-    next_state = next_expiry_membership_state(from_state: membership_state_was, entered: entered)
-    next_state != membership_state_was && next_state == membership_state
+    from_state = expiry_materialized_from_state
+    if from_state.present?
+      entered = membership_state_entered_at || created_at || Time.current
+    else
+      return false if membership_state_was.blank?
+
+      from_state = membership_state_was
+      entered = membership_state_entered_at_was || created_at || Time.current
+    end
+
+    next_state = next_expiry_membership_state(from_state: from_state, entered: entered)
+    next_state != from_state && next_state == membership_state
   end
 
   def resolved_membership_state_entered_at(from_state: membership_state)

@@ -83,6 +83,8 @@ module MembershipState
 
     # Set by the admin edit form and by backfills, which may place a member in any state.
     attr_accessor :allow_any_membership_state_transition
+    # Assigned state before new-record expiry materialization; drives entered_at stamping.
+    attr_accessor :expiry_materialized_from_state
 
     validate :membership_state_transition_is_allowed
 
