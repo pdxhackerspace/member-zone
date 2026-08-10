@@ -216,7 +216,7 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
   test 'add_training refuses a banned member' do
     sign_in_as_admin
     trainee = users(:three)
-    trainee.update!(membership_status: 'banned')
+    trainee.ban!
 
     assert_no_difference 'Training.count' do
       post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile')
@@ -277,7 +277,7 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
   private
 
   def make_inactive(user)
-    Membership::ActiveStatus.assign_and_save!(user, membership_status: 'paying', dues_status: 'lapsed')
+    user.update!(membership_state: 'inactive_member')
     assert_not user.reload.active?
     user
   end

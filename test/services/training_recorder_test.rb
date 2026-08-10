@@ -175,8 +175,8 @@ class TrainingRecorderTest < ActiveSupport::TestCase
   private
 
   def inactive_user
-    user = users(:three)
-    Membership::ActiveStatus.assign_and_save!(user, membership_status: 'paying', dues_status: 'lapsed')
+    user = users(:two)
+    user.update!(membership_state: 'inactive_member')
     assert_not user.reload.active?
     user
   end
