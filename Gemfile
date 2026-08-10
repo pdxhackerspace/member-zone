@@ -68,7 +68,7 @@ gem 'bcrypt', '~> 3.1'
 # Error tracking
 gem 'sentry-rails', '~> 6.7'
 gem 'sentry-ruby', '~> 6.6'
-gem 'sentry-sidekiq', '~> 6.6'
+gem 'sentry-sidekiq', '~> 6.7'
 gem 'stackprof'
 
 # SSH client for Ruby scripts
