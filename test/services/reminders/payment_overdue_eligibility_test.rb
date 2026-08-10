@@ -105,6 +105,22 @@ module Reminders
       end
     end
 
+    test 'due excludes an overdue member whose cancellation has not been recorded yet' do
+      user = overdue_user(email: 'filed-cancellation@example.com')
+      file_cancellation(user, at: @now - 5.days)
+
+      assert_not PaymentOverdueEligibility.due?(user, now: @now)
+      assert_not_includes PaymentOverdueEligibility.due(now: @now), user
+    end
+
+    test 'due still includes an overdue member who paid after an old cancellation' do
+      user = overdue_user(email: 'resubscribed-then-lapsed@example.com')
+      file_cancellation(user, at: @now - 1.year)
+      user.update_columns(last_payment_date: (@now - 60.days).to_date)
+
+      assert PaymentOverdueEligibility.due?(user.reload, now: @now)
+    end
+
     test 'total_overdue counts every overdue member regardless of reminder history' do
       overdue_user(email: 'overdue-a@example.com')
       reminded = overdue_user(email: 'overdue-b@example.com')
@@ -126,6 +142,17 @@ module Reminders
       )
       user.update_columns(membership_state_entered_at: @now - 2.days)
       user.reload
+    end
+
+    def file_cancellation(user, at:)
+      PaymentEvent.create!(
+        user: user,
+        event_type: 'subscription_cancelled',
+        source: 'recharge',
+        occurred_at: at,
+        external_id: "recharge-sub-#{SecureRandom.hex(4)}-subscription_cancelled",
+        details: 'Recharge subscription cancelled'
+      )
     end
 
     def queue_reminder_mail(user, status:)

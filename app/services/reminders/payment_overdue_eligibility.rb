@@ -70,11 +70,25 @@ module Reminders
     # Reads the resolved state rather than the column: a member whose overdue grace ran
     # out is on their way to inactive and should not get one last nag.
     def self.base_user?(user)
-      !user.service_account? &&
-        user.email.present? &&
-        user.effective_membership_state == 'overdue_member'
+      return false if user.service_account?
+      return false if user.email.blank?
+      return false unless user.effective_membership_state == 'overdue_member'
+
+      !unreconciled_cancellation?(user)
     end
 
-    private_class_method :base_user?
+    # A cancellation notice the state machine has not caught up with. Membership::
+    # CancellationReconciler moves these members out of the reminder pool for good; until
+    # it runs — or if a webhook goes missing between runs — the filed notice on its own is
+    # reason enough not to chase them for a membership they ended.
+    def self.unreconciled_cancellation?(user)
+      cancelled_at = PaymentEvent.for_user(user).by_type('subscription_cancelled').maximum(:occurred_at)
+      return false if cancelled_at.blank?
+
+      last_paid = user.last_payment_on
+      last_paid.blank? || last_paid <= cancelled_at.to_date
+    end
+
+    private_class_method :base_user?, :unreconciled_cancellation?
   end
 end

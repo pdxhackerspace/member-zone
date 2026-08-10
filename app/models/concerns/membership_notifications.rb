@@ -9,6 +9,7 @@ module MembershipNotifications
   def notify_membership_state_entered
     return unless saved_change_to_membership_state?
     return if email.blank?
+    return if Current.skip_membership_state_email
 
     case membership_state
     when 'cancelled_member' then notify_membership_cancelled

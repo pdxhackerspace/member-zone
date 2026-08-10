@@ -228,11 +228,49 @@ still `overdue_member`, not reminded within `payment_overdue_reminder_repeat_day
 7), with an email address, no reminder already waiting in the queue, and not a service
 account. Reading the resolved state rather than the column means a member whose overdue
 grace has run out does not get one last nag on their way to inactive. Cancelled members are
-excluded by design — they told us they were leaving.
+excluded by design — they told us they were leaving — as are members with a cancellation on
+file that has not been reconciled yet (see below).
 
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
 address.
+
+---
+
+## Catching up on filed cancellations
+
+Recharge has been telling us about cancellations since long before the state machine
+existed. Each notice was filed as a `subscription_cancelled` payment event, but nothing
+consumed it, so the member's standing never moved: they stayed `current_member`, went
+`overdue_member` on their own clock, and collected past-due reminders for a membership they
+had already ended.
+
+`Membership::CancellationReconciler` walks the filed notices and plays each one forward
+from the day it arrived rather than treating an old cancellation as today's news:
+
+```bash
+rake membership:preview_cancellations   # dry run — what would change
+rake membership:process_cancellations   # apply
+```
+
+For each member it takes the most recent notice on file — an older one from a subscription
+they already replaced says nothing about where they stand — and:
+
+- Moves them to `cancelled_member` with `membership_state_entered_at` set to the
+  cancellation date, then materializes any deadline that has since passed, so a member
+  whose paid-through date ran out lands in `inactive_member` in the same pass.
+- Withdraws `payment_past_due` mail still waiting in the review queue. An approved-but-unsent
+  reminder is rejected too; `QueuedMailDeliveryJob` re-checks the status before sending.
+- Suppresses state-entry email for the whole run via `Current.skip_membership_state_email`.
+  Nobody should get "sorry to see you go" about a subscription they ended two years ago.
+
+It leaves alone anyone who paid or opened a new subscription after cancelling, anyone
+already `cancelled_member` or `inactive_member`, service accounts, and the states a person
+chose deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
+
+Until a notice is reconciled, `PaymentOverdueEligibility` skips members whose most recent
+cancellation is newer than their last payment. That keeps the reminders quiet if a webhook
+goes missing and the sync's lookback window closes before anyone notices.
 
 ---
 
@@ -261,6 +299,10 @@ unset, `Training` creation does not advance anyone out of `new_member`.
   cancellation signal, so a member who cancels there goes `overdue_member` →
   `inactive_member` and gets reminders on the way. Staff can record it by hand from the
   member page.
+- **Recharge cancellations are reconciled on demand, not on a schedule.**
+  `Recharge::SubscriptionSynchronizer` only looks back seven days, so a notice missed for
+  longer needs `rake membership:process_cancellations`. The eligibility guard keeps the
+  reminders quiet in the meantime, but the member's state stays wrong until it runs.
 - **Revoking building access training does not move anyone back.** Payment state is
   independent of training, so a `current_member` who loses the training stays current.
 
