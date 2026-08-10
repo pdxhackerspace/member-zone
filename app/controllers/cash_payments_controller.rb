@@ -132,23 +132,24 @@ class CashPaymentsController < AuthenticatedController
   end
 
   def recalculate_user_without_cash_payments!(user)
-    return if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
-
     last_paid = latest_payment_date_from_sources(user)
+    immune = user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+
     if last_paid.blank?
       user.update!(last_payment_date: nil, dues_due_at: nil)
-      user.transition_to!('inactive_member') unless user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+      user.transition_to!('inactive_member') unless immune
       return
     end
 
     attrs = { last_payment_date: last_paid }
-    if last_paid.present? && user.membership_plan.present?
-      attrs[:dues_due_at] = User.dues_due_at_from_payment_cycle(last_paid, user.membership_plan)
-    else
-      attrs[:dues_due_at] = nil
+    if user.membership_plan.present?
+      attrs[:dues_due_at] =
+        User.dues_due_at_from_payment_cycle(last_paid, user.membership_plan)
     end
 
     user.update!(attrs)
+    return if immune
+
     user.expire_membership_state! if user.membership_state_expired?
   end
 

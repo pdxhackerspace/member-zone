@@ -276,7 +276,11 @@ class MembershipStateTest < ActiveSupport::TestCase
   test 'expire_membership_state advances one hop at a time' do
     paid_through = 10.days.ago.beginning_of_day
     user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
-    user.update_columns(membership_state: 'current_member', dues_due_at: paid_through, membership_state_entered_at: 90.days.ago)
+    user.update_columns(
+      membership_state: 'current_member',
+      dues_due_at: paid_through,
+      membership_state_entered_at: 90.days.ago
+    )
 
     assert user.expire_membership_state!
     assert_equal 'overdue_member', user.membership_state
@@ -303,12 +307,31 @@ class MembershipStateTest < ActiveSupport::TestCase
   test 'materializing overdue from a past-due current member anchors grace at paid-through' do
     paid_through = 5.days.ago.beginning_of_day
     user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
-    user.update_columns(membership_state: 'current_member', dues_due_at: paid_through, membership_state_entered_at: 60.days.ago)
+    user.update_columns(
+      membership_state: 'current_member',
+      dues_due_at: paid_through,
+      membership_state_entered_at: 60.days.ago
+    )
 
     user.save!
 
     assert_equal 'overdue_member', user.membership_state
     assert_equal paid_through.to_i, user.membership_state_entered_at.to_i
+  end
+
+  test 'record_payment stamps entered_at now even when leaving an expired state' do
+    paid_through = 10.days.ago.beginning_of_day
+    user = create_member(state: 'overdue_member')
+    user.update_columns(membership_state_entered_at: paid_through, dues_due_at: paid_through)
+
+    travel 1.minute do
+      stamped_at = Time.current
+      user.record_payment!(last_payment_date: Date.current, dues_due_at: 1.month.from_now)
+
+      assert user.current_member?
+      assert_operator user.membership_state_entered_at, :>=, stamped_at
+      assert_not_equal paid_through.to_i, user.membership_state_entered_at.to_i
+    end
   end
 
   test 'entering a state stamps when it happened' do

@@ -249,6 +249,19 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 10.days.ago.to_date, event.occurred_at.to_date
   end
 
+  test 'destroying last cash payment clears dates for cancelled members' do
+    @user.cash_payments.destroy_all
+    @user.update_columns(membership_state: 'cancelled_member', payment_type: 'cash')
+    post_cash_payment
+
+    delete cash_payment_path(CashPayment.last)
+
+    @user.reload
+    assert_nil @user.last_payment_date
+    assert_nil @user.dues_due_at
+    assert_equal 'cancelled_member', @user.membership_state
+  end
+
   test 'deletes cash payment and recalculates membership' do
     @user.cash_payments.destroy_all
     post_cash_payment

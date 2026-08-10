@@ -13,6 +13,7 @@
 module MembershipState
   extend ActiveSupport::Concern
   include MembershipStateResolution
+  include MembershipStateEnteredAt
   include MembershipStateProjection
   include MembershipTransitions
   include MembershipNotifications
