@@ -81,7 +81,10 @@ module MembershipTransitions
   def expire_membership_state!
     return false unless membership_state_expired?
 
-    transition_to!(effective_membership_state)
+    next_state = next_expiry_membership_state
+    return false if next_state == membership_state
+
+    transition_to!(next_state)
   end
 
   def transition_to!(state, **attrs)

@@ -273,6 +273,19 @@ class MembershipStateTest < ActiveSupport::TestCase
     assert_equal 'overdue_member', user.reload.effective_membership_state
   end
 
+  test 'expire_membership_state advances one hop at a time' do
+    paid_through = 10.days.ago.beginning_of_day
+    user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
+    user.update_columns(membership_state: 'current_member', dues_due_at: paid_through, membership_state_entered_at: 90.days.ago)
+
+    assert user.expire_membership_state!
+    assert_equal 'overdue_member', user.membership_state
+    assert_equal paid_through.to_i, user.membership_state_entered_at.to_i
+
+    assert_not user.reload.expire_membership_state!
+    assert_equal 'overdue_member', user.membership_state
+  end
+
   test 'expire_membership_state materializes the resolved state' do
     user = create_member(state: 'overdue_member')
     user.update_columns(membership_state_entered_at: 31.days.ago)

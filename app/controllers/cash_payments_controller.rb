@@ -59,8 +59,12 @@ class CashPaymentsController < AuthenticatedController
   def destroy
     user = @cash_payment.user
     user_name = user.display_name
-    @cash_payment.destroy
-    recalculate_user_cash_dues!(user)
+
+    ActiveRecord::Base.transaction do
+      @cash_payment.destroy!
+      recalculate_user_cash_dues!(user)
+    end
+
     redirect_to cash_payments_path, notice: "Cash payment for #{user_name} deleted."
   end
 

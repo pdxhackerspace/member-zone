@@ -254,16 +254,20 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
     post_cash_payment
 
     payment = CashPayment.last
+    event = payment.payment_events.first
     assert_equal Date.current, @user.reload.last_payment_date
 
     assert_difference('CashPayment.count', -1) do
-      delete cash_payment_path(payment)
+      assert_difference('PaymentEvent.count', -1) do
+        delete cash_payment_path(payment)
+      end
     end
 
     @user.reload
     assert_nil @user.last_payment_date
     assert_nil @user.dues_due_at
     assert_equal 'inactive_member', @user.membership_state
+    assert_not PaymentEvent.exists?(event.id)
   end
 
   test 'deletes cash payment' do

@@ -28,7 +28,7 @@ module Membership
 
       if @user.membership_state_expired?
         from = @user.membership_state
-        to = @user.effective_membership_state
+        to = @user.next_expiry_membership_state
         @user.expire_membership_state!
         return Result.new(status: :expired, user: @user, from_state: from, to_state: to)
       end
@@ -47,7 +47,7 @@ module Membership
       stored = @user.read_attribute(:active)
       parts << "active #{stored} -> #{computed}" if stored != computed
       if @user.membership_state_expired?
-        parts << "state #{@user.membership_state} -> #{@user.effective_membership_state}"
+        parts << "state #{@user.membership_state} -> #{@user.next_expiry_membership_state}"
       end
       parts << 'payment_type -> inactive' if @user.deceased? && @user.payment_type != 'inactive'
       parts.join(', ')
