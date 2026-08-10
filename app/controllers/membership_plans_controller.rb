@@ -111,12 +111,7 @@ class MembershipPlansController < AuthenticatedController
     user = User.find(params[:user_id])
     old_dues_status = user.dues_status
     dues_at = User.dues_due_at_from_payment_cycle(Date.current, user.membership_plan)
-    user.update!(
-      dues_status: 'current',
-      last_payment_date: Date.current,
-      membership_status: 'paying',
-      dues_due_at: dues_at
-    )
+    user.record_payment!(last_payment_date: Date.current, dues_due_at: dues_at)
     Journal.create!(
       user: user,
       actor_user: current_user,

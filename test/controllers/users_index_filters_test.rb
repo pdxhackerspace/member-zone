@@ -109,12 +109,12 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
     assert_no_match(/Service Exclude Test/, response.body)
   end
 
-  # ─── Membership status filtering ───────────────────────────────────
+  # ─── Membership state filtering ────────────────────────────────────
 
-  test 'filtering by membership_status works' do
-    users(:one).update_columns(membership_status: 'sponsored')
+  test 'filtering by membership_state works' do
+    users(:one).update_columns(membership_state: 'sponsored_member')
 
-    get users_path(membership_status: 'sponsored')
+    get users_path(membership_state: 'sponsored_member')
     assert_response :success
     assert_match users(:one).display_name, response.body
   end
@@ -129,12 +129,12 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
     assert_match users(:one).display_name, response.body
   end
 
-  # ─── Dues status filtering ─────────────────────────────────────────
+  # ─── Overdue filtering ─────────────────────────────────────────────
 
-  test 'filtering by dues_status works' do
-    users(:one).update_columns(dues_status: 'current')
+  test 'filtering by an overdue membership state works' do
+    users(:one).update_columns(membership_state: 'overdue_member')
 
-    get users_path(dues_status: 'current')
+    get users_path(membership_state: 'overdue_member')
     assert_response :success
     assert_match users(:one).display_name, response.body
   end
@@ -173,11 +173,11 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
   end
 
   test 'stacking two filters returns intersection' do
-    users(:one).update_columns(membership_status: 'paying', dues_status: 'lapsed')
-    users(:two).update_columns(membership_status: 'paying', dues_status: 'current')
-    users(:three).update_columns(membership_status: 'sponsored', dues_status: 'lapsed')
+    users(:one).update_columns(membership_state: 'overdue_member', payment_type: 'paypal')
+    users(:two).update_columns(membership_state: 'current_member', payment_type: 'paypal')
+    users(:three).update_columns(membership_state: 'overdue_member', payment_type: 'cash')
 
-    get users_path(membership_status: 'paying', dues_status: 'lapsed')
+    get users_path(membership_state: 'overdue_member', payment_type: 'paypal')
     assert_response :success
     assert_match users(:one).display_name, response.body
     assert_no_match(/#{Regexp.escape(users(:two).display_name)}/, response.body)
@@ -185,56 +185,60 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
   end
 
   test 'stacking three filters narrows results further' do
-    users(:one).update_columns(membership_status: 'paying', dues_status: 'lapsed', payment_type: 'paypal')
-    users(:cash_payer).update_columns(membership_status: 'paying', dues_status: 'lapsed', payment_type: 'cash')
+    users(:one).update_columns(membership_state: 'overdue_member', payment_type: 'paypal', legacy: false)
+    users(:cash_payer).update_columns(membership_state: 'overdue_member', payment_type: 'cash')
 
-    get users_path(membership_status: 'paying', dues_status: 'lapsed', payment_type: 'paypal')
+    get users_path(membership_state: 'overdue_member', payment_type: 'paypal', active: 'true')
     assert_response :success
     assert_match users(:one).display_name, response.body
     assert_no_match(/Cash Payer User/, response.body)
   end
 
   test 'badge counts reflect the filtered set' do
-    users(:one).update_columns(membership_status: 'paying', dues_status: 'lapsed', payment_type: 'paypal')
-    users(:two).update_columns(membership_status: 'sponsored', dues_status: 'lapsed', payment_type: 'paypal')
+    users(:one).update_columns(membership_state: 'overdue_member', payment_type: 'paypal')
+    users(:two).update_columns(membership_state: 'sponsored_member', payment_type: 'paypal')
 
-    get users_path(dues_status: 'lapsed')
+    get users_path(payment_type: 'paypal')
     assert_response :success
 
-    assert_select 'a[href*="membership_status=paying"]', /Paying\s+\d+/
-    assert_select 'a[href*="membership_status=sponsored"]', /Sponsored\s+\d+/
+    assert_select 'a[href*="membership_state=overdue_member"]', /Overdue\s+\d+/
+    assert_select 'a[href*="membership_state=sponsored_member"]', /Sponsored\s+\d+/
   end
 
   test 'filter summary shows all active filter labels' do
-    get users_path(membership_status: 'paying', dues_status: 'lapsed')
+    get users_path(membership_state: 'overdue_member', payment_type: 'paypal')
     assert_response :success
-    assert_match 'Membership: Paying', response.body
-    assert_match 'Dues: Lapsed', response.body
+    assert_match 'Membership: Overdue', response.body
+    assert_match 'Payment: Paypal', response.body
   end
 
   test 'badge links preserve existing filter params' do
-    get users_path(dues_status: 'lapsed')
+    users(:one).update_columns(membership_state: 'overdue_member', payment_type: 'paypal')
+
+    get users_path(payment_type: 'paypal')
     assert_response :success
-    assert_select 'a[href*="dues_status=lapsed"][href*="membership_status=paying"]'
+    assert_select 'a[href*="payment_type=paypal"][href*="membership_state=overdue_member"]'
   end
 
-  test 'clicking active badge toggles it off (link without that param)' do
-    get users_path(dues_status: 'lapsed')
+  test 'clicking an applied filter chip toggles it off (link without that param)' do
+    users(:one).update_columns(membership_state: 'overdue_member')
+
+    get users_path(membership_state: 'overdue_member')
     assert_response :success
-    # The "Lapsed" badge should link without dues_status (toggling it off)
-    assert_select 'a.border-dark' do |elements|
-      lapsed_badge = elements.find { |e| e.text.include?('Lapsed') }
-      assert lapsed_badge, 'Expected a highlighted Lapsed badge'
-      assert_not_includes lapsed_badge['href'], 'dues_status=' if lapsed_badge
+
+    assert_select 'a.filter-chip.active' do |elements|
+      chip = elements.find { |e| e.text.include?('Overdue') }
+      assert chip, 'Expected a highlighted Overdue chip'
+      assert_not_includes chip['href'], 'membership_state='
     end
   end
 
   # ─── Legacy stacking ────────────────────────────────────────────
 
   test 'legacy toggle stacks with other filters' do
-    users(:one).update_columns(legacy: true, membership_status: 'paying')
+    users(:one).update_columns(legacy: true, membership_state: 'current_member')
 
-    get users_path(include_legacy: '1', membership_status: 'paying')
+    get users_path(include_legacy: '1', membership_state: 'current_member')
     assert_response :success
     assert_match users(:one).display_name, response.body
     assert_match 'Including legacy', response.body
@@ -242,11 +246,11 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
 
   test 'legacy badge preserves other active filters' do
     users(:one).update_columns(legacy: true)
-    get users_path(dues_status: 'lapsed')
+    get users_path(payment_type: 'paypal')
     assert_response :success
     # The legacy checkbox onchange URL should include both include_legacy and current filter params
     assert_match(/include_legacy/, response.body)
-    assert_match(/dues_status.*lapsed|lapsed.*dues_status/, response.body)
+    assert_match(/payment_type.*paypal|paypal.*payment_type/, response.body)
   end
 
   private

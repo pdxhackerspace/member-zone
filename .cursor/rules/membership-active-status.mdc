@@ -1,46 +1,63 @@
 ---
-description: Keep User#active derived from Membership::ActiveStatus; never bypass with update_columns
-globs: app/**/*.rb,lib/**/*.rb
+description: Move members with User transition methods; never assign membership_state, active, membership_status, or dues_status
+globs: app/**/*.rb,lib/**/*.rb,test/**/*.rb
 alwaysApply: false
 ---
 
-# Membership active status
+# Membership state
 
-The rules for whether a member is active live in `Membership::ActiveStatus` (`app/services/membership/active_status.rb`). `User` runs `Membership::ActiveStatus.apply_to` on every `save` via `before_save`.
+A member's standing is one column, `users.membership_state`, and all the logic for it lives
+on `User` (`app/models/concerns/membership_state.rb` and its sibling concerns). See
+`docs/membership-state-machine.md` for the full specification.
 
-Priority (first match wins):
+`active`, `membership_status`, and `dues_status` are **cached projections**, rewritten from
+`membership_state` on every save. Assigning them does nothing durable.
 
-1. Banned or deceased -> inactive
-2. Sponsored -> active
-3. Emergency active override -> active
-4. Guest with unexpired limited access -> active
-5. Paying/cancelled/unknown with current dues -> active; lapsed/overdue -> inactive
+`Membership::ActiveStatus` is a thin adapter kept for older callers. It delegates to `User`
+and decides nothing; do not add logic to it.
 
 ## Do
 
-- Change membership inputs (`membership_status`, `dues_status`, `dues_due_at`, `is_sponsored`, `emergency_active_override`) and call `user.save!` / `user.update!`.
-- Use `Membership::ActiveStatus.assign_and_save!(user, attrs)` in rake tasks when setting several fields at once.
-- Use `User.active` / `user.active?` to read the stored `active` column — they must agree after a save.
-- Run `rake membership:preview_reconcile_active` after bulk imports or legacy fixes.
+- Move a member by calling the transition that names the event: `approve_application!`,
+  `grant_building_access!`, `record_payment!`, `record_cancellation!`, `ban!`, `unban!`,
+  `mark_deceased!`, `mark_sponsored!`, `unmark_sponsored!`, `mark_guest!`.
+- Read `membership_state`, or `effective_membership_state` when elapsed deadlines matter.
+- Query with the scopes: `User.access_granting`, `User.dues_lapsed`, `User.dues_current`,
+  `User.membership_undetermined`, `User.in_membership_states(...)`.
+- Set `allow_any_membership_state_transition = true` only where a member genuinely may be
+  placed anywhere: the admin edit form and data backfills.
+- Read timing from `MembershipSetting`, never from a constant.
 
 ## Do not
 
-- Call `update_columns`, `update_column`, or `update_all` on `User` for fields that affect active status: `active`, `membership_status`, `dues_status`, `dues_due_at`, `is_sponsored`, `emergency_active_override`, `payment_type` (when driven by deceased).
-- Assign `user.active = ...` directly for non-service accounts — let `ActiveStatus` compute it.
-- Reimplement banned/deceased/dues rules outside `Membership::ActiveStatus`.
+- Assign `active`, `membership_status`, or `dues_status`. They are overwritten on save.
+- Assign `membership_state` directly outside the admin form and backfills — the transition
+  guard exists to stop illegal moves.
+- Use `update_columns` / `update_column` / `update_all` on `membership_state`, `active`,
+  `membership_status`, `dues_status`, `dues_due_at`, `is_sponsored`,
+  `emergency_active_override`, or `payment_type`. It skips the guard, the
+  `membership_state_entered_at` stamp, the projection, and the state-entry email.
+- Reimplement the payment window, the grace periods, or the access rules anywhere but
+  `User`.
 
 ```ruby
-# ❌ bypasses ActiveStatus
-user.update_columns(membership_status: 'banned', active: false)
+# ❌ nothing outside User decides what a payment means
+user.update!(membership_status: 'paying', dues_status: 'current')
 
 # ✅
-user.update!(membership_status: 'banned')
+user.record_payment!(last_payment_date: Date.current, payment_type: 'paypal')
 
-# ❌
-user.update_columns(dues_status: 'lapsed')
+# ❌ silently reverted on the next save
+user.update!(active: false)
 
-# ✅
-Membership::ActiveStatus.assign_and_save!(user, dues_status: 'lapsed')
+# ✅ say why they are inactive
+user.ban!
 ```
 
-`update_columns` remains acceptable for unrelated fields (sync timestamps, `authentik_id`, geocoding coordinates) when membership state is untouched.
+`update_columns` remains fine for unrelated fields — sync timestamps, `authentik_id`,
+geocoding coordinates — as long as membership state is untouched.
+
+## In tests
+
+Put a member in a state by assigning `membership_state` when you build them, or by calling
+the transition that gets them there. `active: false` does nothing on its own.

@@ -45,7 +45,8 @@ class UserDuesDueAtTest < ActiveSupport::TestCase
 
   test 'apply_payment_updates does not set dues_due_at for sponsored member' do
     user = users(:cash_payer)
-    user.update_columns(membership_status: 'sponsored', payment_type: 'sponsored', dues_due_at: 2.months.from_now)
+    user.update_columns(membership_state: 'sponsored_member', membership_status: 'sponsored',
+                        payment_type: 'sponsored', dues_due_at: 2.months.from_now)
     future_end = user.dues_due_at
     paid_on = Date.new(2025, 6, 1)
     updates = user.apply_payment_updates({ time: paid_on.midday, amount: 100.0 }, {})
@@ -67,9 +68,8 @@ class UserDuesDueAtTest < ActiveSupport::TestCase
       full_name: 'Limited Guest',
       username: "limitedguest#{SecureRandom.hex(2)}",
       email: "limited#{SecureRandom.hex(4)}@example.com",
-      membership_status: 'guest',
+      membership_state: 'guest_member',
       payment_type: 'inactive',
-      dues_status: 'unknown',
       profile_visibility: 'members',
       sponsored_guest_duration_months: 6
     )
@@ -82,7 +82,7 @@ class UserDuesDueAtTest < ActiveSupport::TestCase
   test 'on_paypal_payment_linked sets dues_due_at from plan cycle' do
     user = users(:one)
     plan = membership_plans(:monthly_standard)
-    user.update!(membership_plan: plan, membership_status: 'paying', payment_type: 'paypal')
+    user.update!(membership_plan: plan, membership_state: 'current_member', payment_type: 'paypal')
     user.on_paypal_payment_linked(paypal_payments(:sample_payment))
     user.reload
     assert_equal Date.new(2025, 12, 14), user.dues_due_at.to_date
@@ -91,7 +91,7 @@ class UserDuesDueAtTest < ActiveSupport::TestCase
   test 'on_recharge_payment_linked sets dues_due_at from plan cycle' do
     user = users(:one)
     plan = membership_plans(:monthly_standard)
-    user.update!(membership_plan: plan, membership_status: 'paying', payment_type: 'recharge')
+    user.update!(membership_plan: plan, membership_state: 'current_member', payment_type: 'recharge')
     user.on_recharge_payment_linked(recharge_payments(:recharge_payment))
     user.reload
     assert_equal Date.new(2025, 12, 13), user.dues_due_at.to_date
@@ -103,9 +103,8 @@ class UserDuesDueAtTest < ActiveSupport::TestCase
       full_name: 'Guest Clear',
       username: "guestclear#{SecureRandom.hex(2)}",
       email: "guestclear#{SecureRandom.hex(4)}@example.com",
-      membership_status: 'guest',
+      membership_state: 'guest_member',
       payment_type: 'inactive',
-      dues_status: 'unknown',
       profile_visibility: 'members',
       dues_due_at: 1.month.from_now
     )

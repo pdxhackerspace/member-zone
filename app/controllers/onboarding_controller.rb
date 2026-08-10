@@ -14,9 +14,9 @@ class OnboardingController < AuthenticatedController
 
   def create_member
     @user = User.new(member_params)
-    @user.membership_status = 'unknown'
-    @user.dues_status = 'unknown'
-    @user.active = false
+    # A placeholder until the payment step, which is where this wizard settles their
+    # standing. It matters when an admin abandons the wizard halfway.
+    @user.membership_state = User.initial_membership_state
 
     if onboarding_email_present? && @user.save
       redirect_to onboard_payment_path(@user), status: :see_other
@@ -29,61 +29,8 @@ class OnboardingController < AuthenticatedController
   def payment; end
 
   def save_payment
-    membership_type = params[:membership_type]
-
-    case membership_type
-    when 'paying'
-      if params[:cash_plan] == '1'
-        plan = MembershipPlan.create!(
-          name: "Cash - #{@user.display_name}",
-          cost: params[:plan_cost].to_f.positive? ? params[:plan_cost].to_f : 0,
-          billing_period_days: onboarding_cash_plan_billing_period_days,
-          description: params[:plan_notes].presence,
-          plan_type: 'primary',
-          manual: true,
-          visible: false,
-          user: @user
-        )
-        @user.update!(
-          membership_status: 'paying',
-          payment_type: 'cash',
-          membership_plan: plan,
-          active: true,
-          dues_status: 'current'
-        )
-      else
-        @user.update!(
-          membership_status: 'paying',
-          payment_type: 'unknown',
-          active: true,
-          dues_status: 'current'
-        )
-      end
-    when 'sponsored'
-      @user.update!(
-        {
-          membership_status: 'sponsored',
-          payment_type: 'sponsored',
-          active: true,
-          dues_status: 'current'
-        }.merge(onboarding_sponsored_guest_duration)
-      )
-    when 'guest'
-      @user.update!(
-        {
-          membership_status: 'guest',
-          payment_type: 'inactive',
-          active: false,
-          dues_status: 'unknown'
-        }.merge(onboarding_sponsored_guest_duration)
-      )
-    end
-
-    if membership_type == 'guest'
-      redirect_to onboard_mail_path(@user), status: :see_other
-    else
-      redirect_to onboard_access_path(@user), status: :see_other
-    end
+    apply_onboarding_payment!(params[:membership_type])
+    redirect_after_onboarding_payment!(params[:membership_type])
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:alert] = "Error: #{e.message}"
     render :payment, status: :unprocessable_content
@@ -93,7 +40,7 @@ class OnboardingController < AuthenticatedController
   def access
     @rfids = @user.rfids
     @rfid_code_default = DefaultSetting.instance.rfid_facility_prefix
-    @building_access_topic = TrainingTopic.find_by('LOWER(name) LIKE ?', '%building access%')
+    @building_access_topic = TrainingTopic.building_access
     @has_building_access_training = @building_access_topic &&
                                     Training.exists?(trainee: @user, training_topic: @building_access_topic)
   end
@@ -115,7 +62,7 @@ class OnboardingController < AuthenticatedController
   end
 
   def save_training
-    topic = TrainingTopic.find_by('LOWER(name) LIKE ?', '%building access%')
+    topic = TrainingTopic.building_access
     unless topic
       flash[:alert] = 'Building Access training topic not found. Please create it under Settings > Training Topics.'
       redirect_to onboard_mail_path(@user), status: :see_other
@@ -185,6 +132,55 @@ class OnboardingController < AuthenticatedController
     return {} unless m.present? && m.positive?
 
     { dues_due_at: Time.current + m.months }
+  end
+
+  def apply_onboarding_payment!(membership_type)
+    case membership_type
+    when 'paying' then apply_paying_onboarding_payment!
+    when 'sponsored' then apply_sponsored_onboarding_payment!
+    when 'guest' then apply_guest_onboarding_payment!
+    end
+  end
+
+  def apply_paying_onboarding_payment!
+    if params[:cash_plan] == '1'
+      plan = create_onboarding_cash_plan!
+      @user.record_payment!(payment_type: 'cash', membership_plan: plan, last_payment_date: Date.current)
+    else
+      @user.record_payment!(payment_type: 'unknown', last_payment_date: Date.current)
+    end
+  end
+
+  def apply_sponsored_onboarding_payment!
+    @user.mark_sponsored!
+    duration = onboarding_sponsored_guest_duration
+    @user.update!(duration) if duration.present?
+  end
+
+  def apply_guest_onboarding_payment!
+    months = params[:sponsored_guest_duration_months].to_s.strip.presence&.to_i
+    @user.mark_guest!(duration_months: months)
+  end
+
+  def create_onboarding_cash_plan!
+    MembershipPlan.create!(
+      name: "Cash - #{@user.display_name}",
+      cost: params[:plan_cost].to_f.positive? ? params[:plan_cost].to_f : 0,
+      billing_period_days: onboarding_cash_plan_billing_period_days,
+      description: params[:plan_notes].presence,
+      plan_type: 'primary',
+      manual: true,
+      visible: false,
+      user: @user
+    )
+  end
+
+  def redirect_after_onboarding_payment!(membership_type)
+    if membership_type == 'guest'
+      redirect_to onboard_mail_path(@user), status: :see_other
+    else
+      redirect_to onboard_access_path(@user), status: :see_other
+    end
   end
 
   def onboarding_cash_plan_billing_period_days

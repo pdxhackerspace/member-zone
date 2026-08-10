@@ -36,8 +36,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
       full_name: 'Due Preview User',
       active: true,
       service_account: false,
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       payment_type: 'unknown'
     )
     MembershipApplication.create!(

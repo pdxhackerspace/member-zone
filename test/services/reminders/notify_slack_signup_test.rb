@@ -95,8 +95,7 @@ module Reminders
         full_name: 'Slack Notify Target',
         active: true,
         service_account: false,
-        membership_status: 'paying',
-        dues_status: 'current',
+        membership_state: 'current_member',
         payment_type: 'unknown'
       )
       MembershipApplication.create!(

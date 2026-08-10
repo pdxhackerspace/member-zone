@@ -12,16 +12,14 @@ class MembershipRecalculateStatusTest < ActiveSupport::TestCase
       authentik_id: 'recalc-task-sponsored',
       full_name: 'Recalc Sponsored',
       is_sponsored: true,
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       payment_type: 'paypal'
     )
 
     capture_io { @task.invoke }
 
     user.reload
-    assert_equal 'sponsored', user.membership_status
-    assert_equal 'current', user.dues_status
+    assert_equal 'sponsored_member', user.membership_state
     assert_equal 'sponsored', user.payment_type
     assert user.active?
   end
@@ -30,9 +28,8 @@ class MembershipRecalculateStatusTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'recalc-banned-sponsored',
       full_name: 'Banned Sponsored',
-      membership_status: 'banned',
+      membership_state: 'banned_member',
       is_sponsored: true,
-      dues_status: 'current',
       payment_type: 'sponsored',
       active: false
     )
@@ -40,7 +37,7 @@ class MembershipRecalculateStatusTest < ActiveSupport::TestCase
     capture_io { @task.invoke }
 
     user.reload
-    assert_equal 'banned', user.membership_status
+    assert_equal 'banned_member', user.membership_state
     assert_not user.active?
   end
 
@@ -48,17 +45,16 @@ class MembershipRecalculateStatusTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'recalc-deceased-sponsored',
       full_name: 'Deceased Sponsored',
-      membership_status: 'deceased',
+      membership_state: 'deceased_member',
       is_sponsored: true,
       payment_type: 'sponsored',
-      dues_status: 'current',
       active: false
     )
 
     capture_io { @task.invoke }
 
     user.reload
-    assert_equal 'deceased', user.membership_status
+    assert_equal 'deceased_member', user.membership_state
     assert_not user.active?
   end
 end

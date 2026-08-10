@@ -137,7 +137,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'admin profile shows active override banner only when override is active' do
-    @user.update_columns(emergency_active_override: true, active: true, dues_status: 'lapsed')
+    @user.update_columns(emergency_active_override: true, active: true, membership_state: 'overdue_member')
 
     get user_path(@user, tab: :profile)
 
@@ -147,7 +147,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'admin preview hides admin-only profile affordances' do
-    @user.update_columns(emergency_active_override: true, active: true, dues_status: 'lapsed')
+    @user.update_columns(emergency_active_override: true, active: true, membership_state: 'overdue_member')
 
     get user_path(@user, view_as: :self, tab: :profile)
 

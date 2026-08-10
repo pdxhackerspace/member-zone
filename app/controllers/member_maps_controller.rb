@@ -37,7 +37,7 @@ class MemberMapsController < AuthenticatedController
   def map_member_scope
     scope = User.non_service_accounts
                 .non_legacy
-                .where.not(membership_status: 'banned')
+                .where.not(membership_state: User::TERMINAL_STATES)
     scope = scope.where(active: true) unless @include_inactive_members
     scope
   end

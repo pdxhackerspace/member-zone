@@ -7,8 +7,8 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
     sign_in_as_local_admin
 
     @regular_user = users(:one)
-    @regular_user.update_columns(service_account: false, membership_status: 'paying', dues_status: 'current',
-                                 active: true)
+    @regular_user.update_columns(service_account: false, membership_state: 'current_member',
+                                 membership_status: 'paying', dues_status: 'current', active: true)
   end
 
   teardown do
@@ -55,7 +55,7 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
     post ban_user_path(@regular_user)
     assert_redirected_to user_path(@regular_user)
     @regular_user.reload
-    assert_equal 'banned', @regular_user.membership_status
+    assert_equal 'banned_member', @regular_user.membership_state
     assert_not @regular_user.active?, 'banned member should be inactive'
   end
 
@@ -65,7 +65,7 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
     post mark_deceased_user_path(@regular_user)
     assert_redirected_to user_path(@regular_user)
     @regular_user.reload
-    assert_equal 'deceased', @regular_user.membership_status
+    assert_equal 'deceased_member', @regular_user.membership_state
     assert_not @regular_user.active?, 'deceased member should be inactive'
     assert_equal 'inactive', @regular_user.payment_type
   end
@@ -73,7 +73,7 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
   # ─── Edit form: active param protection ────────────────────────────
 
   test 'editing a non-service account cannot set active directly' do
-    @regular_user.update_columns(membership_status: 'banned', active: false)
+    @regular_user.update_columns(membership_state: 'banned_member', active: false)
     patch user_path(@regular_user), params: { user: { active: '1', full_name: 'Updated Name' } }
     @regular_user.reload
     assert_not @regular_user.active?, 'active should not be settable via form for non-service accounts'
@@ -90,7 +90,7 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
   # ─── Emergency active override ─────────────────────────────────────
 
   test 'enable_emergency_active_override forces inactive member active' do
-    @regular_user.update_columns(membership_status: 'paying', dues_status: 'lapsed', active: false,
+    @regular_user.update_columns(membership_state: 'inactive_member', active: false,
                                  emergency_active_override: false, service_account: false)
     post enable_emergency_active_override_user_path(@regular_user)
     assert_redirected_to user_path(@regular_user)
@@ -100,7 +100,7 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
   end
 
   test 'clear_emergency_active_override recomputes active' do
-    @regular_user.update_columns(membership_status: 'paying', dues_status: 'lapsed', active: true,
+    @regular_user.update_columns(membership_state: 'inactive_member', active: true,
                                  emergency_active_override: true, service_account: false)
     post clear_emergency_active_override_user_path(@regular_user)
     assert_redirected_to user_path(@regular_user)
@@ -110,8 +110,8 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
   end
 
   test 'enable_emergency_active_override rejects banned members' do
-    @regular_user.update_columns(membership_status: 'banned', active: false, emergency_active_override: false,
-                                 service_account: false)
+    @regular_user.update_columns(membership_state: 'banned_member', active: false,
+                                 emergency_active_override: false, service_account: false)
     post enable_emergency_active_override_user_path(@regular_user)
     assert_redirected_to user_path(@regular_user)
     follow_redirect!
@@ -140,8 +140,6 @@ class UsersActivateDeactivateTest < ActionDispatch::IntegrationTest
       authentik_id: "sa-ctrl-#{SecureRandom.hex(4)}",
       full_name: "Service Ctrl #{SecureRandom.hex(4)}",
       payment_type: 'unknown',
-      membership_status: 'unknown',
-      dues_status: 'unknown',
       service_account: true,
       active: true
     }

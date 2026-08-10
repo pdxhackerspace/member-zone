@@ -5,11 +5,10 @@ namespace :training do
     puts '=' * 50
     puts ''
 
-    # Find or create the Building Access training topic
-    topic = TrainingTopic.find_by(name: 'Building Access')
+    topic = TrainingTopic.building_access
     unless topic
-      puts "ERROR: Training topic 'Building Access' not found."
-      puts 'Please create it first in Settings > Training Topics.'
+      puts 'ERROR: Building Access training topic not found.'
+      puts 'Set it under Settings > Membership, or create a topic named "Building Access".'
       exit 1
     end
 
@@ -59,11 +58,10 @@ namespace :training do
     puts '=' * 50
     puts ''
 
-    # Find the Building Access training topic
-    topic = TrainingTopic.find_by(name: 'Building Access')
+    topic = TrainingTopic.building_access
     unless topic
-      puts "ERROR: Training topic 'Building Access' not found."
-      puts 'Please create it first in Settings > Training Topics.'
+      puts 'ERROR: Building Access training topic not found.'
+      puts 'Set it under Settings > Membership, or create a topic named "Building Access".'
       exit 1
     end
 

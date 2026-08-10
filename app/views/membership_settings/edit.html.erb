@@ -30,6 +30,18 @@
         </div>
 
         <div class="mb-3">
+          <%= f.label :planless_payment_window_days, "Planless payment window (days)", class: "form-label" %>
+          <%= f.number_field :planless_payment_window_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">How long a linked payment counts as current when the member has no membership plan assigned.</div>
+        </div>
+
+        <div class="mb-3">
+          <%= f.label :payment_currency_buffer_days, "Payment currency buffer (days)", class: "form-label" %>
+          <%= f.number_field :payment_currency_buffer_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">Extra days added to a plan's billing cycle when deciding whether a payment is still current.</div>
+        </div>
+
+        <div class="mb-3">
           <%= f.label :manual_payment_due_soon_days, "Manual payment “due soon” window (days)", class: "form-label" %>
           <%= f.number_field :manual_payment_due_soon_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
           <div class="form-text">
@@ -38,10 +50,38 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          <%= f.label :overdue_grace_period_days, "Overdue grace period (days)", class: "form-label" %>
+          <%= f.number_field :overdue_grace_period_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">How long an overdue member keeps access after their dues date passes, before they become inactive.</div>
+        </div>
+
         <div class="mb-0">
           <%= f.label :reactivation_grace_period_months, "Reactivation grace period (months)", class: "form-label" %>
           <%= f.number_field :reactivation_grace_period_months, class: "form-control", min: 0, style: "max-width: 150px;" %>
           <div class="form-text">Months a lapsed member can reactivate without needing to reapply.</div>
+        </div>
+      <% end %>
+
+      <%= render "setting_group", title: "New members", form: true do %>
+        <div class="mb-3">
+          <%= f.label :building_access_training_topic_id, "Building access training topic", class: "form-label" %>
+          <%= f.collection_select :building_access_training_topic_id, TrainingTopic.order(:name), :id, :name,
+                                  { include_blank: "Match on the name “Building Access”" },
+                                  { class: "form-select", style: "max-width: 320px;" } %>
+          <div class="form-text">Recording this training moves a new member into their pre-payment grace period.</div>
+        </div>
+
+        <div class="mb-3">
+          <%= f.label :new_member_grace_period_days, "New member grace period (days)", class: "form-label" %>
+          <%= f.number_field :new_member_grace_period_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">How long a newly trained member stays active before their first payment is expected.</div>
+        </div>
+
+        <div class="mb-0">
+          <%= f.label :new_member_expiry_days, "New member expiry (days)", class: "form-label" %>
+          <%= f.number_field :new_member_expiry_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">Cap on how long an approved member who never took building access training stays active.</div>
         </div>
       <% end %>
 
@@ -138,10 +178,16 @@
           <div class="form-text">Days after the application link email before the first reminder is sent, and between subsequent reminders.</div>
         </div>
 
-        <div class="mb-0">
+        <div class="mb-3">
           <%= f.label :application_link_reminder_max_count, "Application link reminder — maximum count", class: "form-label" %>
           <%= f.number_field :application_link_reminder_max_count, class: "form-control", min: 1, style: "max-width: 150px;" %>
           <div class="form-text">Stop reminding after this many emails or when the link expires, whichever comes first.</div>
+        </div>
+
+        <div class="mb-0">
+          <%= f.label :payment_overdue_reminder_repeat_days, "Overdue payment reminder — repeat interval (days)", class: "form-label" %>
+          <%= f.number_field :payment_overdue_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">Minimum days between overdue payment reminders for the same member.</div>
         </div>
       <% end %>
 

@@ -46,7 +46,7 @@ class PrivilegeRolloutTest < ActionDispatch::IntegrationTest
   test 'a key fob manager cannot use the fob form to confer training privileges' do
     staff = sign_in_as_plain_member
     grant_privileges(staff, 'access.manage_rfids')
-    building_access = TrainingTopic.create!(name: 'Building Access')
+    building_access = training_topics(:building_access)
     role = Role.create!(name: 'Fob granter', privileges: [find_or_create_privilege('members.ban')])
     TrainingTopicRole.create!(training_topic: building_access, role: role, member_source: 'trained_in')
 

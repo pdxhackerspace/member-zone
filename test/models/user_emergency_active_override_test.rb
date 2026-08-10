@@ -4,8 +4,7 @@ class UserEmergencyActiveOverrideTest < ActiveSupport::TestCase
   test 'compute_active_status keeps member active when emergency override is set' do
     u = users(:one)
     u.assign_attributes(
-      membership_status: 'paying',
-      dues_status: 'lapsed',
+      membership_state: 'inactive_member',
       emergency_active_override: true,
       service_account: false
     )
@@ -27,8 +26,7 @@ class UserEmergencyActiveOverrideTest < ActiveSupport::TestCase
   test 'compute_active_status ignores override for banned members' do
     u = users(:one)
     u.assign_attributes(
-      membership_status: 'banned',
-      dues_status: 'current',
+      membership_state: 'banned_member',
       emergency_active_override: true,
       service_account: false
     )
@@ -39,8 +37,7 @@ class UserEmergencyActiveOverrideTest < ActiveSupport::TestCase
   test 'compute_active_status ignores override for deceased members' do
     u = users(:one)
     u.assign_attributes(
-      membership_status: 'deceased',
-      dues_status: 'current',
+      membership_state: 'deceased_member',
       emergency_active_override: true,
       service_account: false
     )

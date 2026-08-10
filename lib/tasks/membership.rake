@@ -18,17 +18,14 @@ namespace :membership do
     end
     puts ''
 
-    # Step 1: Reset everyone
+    # Step 1: Reset everyone. The blanket reset crosses the transition table on purpose,
+    # so it has to say so.
     puts 'Step 1: Resetting all users...'
     User.find_each do |user|
-      next if Membership::ActiveStatus.terminal_membership?(user)
+      next if user.terminal_membership_state?
 
-      Membership::ActiveStatus.assign_and_save!(
-        user,
-        membership_status: 'unknown',
-        dues_status: 'unknown',
-        membership_plan_id: nil
-      )
+      user.allow_any_membership_state_transition = true
+      Membership::ActiveStatus.assign_and_save!(user, membership_state: 'unknown', membership_plan_id: nil)
     end
     puts "  Reset #{User.count} users to unknown/inactive"
     puts ''
@@ -38,9 +35,10 @@ namespace :membership do
     sponsored_count = 0
 
     User.find_each do |user|
-      next unless Membership::ActiveStatus.recalculate_sponsored_candidate?(user)
+      next if user.terminal_membership_state?
+      next unless user.is_sponsored? || user.payment_type == 'sponsored'
 
-      Membership::ActiveStatus.restore_sponsored_membership!(user)
+      user.mark_sponsored!
       sponsored_count += 1
       puts "  Sponsored: #{user.display_name}"
     end
@@ -54,9 +52,9 @@ namespace :membership do
     plan_matched_count = 0
 
     User.find_each do |user|
-      next if Membership::ActiveStatus.terminal_membership?(user)
+      next if user.terminal_membership_state?
       # Skip if already sponsored (don't downgrade)
-      next if Membership::ActiveStatus.sponsored?(user)
+      next if user.sponsored?
 
       # Collect all payments (PayPal and Recharge) with normalized structure
       all_payments = []
@@ -92,43 +90,30 @@ namespace :membership do
       if latest_payment[:amount].present?
         matched_plan = MembershipTaskHelpers.find_matching_plan(membership_plans, latest_payment[:amount])
         if matched_plan
-          Membership::ActiveStatus.assign_and_save!(user, membership_plan_id: matched_plan.id)
+          user.update!(membership_plan_id: matched_plan.id)
           plan_matched_count += 1
         end
       end
 
-      # Calculate cutoff based on matched plan's billing frequency
-      cutoff_date = MembershipTaskHelpers.cutoff_for_plan(matched_plan)
+      # Record the payment and let User decide whether it still covers them, rather than
+      # applying a second freshness rule here.
+      user.record_payment!(payment_type: latest_payment[:type], last_payment_date: latest_payment[:time].to_date,
+                           dues_due_at: User.dues_due_at_from_payment_cycle(latest_payment[:time].to_date,
+                                                                            matched_plan))
 
-      # Process payments to determine current status
-      # We check if the latest payment is within the plan's billing period
-      if latest_payment[:time] >= cutoff_date
-        Membership::ActiveStatus.assign_and_save!(
-          user,
-          membership_status: 'paying',
-          dues_status: 'current',
-          payment_type: latest_payment[:type]
-        )
+      plan_info = if matched_plan
+                    " [#{matched_plan.name}, #{MembershipTaskHelpers.billing_period_description(matched_plan)}]"
+                  else
+                    ' [no plan, 1 month default]'
+                  end
+
+      if user.current_member?
         paying_count += 1
-        plan_info = if matched_plan
-                      " [#{matched_plan.name}, #{MembershipTaskHelpers.billing_period_description(matched_plan)}]"
-                    else
-                      ' [no plan, 1 month default]'
-                    end
         puts "  Paying: #{user.display_name} (#{latest_payment[:type]})#{plan_info}"
       else
-        Membership::ActiveStatus.assign_and_save!(
-          user,
-          dues_status: 'lapsed',
-          payment_type: latest_payment[:type]
-        )
         lapsed_count += 1
-        plan_info = if matched_plan
-                      " [#{matched_plan.name}, #{MembershipTaskHelpers.billing_period_description(matched_plan)}]"
-                    else
-                      ' [no plan, 1 month default]'
-                    end
-        puts "  Lapsed: #{user.display_name} (last payment: #{latest_payment[:time].to_date})#{plan_info}"
+        puts "  #{user.membership_state.humanize}: #{user.display_name} " \
+             "(last payment: #{latest_payment[:time].to_date})#{plan_info}"
       end
     end
 
@@ -495,13 +480,13 @@ namespace :membership do
     MembershipCleanup.new(dry_run: true).run
   end
 
-  desc 'Preview recomputing stored active flags from membership state'
+  desc 'Preview membership state expiries and stale active flags (dry run)'
   task preview_reconcile_active: :environment do
     MembershipActiveReconciler.new(dry_run: true).run
   end
 
-  desc 'Recompute stored active flags where they disagree with membership state'
+  desc 'Materialize expired membership states and reconcile stale active flags (same as the nightly job)'
   task reconcile_active: :environment do
-    MembershipActiveReconciler.new(dry_run: false).run
+    Membership::TickJob.perform_now
   end
 end

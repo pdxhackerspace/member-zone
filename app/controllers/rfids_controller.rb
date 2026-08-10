@@ -65,7 +65,7 @@ class RfidsController < AuthenticatedController
 
   def prepare_form_data
     @users = User.ordered_by_display_name
-    @building_access_topic = TrainingTopic.find_by('LOWER(name) LIKE ?', '%building access%')
+    @building_access_topic = TrainingTopic.building_access
     @trained_user_ids = if @building_access_topic
                           Training.where(training_topic: @building_access_topic).pluck(:trainee_id).to_set
                         else
@@ -74,7 +74,7 @@ class RfidsController < AuthenticatedController
   end
 
   def add_building_access_training(user)
-    topic = TrainingTopic.find_by('LOWER(name) LIKE ?', '%building access%')
+    topic = TrainingTopic.building_access
     return false unless topic
     return false if Training.exists?(trainee: user, training_topic: topic)
     # Recording training here would confer the topic's roles, so the same no-escalation rule

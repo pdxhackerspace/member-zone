@@ -27,7 +27,7 @@ class UserServiceAccountTest < ActiveSupport::TestCase
   end
 
   test 'service account active flag is independent of membership status' do
-    sa = create_service_account(active: true, membership_status: 'unknown', dues_status: 'unknown')
+    sa = create_service_account(active: true)
     assert sa.active?, 'service account should stay active regardless of unknown status'
 
     sa.update!(active: false)
@@ -41,8 +41,6 @@ class UserServiceAccountTest < ActiveSupport::TestCase
       authentik_id: "sa-#{SecureRandom.hex(4)}",
       full_name: "Service Account #{SecureRandom.hex(4)}",
       payment_type: 'unknown',
-      membership_status: 'unknown',
-      dues_status: 'unknown',
       service_account: true,
       active: true
     }

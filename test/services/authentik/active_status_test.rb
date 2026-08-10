@@ -15,7 +15,7 @@ module Authentik
       @settings.update!(authentik_sync_inactive_as_active: false)
       active_user = users(:one)
       inactive_user = users(:two)
-      inactive_user.update_columns(active: false)
+      inactive_user.update_columns(active: false, membership_state: 'inactive_member')
 
       assert Authentik::ActiveStatus.for(active_user)
       assert_not Authentik::ActiveStatus.for(inactive_user)
@@ -24,7 +24,7 @@ module Authentik
     test 'forces inactive users active when sync inactive as active is enabled' do
       @settings.update!(authentik_sync_inactive_as_active: true)
       inactive_user = users(:two)
-      inactive_user.update_columns(active: false)
+      inactive_user.update_columns(active: false, membership_state: 'inactive_member')
 
       assert Authentik::ActiveStatus.for(inactive_user)
     end

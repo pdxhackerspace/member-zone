@@ -5,8 +5,7 @@ class MembershipActiveReconcilerTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'reconcile-preview',
       full_name: 'Stale Preview',
-      membership_status: 'banned',
-      dues_status: 'current',
+      membership_state: 'banned_member',
       payment_type: 'unknown'
     )
     user.update_columns(active: true)
@@ -22,8 +21,7 @@ class MembershipActiveReconcilerTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'reconcile-apply',
       full_name: 'Stale Apply',
-      membership_status: 'banned',
-      dues_status: 'current',
+      membership_state: 'banned_member',
       payment_type: 'unknown'
     )
     user.update_columns(active: true)

@@ -34,8 +34,7 @@ module Slack
         email: @slack_user.email,
         slack_id: @slack_user.slack_id,
         slack_handle: @slack_user.username,
-        active: true,
-        membership_status: 'unknown',
+        membership_state: User.initial_membership_state,
         payment_type: 'unknown'
       )
 

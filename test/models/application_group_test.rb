@@ -79,7 +79,7 @@ class ApplicationGroupTest < ActiveSupport::TestCase
 
   test 'effective_members returns non-banned users for unbanned_members' do
     @group.member_source = 'unbanned_members'
-    expected = User.non_service_accounts.where.not(membership_status: 'banned').count
+    expected = User.non_service_accounts.where.not(membership_state: 'banned_member').count
     assert_equal expected, @group.effective_members.count
   end
 

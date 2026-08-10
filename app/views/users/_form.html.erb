@@ -107,28 +107,33 @@
   <% if can?(:'members.edit_membership') %>
     <% membership_status_locked = (@user.banned? && !can?(:'members.ban')) ||
                                   (@user.deceased? && !can?(:'members.mark_deceased')) %>
-    <% membership_status_options = [
-         ['Paying', 'paying'],
-         ['Guest', 'guest'],
-         ['Sponsored', 'sponsored'],
-         ['New Member', 'applicant'],
-         ['Cancelled', 'cancelled'],
+    <% membership_state_options = [
+         ['New member — awaiting building access', 'new_member'],
+         ['New member — in grace period', 'provisional_member'],
+         ['Current member', 'current_member'],
+         ['Overdue', 'overdue_member'],
+         ['Cancelled', 'cancelled_member'],
+         ['Inactive', 'inactive_member'],
+         ['Guest', 'guest_member'],
+         ['Sponsored', 'sponsored_member'],
          ['Unknown', 'unknown']
        ] %>
-    <% membership_status_options << ['Banned', 'banned'] if can?(:'members.ban') %>
-    <% membership_status_options << ['Deceased', 'deceased'] if can?(:'members.mark_deceased') %>
+    <% membership_state_options << ['Banned', 'banned_member'] if can?(:'members.ban') %>
+    <% membership_state_options << ['Deceased', 'deceased_member'] if can?(:'members.mark_deceased') %>
 
     <div>
-      <%= f.label :membership_status, "Membership Status", class: "form-label" %>
+      <%= f.label :membership_state, "Membership state", class: "form-label" %>
       <% if membership_status_locked %>
-        <div class="form-control-plaintext"><%= membership_status_label(@user.membership_status) %></div>
-        <div class="form-text">Use the member profile actions to change this status.</div>
+        <div class="form-control-plaintext"><%= membership_state_label(@user.membership_state) %></div>
+        <div class="form-text">Use the member profile actions to change this state.</div>
       <% else %>
-        <%= f.select :membership_status,
-            options_for_select(membership_status_options, @user.membership_status),
+        <%= f.select :membership_state,
+            options_for_select(membership_state_options, @user.membership_state),
             {},
-            { class: "form-select", id: "user_membership_status" } %>
-        <div class="form-text">For Guest or Sponsored, you can set when access ends below (optional).</div>
+            { class: "form-select", id: "user_membership_state" } %>
+        <div class="form-text">
+          Setting this by hand overrides the state machine. For Guest or Sponsored, you can set when access ends below.
+        </div>
       <% end %>
     </div>
 
@@ -195,12 +200,12 @@
     <% unless membership_status_locked %>
       <script>
       (function() {
-        const sel = document.getElementById('user_membership_status');
+        const sel = document.getElementById('user_membership_state');
         const box = document.getElementById('guest-sponsored-access-fields');
         if (!sel || !box) return;
         function sync() {
           const v = sel.value;
-          box.style.display = (v === 'guest' || v === 'sponsored') ? 'block' : 'none';
+          box.style.display = (v === 'guest_member' || v === 'sponsored_member') ? 'block' : 'none';
         }
         sel.addEventListener('change', sync);
         sync();

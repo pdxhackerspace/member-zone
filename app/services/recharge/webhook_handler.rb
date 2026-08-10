@@ -35,76 +35,56 @@ module Recharge
       user = find_user
       return user_not_found('subscription/created') unless user
 
-      old_status = user.membership_status
-      user.update!(membership_status: 'paying') if user.cancelled?
+      old_state = user.membership_state
+      user.record_payment! if user.cancelled?
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
-      details = { 'previous_membership_status' => old_status,
-                  'new_membership_status' => user.reload.membership_status }
+      details = { 'previous_membership_state' => old_state,
+                  'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_created', details: details)
       create_payment_event(user, 'subscription_started')
-      log_and_respond('subscription/created', user, old_status, user.membership_status)
+      log_and_respond('subscription/created', user, old_state, user.membership_state)
     end
 
+    # Recording the cancellation is enough: User keeps the member active until their
+    # paid-through date and moves them to inactive when it passes.
     def handle_subscription_cancelled
       user = find_user
       return user_not_found('subscription/cancelled') unless user
-      return log_and_respond('subscription/cancelled', user, 'cancelled', 'cancelled') if user.cancelled?
+      return log_and_respond('subscription/cancelled', user, 'cancelled_member', 'cancelled_member') if user.cancelled?
 
-      details = { 'previous_membership_status' => user.membership_status,
-                  'cancellation_reason' => @subscription['cancellation_reason'],
-                  'cancelled_at' => @subscription['cancelled_at'] }
-      create_journal_entry(user: user, action: 'subscription_cancelled', details: details)
-      create_payment_event(user, 'subscription_cancelled')
-
-      if payment_period_expired?(user)
-        old_status = user.membership_status
-        user.update!(membership_status: 'cancelled')
-        log_and_respond('subscription/cancelled', user, old_status, 'cancelled')
-      else
-        Rails.logger.info("[Recharge::WebhookHandler] subscription/cancelled: #{user.display_name} " \
-                          '(membership active until payment period ends)')
-        { status: 'processed', user_id: user.id, action: 'subscription_cancelled', deferred: true }
-      end
+      old_state = user.membership_state
+      SubscriptionCancellation.call(user: user, subscription: @subscription, source: 'webhook')
+      log_and_respond('subscription/cancelled', user, old_state, user.membership_state)
     end
 
     def handle_subscription_resumed
       user = find_user
       return user_not_found('subscription/activated') unless user
 
-      old_status = user.membership_status
-      user.update!(membership_status: 'paying') if user.cancelled?
+      old_state = user.membership_state
+      user.record_payment! if user.cancelled?
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
-      details = { 'previous_membership_status' => old_status,
-                  'new_membership_status' => user.reload.membership_status }
+      details = { 'previous_membership_state' => old_state,
+                  'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_resumed', details: details)
       create_payment_event(user, 'subscription_resumed')
-      log_and_respond('subscription/activated', user, old_status, user.membership_status)
+      log_and_respond('subscription/activated', user, old_state, user.membership_state)
     end
 
     def handle_subscription_paused
       user = find_user
       return user_not_found('subscription/paused') unless user
 
-      details = { 'previous_membership_status' => user.membership_status }
+      details = { 'previous_membership_state' => user.membership_state }
       create_journal_entry(user: user, action: 'subscription_paused', details: details)
       create_payment_event(user, 'subscription_paused')
-      log_and_respond('subscription/paused', user, user.membership_status, user.membership_status)
+      log_and_respond('subscription/paused', user, user.membership_state, user.membership_state)
     end
 
     def link_customer_id?(user)
       customer_id.present? && user.recharge_customer_id != customer_id
-    end
-
-    def payment_period_expired?(user)
-      window = user.payment_currency_window
-      return false if window.nil?
-
-      last_payment = user.most_recent_payment_date
-      return true if last_payment.blank?
-
-      last_payment < window.ago.to_date
     end
 
     def user_not_found(topic)

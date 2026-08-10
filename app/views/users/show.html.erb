@@ -70,7 +70,7 @@
       <i class="bi bi-lightning-charge text-warning" aria-hidden="true"></i>
       <span>
         <strong>Active override applied</strong> -
-        membership shows as Active despite <%= @user.dues_status.to_s.humanize.downcase %> dues.
+        membership shows as Active despite state <%= membership_state_label(@user.membership_state).downcase %>.
         <span class="text-secondary">See Journal for audit details.</span>
       </span>
     </div>
@@ -96,8 +96,11 @@
           <span class="status-pill <%= status_class %>">
             <span class="dot">●</span> <%= status_label %>
           </span>
-          <% if @user.dues_status == 'lapsed' %>
-            <span class="badge text-bg-warning-subtle small fw-normal">Lapsed dues</span>
+          <%# The pill above says whether they get in; this says why, when the reason is not obvious. %>
+          <% unless @user.effective_membership_state.in?(%w[current_member sponsored_member]) %>
+            <span class="badge <%= membership_state_badge_subtle_class(@user.effective_membership_state) %> small fw-normal">
+              <%= membership_state_label(@user.effective_membership_state) %>
+            </span>
           <% end %>
           <% if @user.is_sponsored? %>
             <span class="badge text-bg-info-subtle small fw-normal">Sponsored</span>
@@ -153,7 +156,7 @@
             <% if @profile_caps[:emergency_override] %>
               <li data-action-key="members.emergency_active_override"><%= button_to "Clear active override", clear_emergency_active_override_user_path(@user), method: :post, class: "dropdown-item", form: { data: { turbo: false } } %></li>
             <% end %>
-          <% elsif !@user.active? && !@user.membership_status.in?(%w[banned deceased]) %>
+          <% elsif !@user.active? && !@user.terminal_membership_state? %>
             <% if @profile_caps[:emergency_override] %>
               <li data-action-key="members.emergency_active_override"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#applyOverrideModal">Apply active override...</button></li>
             <% end %>
@@ -165,6 +168,9 @@
               <% else %>
                 <li data-action-key="members.sponsor"><%= button_to "Sponsor...", mark_sponsored_user_path(@user), method: :post, class: "dropdown-item", form: { data: { turbo: false } } %></li>
               <% end %>
+            <% end %>
+            <% if @profile_caps[:edit_membership] && @user.membership_state.in?(%w[current_member overdue_member new_member provisional_member]) %>
+              <li data-action-key="members.edit_membership"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#recordCancellationModal">Record cancellation...</button></li>
             <% end %>
             <% if @profile_caps[:mark_deceased] %>
               <li data-action-key="members.mark_deceased"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#deceasedModal">Mark as deceased...</button></li>
@@ -191,7 +197,11 @@
               <li><hr class="dropdown-divider"></li>
             <% end %>
             <% if @profile_caps[:ban] && !@user.service_account? %>
-              <li data-action-key="members.ban"><button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#banModal">Ban...</button></li>
+              <% if @user.banned? %>
+                <li data-action-key="members.ban"><%= button_to "Lift ban", unban_user_path(@user), method: :post, class: "dropdown-item", form: { data: { turbo: false } } %></li>
+              <% else %>
+                <li data-action-key="members.ban"><button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#banModal">Ban...</button></li>
+              <% end %>
             <% end %>
             <% if @profile_caps[:delete] %>
               <li data-action-key="members.delete"><button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteMemberModal">Delete member...</button></li>

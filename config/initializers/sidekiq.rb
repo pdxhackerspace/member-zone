@@ -70,6 +70,23 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Membership State Tick - Daily at 4am, before the payment syncs and reminders so
+  # they see today's states rather than yesterday's.
+  Sidekiq::Cron::Job.create(
+    name: 'Membership State Tick - Daily at 4am',
+    cron: '0 4 * * *',
+    class: 'Membership::TickJob',
+    active_job: true
+  )
+
+  # Overdue Payment Reminder - Daily at 7:30am (cadence enforced per member)
+  Sidekiq::Cron::Job.create(
+    name: 'Overdue Payment Reminder - Daily at 7:30am',
+    cron: '30 7 * * *',
+    class: 'PaymentOverdueReminderJob',
+    active_job: true
+  )
+
   # Parking Notice Expiration - Daily at 7am
   Sidekiq::Cron::Job.create(
     name: 'Parking Notice Expiration - Daily at 7am',

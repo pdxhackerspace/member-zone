@@ -16,7 +16,6 @@ module ApplicationHelper
     'banned' => 'danger',
     'deceased' => 'dark',
     'sponsored' => 'primary',
-    'applicant' => 'light text-dark',
     'cancelled' => 'secondary',
     'unknown' => 'secondary'
   }.freeze
@@ -39,7 +38,6 @@ module ApplicationHelper
       'banned' => 'text-bg-danger-subtle',
       'deceased' => 'text-bg-dark-subtle',
       'sponsored' => 'text-bg-info-subtle',
-      'applicant' => 'text-bg-warning-subtle',
       'cancelled' => 'text-bg-secondary-subtle',
       'unknown' => 'text-bg-secondary-subtle'
     }.fetch(status.to_s, 'text-bg-secondary-subtle')

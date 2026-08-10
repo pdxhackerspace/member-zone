@@ -67,13 +67,14 @@ module Recharge
 
       return :skipped unless user.cancelled?
 
-      old_status = user.membership_status
-      user.update!(membership_status: 'paying')
+      old_state = user.membership_state
+      user.record_payment!
       link_customer_id(user, sub)
-      create_journal_entry(user, 'subscription_created', sub, old_status, 'paying')
+      create_journal_entry(user, 'subscription_created', sub, old_state, user.membership_state)
       create_payment_event(user, sub, 'subscription_started')
 
-      @logger.info("[Recharge::SubscriptionSynchronizer] Re-activated #{user.display_name} (#{old_status} -> paying)")
+      @logger.info("[Recharge::SubscriptionSynchronizer] Re-activated #{user.display_name} " \
+                   "(#{old_state} -> #{user.membership_state})")
       :created
     end
 
@@ -89,26 +90,7 @@ module Recharge
         return created ? :cancelled : :skipped
       end
 
-      return :skipped if user.cancelled?
-
-      event_is_new = create_payment_event(user, sub, 'subscription_cancelled')
-
-      if payment_period_expired?(user)
-        old_status = user.membership_status
-        user.update!(membership_status: 'cancelled')
-        create_journal_entry(user, 'subscription_cancelled', sub, old_status, 'cancelled') if event_is_new
-        @logger.info("[Recharge::SubscriptionSynchronizer] Cancelled #{user.display_name} (#{old_status} -> cancelled)")
-        :cancelled
-      elsif event_is_new
-        create_journal_entry(user, 'subscription_cancelled', sub, user.membership_status, user.membership_status)
-        @logger.info(
-          '[Recharge::SubscriptionSynchronizer] Recorded cancellation for ' \
-          "#{user.display_name} (membership active until payment period ends)"
-        )
-        :cancelled
-      else
-        :skipped
-      end
+      SubscriptionCancellation.call(user: user, subscription: sub, source: 'subscription_sync', logger: @logger)
     end
 
     def handle_paused(sub)
@@ -119,16 +101,6 @@ module Recharge
 
       @logger.info("[Recharge::SubscriptionSynchronizer] Paused subscription for #{user.display_name}")
       :skipped
-    end
-
-    def payment_period_expired?(user)
-      window = user.payment_currency_window
-      return false if window.nil?
-
-      last_payment = user.most_recent_payment_date
-      return true if last_payment.blank?
-
-      last_payment < window.ago.to_date
     end
 
     def find_user(sub)

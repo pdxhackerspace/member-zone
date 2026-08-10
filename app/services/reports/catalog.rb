@@ -18,40 +18,33 @@ module Reports
     REPORTS = [
       Definition.new(
         key: 'membership-status-unknown',
-        title: 'Membership status unknown',
-        description: 'Active members whose membership status has never been determined.',
+        title: 'Legacy records never matched to a membership',
+        description: 'Imported rows that were never reconciled against a real member — they have ' \
+                     'no access and nothing is chasing them for dues. Every other member has a ' \
+                     'determined state: no payments means inactive, not undetermined.',
         category: 'data-quality',
         partial: 'user_table',
         locals: { show_payment_type: true },
-        empty_message: 'Every active member has a known membership status.'
+        empty_message: 'Every imported record has been matched to a membership.',
+        attention: true
       ) do
-        ScopeQuery.new(
-          User.where(membership_status: 'unknown', active: true).non_service_accounts.order(NAME_ORDER)
-        )
+        ScopeQuery.new(User.membership_undetermined.non_service_accounts.legacy.order(NAME_ORDER))
       end,
 
       Definition.new(
         key: 'payment-type-unknown',
         title: 'Payment type unknown',
-        description: 'Active members with no recorded way of paying their dues.',
+        description: 'Active members with no recorded way of paying their dues — nobody is billing them ' \
+                     'and nothing will chase them. Sponsored members are not here: somebody else covers ' \
+                     'them, and their payment type says so.',
         category: 'data-quality',
         partial: 'user_table',
         locals: { show_payment_type: true },
         empty_message: 'Every active member has a known payment type.'
       ) do
-        ScopeQuery.new(User.where(payment_type: 'unknown', active: true).non_service_accounts.order(NAME_ORDER))
-      end,
-
-      Definition.new(
-        key: 'dues-status-unknown',
-        title: 'Dues status unknown',
-        description: 'Active members whose dues have never been reconciled against a payment.',
-        category: 'data-quality',
-        partial: 'user_table',
-        locals: { show_dues_status: true },
-        empty_message: 'Every active member has a known dues status.'
-      ) do
-        ScopeQuery.new(User.where(dues_status: 'unknown', active: true).non_service_accounts.order(NAME_ORDER))
+        BuildingAccessScopeQuery.new(
+          User.where(payment_type: 'unknown', active: true).non_service_accounts.order(NAME_ORDER)
+        )
       end,
 
       Definition.new(
@@ -60,12 +53,11 @@ module Reports
         description: 'Current members with no email address on file, so nothing can be sent to them.',
         category: 'data-quality',
         partial: 'simple_user_table',
-        locals: { columns: %i[membership_status dues_status] },
+        locals: { columns: %i[membership_status] },
         empty_message: 'Every current member has an email address.'
       ) do
         ScopeQuery.new(
-          User.where(email: [nil, ''])
-              .where("users.active = TRUE OR users.membership_status IN ('paying', 'sponsored', 'guest')")
+          User.where(email: [nil, '']).access_granting
               .non_service_accounts.non_legacy.order(NAME_ORDER)
         )
       end,
@@ -73,27 +65,30 @@ module Reports
       Definition.new(
         key: 'dues-status-lapsed',
         title: 'Dues lapsed',
-        description: 'Active members whose dues have fallen behind.',
+        description: 'Members who are behind on dues but still inside their grace period.',
         category: 'billing',
         partial: 'user_table',
-        locals: { show_dues_status: true, show_last_payment: true },
-        empty_message: 'No active member has lapsed dues.'
+        locals: { show_last_payment: true },
+        empty_message: 'No member is behind on dues.'
       ) do
-        ScopeQuery.new(User.where(dues_status: 'lapsed', active: true).non_service_accounts.order(NAME_ORDER))
+        ScopeQuery.new(
+          User.where(membership_state: 'overdue_member').non_service_accounts.order(NAME_ORDER)
+        )
       end,
 
       Definition.new(
         key: 'sponsored-and-paying',
         title: 'Sponsored and paying',
-        description: 'Members marked as sponsored who are also being charged — usually a billing mistake.',
+        description: 'Members flagged as sponsored whose membership state says otherwise — ' \
+                     'usually a billing mistake.',
         category: 'billing',
         partial: 'simple_user_table',
-        locals: { columns: %i[membership_status dues_status] },
+        locals: { columns: %i[membership_status] },
         empty_message: 'No sponsored member is also paying.',
         attention: true
       ) do
         ScopeQuery.new(
-          User.where(is_sponsored: true, membership_status: 'paying')
+          User.where(is_sponsored: true).where.not(membership_state: 'sponsored_member')
               .non_service_accounts.non_legacy.order(NAME_ORDER)
         )
       end,
@@ -149,10 +144,10 @@ module Reports
                      'what they pay for.',
         category: 'access',
         partial: 'simple_user_table',
-        locals: { columns: %i[membership_status dues_status] },
+        locals: { columns: %i[membership_status] },
         empty_message: 'Every paying member badges in regularly.'
       ) do
-        ids = User.where(membership_status: 'paying').non_service_accounts.non_legacy
+        ids = User.dues_current.non_service_accounts.non_legacy
                   .left_joins(:access_logs).group('users.id')
                   .having('COUNT(access_logs.id) < 3').pluck('users.id')
         ScopeQuery.new(User.where(id: ids).order(NAME_ORDER))
@@ -164,7 +159,7 @@ module Reports
         description: 'Active members who joined recently and have never been linked to a Slack account.',
         category: 'slack',
         partial: 'simple_user_table',
-        locals: { columns: %i[membership_status dues_status] },
+        locals: { columns: %i[membership_status] },
         empty_message: 'Every recent active member has a linked Slack account.'
       ) do
         ScopeQuery.new(
@@ -181,8 +176,7 @@ module Reports
         empty_message: 'No lapsed member has a Slack account.'
       ) do
         ScopeQuery.new(
-          User.where(dues_status: 'lapsed').where.not(membership_status: %w[banned deceased])
-              .non_service_accounts.non_legacy
+          User.dues_lapsed.non_service_accounts.non_legacy
               .joins(:slack_user).includes(:slack_user).order(NAME_ORDER)
         )
       end,

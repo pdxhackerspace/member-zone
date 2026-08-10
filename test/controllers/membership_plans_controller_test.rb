@@ -13,7 +13,8 @@ class MembershipPlansControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'mark_dues_received sets dues_due_at from plan billing cycle' do
-    @user.update_columns(dues_due_at: nil, dues_status: 'lapsed', last_payment_date: 2.months.ago.to_date)
+    @user.update_columns(dues_due_at: nil, membership_state: 'overdue_member', dues_status: 'lapsed',
+                         last_payment_date: 2.months.ago.to_date)
     post mark_dues_received_membership_plans_path, params: { user_id: @user.id }
     assert_redirected_to manual_payments_membership_plans_path
     @user.reload

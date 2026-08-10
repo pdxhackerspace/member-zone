@@ -70,36 +70,28 @@ class UserLegacyTest < ActiveSupport::TestCase
     assert_not user.legacy?, 'Legacy should be cleared when a membership plan is set'
   end
 
-  test 'setting dues_status to current clears legacy flag' do
-    user = create_user(legacy: true, dues_status: 'unknown')
+  test 'a payment clears the legacy flag' do
+    user = create_user(legacy: true)
 
-    user.update!(dues_status: 'current')
+    user.record_payment!(last_payment_date: Date.current)
 
-    assert_not user.legacy?, 'Legacy should be cleared when dues_status changes to current'
+    assert_not user.legacy?, 'Legacy should be cleared when a payment lands'
   end
 
-  test 'setting dues_status to lapsed clears legacy flag' do
-    user = create_user(legacy: true, dues_status: 'unknown')
+  test 'lapsing clears the legacy flag' do
+    user = create_user(legacy: true)
 
-    user.update!(dues_status: 'lapsed')
+    user.update!(membership_state: 'inactive_member')
 
-    assert_not user.legacy?, 'Legacy should be cleared when dues_status changes to lapsed'
+    assert_not user.legacy?, 'Legacy should be cleared once the membership state is determined'
   end
 
-  test 'setting dues_status to inactive clears legacy flag' do
-    user = create_user(legacy: true, dues_status: 'unknown')
-
-    user.update!(dues_status: 'inactive')
-
-    assert_not user.legacy?, 'Legacy should be cleared when dues_status changes to inactive'
-  end
-
-  test 'dues_status remaining unknown does NOT clear legacy flag' do
-    user = create_user(legacy: true, dues_status: 'unknown')
+  test 'a membership state that stays unknown does NOT clear legacy flag' do
+    user = create_user(legacy: true)
 
     user.update!(full_name: "Updated Name #{SecureRandom.hex(4)}")
 
-    assert user.legacy?, 'Legacy should NOT be cleared when dues_status stays unknown'
+    assert user.legacy?, 'Legacy should NOT be cleared when the membership state stays unknown'
   end
 
   test 'setting last_payment_date clears legacy flag' do
@@ -118,40 +110,40 @@ class UserLegacyTest < ActiveSupport::TestCase
     assert_not user.legacy?, 'Legacy should be cleared when recharge_most_recent_payment_date is set'
   end
 
-  test 'setting membership_status to paying clears legacy flag' do
-    user = create_user(legacy: true, membership_status: 'unknown')
+  test 'becoming a current member clears legacy flag' do
+    user = create_user(legacy: true)
 
-    user.update!(membership_status: 'paying')
+    user.update!(membership_state: 'current_member')
 
-    assert_not user.legacy?, 'Legacy should be cleared when membership_status becomes paying'
+    assert_not user.legacy?, 'Legacy should be cleared when the member starts paying'
   end
 
-  test 'setting membership_status to sponsored clears legacy flag' do
-    user = create_user(legacy: true, membership_status: 'unknown')
+  test 'being sponsored clears legacy flag' do
+    user = create_user(legacy: true)
 
-    user.update!(membership_status: 'sponsored')
+    user.mark_sponsored!
 
-    assert_not user.legacy?, 'Legacy should be cleared when membership_status becomes sponsored'
+    assert_not user.legacy?, 'Legacy should be cleared when the member is sponsored'
   end
 
   # ─── Regression: setting legacy must not be undone by existing data ──
 
-  test 'marking legacy sticks even when dues_status is inactive' do
-    user = create_user(legacy: false, dues_status: 'inactive')
+  test 'marking legacy sticks even when the member has already lapsed' do
+    user = create_user(legacy: false, membership_state: 'inactive_member')
 
     user.update!(legacy: true)
     user.reload
 
-    assert user.legacy?, 'Legacy should stick when set on a member with existing inactive dues_status'
+    assert user.legacy?, 'Legacy should stick when set on a member who has already lapsed'
   end
 
-  test 'marking legacy sticks even when dues_status is lapsed' do
-    user = create_user(legacy: false, dues_status: 'lapsed')
+  test 'marking legacy sticks even when the member is overdue' do
+    user = create_user(legacy: false, membership_state: 'overdue_member')
 
     user.update!(legacy: true)
     user.reload
 
-    assert user.legacy?, 'Legacy should stick when set on a member with existing lapsed dues_status'
+    assert user.legacy?, 'Legacy should stick when set on a member who is behind on dues'
   end
 
   test 'marking legacy sticks even when membership_plan is set' do
@@ -169,10 +161,10 @@ class UserLegacyTest < ActiveSupport::TestCase
   # ─── Auto-clear journal ────────────────────────────────────────────
 
   test 'auto-clear of legacy creates a journal entry' do
-    user = create_user(legacy: true, dues_status: 'unknown')
+    user = create_user(legacy: true)
     initial_journal_count = user.journals.count
 
-    user.update!(dues_status: 'current')
+    user.update!(membership_state: 'current_member')
 
     assert_not user.legacy?
     assert_operator user.journals.count, :>, initial_journal_count,
@@ -185,9 +177,7 @@ class UserLegacyTest < ActiveSupport::TestCase
     defaults = {
       authentik_id: "legacy-test-#{SecureRandom.hex(4)}",
       full_name: "Legacy Test #{SecureRandom.hex(4)}",
-      payment_type: attrs[:payment_type] || 'unknown',
-      membership_status: attrs[:membership_status] || 'unknown',
-      dues_status: attrs[:dues_status] || 'unknown',
+      payment_type: 'unknown',
       legacy: false
     }
     User.create!(defaults.merge(attrs))

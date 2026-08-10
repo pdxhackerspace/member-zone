@@ -1,5 +1,5 @@
 <%# Status Panel - shows membership status information %>
-<%# Params: user, show_dues (boolean) %>
+<%# Params: user %>
 <div class="card border-0 bg-body-tertiary">
   <div class="card-body text-center">
     <%# Service Account Badge %>
@@ -92,7 +92,8 @@
         <% end %>
 
         <% next_payment = user.next_payment_date %>
-        <% if next_payment.present? && user.membership_status.in?(%w[paying cancelled unknown applicant]) %>
+        <% limited_access_state = user.membership_state.in?(%w[guest_member sponsored_member]) %>
+        <% if next_payment.present? && !limited_access_state %>
           <div class="mb-3">
             <small class="text-muted d-block">Next Payment</small>
             <% if next_payment > Date.current %>
@@ -107,9 +108,9 @@
               </span>
             <% end %>
           </div>
-        <% elsif user.dues_due_at.present? && user.membership_status.in?(%w[guest sponsored]) %>
+        <% elsif user.dues_due_at.present? && limited_access_state %>
           <div class="mb-3">
-            <small class="text-muted d-block">Limited <%= user.membership_status.humanize %> Access</small>
+            <small class="text-muted d-block">Limited <%= membership_state_label(user.membership_state) %> Access</small>
             <% if user.dues_due_at > Time.current %>
               <span class="text-success">
                 <i class="bi bi-calendar-event me-1"></i>
@@ -124,20 +125,6 @@
                 Ended <%= user.dues_due_at.strftime('%B %d, %Y') %>
               </span>
             <% end %>
-          </div>
-        <% end %>
-
-        <% if local_assigns[:show_dues] %>
-          <div class="mb-3">
-            <small class="text-muted d-block">Dues Status</small>
-            <% dues_badge_class = case user.dues_status
-               when "current" then "success"
-               when "lapsed" then "warning"
-               when "inactive" then "secondary"
-               when "unknown" then "secondary"
-               else "secondary"
-               end %>
-            <span class="badge text-bg-<%= dues_badge_class %> fs-6"><%= user.dues_status.humanize %></span>
           </div>
         <% end %>
 
@@ -197,8 +184,14 @@
         <% end %>
 
         <div class="mb-3">
-          <small class="text-muted d-block">Membership Status</small>
-          <span class="badge text-bg-<%= membership_status_badge_class(user.membership_status) %> fs-6"><%= membership_status_label(user.membership_status) %></span>
+          <small class="text-muted d-block">Membership state</small>
+          <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %> fs-6"><%= membership_state_label(user.membership_state) %></span>
+          <% expires_at = user.membership_state_expires_at %>
+          <% if expires_at.present? %>
+            <div class="text-12 text-secondary mt-1" title="<%= l(expires_at, format: :long) %>">
+              <%= expires_at > Time.current ? "Until #{expires_at.to_date.strftime('%b %-d, %Y')}" : "Lapsed #{time_ago_in_words(expires_at)} ago" %>
+            </div>
+          <% end %>
         </div>
 
         <% manage_membership_content = TextFragment.content_for('manage_your_membership') %>

@@ -25,7 +25,8 @@ class UsersSponsoredTest < ActionDispatch::IntegrationTest
   end
 
   test 'mark_sponsored activates the member' do
-    @user.update_columns(membership_status: 'unknown', dues_status: 'unknown', active: false)
+    @user.update_columns(membership_state: 'unknown', membership_status: 'unknown', dues_status: 'unknown',
+                         active: false)
 
     post mark_sponsored_user_path(@user)
     @user.reload
