@@ -3,7 +3,7 @@ module Membership
   # nightly TickJob and the preview/apply rake tasks so the rules live in one place.
   class StateTick
     EXPIRING_STATES = MembershipStateResolution::EXPIRY_TARGETS.keys.freeze
-    Result = Struct.new(:status, :user, :from_state, :to_state, keyword_init: true) do
+    Result = Struct.new(:status, :user, :from_state, :to_state) do
       def expired? = status == :expired
       def reconciled? = status == :reconciled
       def changed? = expired? || reconciled?

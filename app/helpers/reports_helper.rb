@@ -9,9 +9,9 @@ module ReportsHelper
 
     if status.trained?
       safe_join([
-        tag.span(label, class: building_access_label_class(status)),
-        tag.div(admin_profile_time(status.trained_at), class: 'text-12 text-secondary')
-      ])
+                  tag.span(label, class: building_access_label_class(status)),
+                  tag.div(admin_profile_time(status.trained_at), class: 'text-12 text-secondary')
+                ])
     else
       tag.span(label, class: building_access_label_class(status))
     end

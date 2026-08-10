@@ -29,39 +29,8 @@ class OnboardingController < AuthenticatedController
   def payment; end
 
   def save_payment
-    membership_type = params[:membership_type]
-
-    case membership_type
-    when 'paying'
-      if params[:cash_plan] == '1'
-        plan = MembershipPlan.create!(
-          name: "Cash - #{@user.display_name}",
-          cost: params[:plan_cost].to_f.positive? ? params[:plan_cost].to_f : 0,
-          billing_period_days: onboarding_cash_plan_billing_period_days,
-          description: params[:plan_notes].presence,
-          plan_type: 'primary',
-          manual: true,
-          visible: false,
-          user: @user
-        )
-        @user.record_payment!(payment_type: 'cash', membership_plan: plan, last_payment_date: Date.current)
-      else
-        @user.record_payment!(payment_type: 'unknown', last_payment_date: Date.current)
-      end
-    when 'sponsored'
-      @user.mark_sponsored!
-      duration = onboarding_sponsored_guest_duration
-      @user.update!(duration) if duration.present?
-    when 'guest'
-      months = params[:sponsored_guest_duration_months].to_s.strip.presence&.to_i
-      @user.mark_guest!(duration_months: months)
-    end
-
-    if membership_type == 'guest'
-      redirect_to onboard_mail_path(@user), status: :see_other
-    else
-      redirect_to onboard_access_path(@user), status: :see_other
-    end
+    apply_onboarding_payment!(params[:membership_type])
+    redirect_after_onboarding_payment!(params[:membership_type])
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:alert] = "Error: #{e.message}"
     render :payment, status: :unprocessable_content
@@ -163,6 +132,55 @@ class OnboardingController < AuthenticatedController
     return {} unless m.present? && m.positive?
 
     { dues_due_at: Time.current + m.months }
+  end
+
+  def apply_onboarding_payment!(membership_type)
+    case membership_type
+    when 'paying' then apply_paying_onboarding_payment!
+    when 'sponsored' then apply_sponsored_onboarding_payment!
+    when 'guest' then apply_guest_onboarding_payment!
+    end
+  end
+
+  def apply_paying_onboarding_payment!
+    if params[:cash_plan] == '1'
+      plan = create_onboarding_cash_plan!
+      @user.record_payment!(payment_type: 'cash', membership_plan: plan, last_payment_date: Date.current)
+    else
+      @user.record_payment!(payment_type: 'unknown', last_payment_date: Date.current)
+    end
+  end
+
+  def apply_sponsored_onboarding_payment!
+    @user.mark_sponsored!
+    duration = onboarding_sponsored_guest_duration
+    @user.update!(duration) if duration.present?
+  end
+
+  def apply_guest_onboarding_payment!
+    months = params[:sponsored_guest_duration_months].to_s.strip.presence&.to_i
+    @user.mark_guest!(duration_months: months)
+  end
+
+  def create_onboarding_cash_plan!
+    MembershipPlan.create!(
+      name: "Cash - #{@user.display_name}",
+      cost: params[:plan_cost].to_f.positive? ? params[:plan_cost].to_f : 0,
+      billing_period_days: onboarding_cash_plan_billing_period_days,
+      description: params[:plan_notes].presence,
+      plan_type: 'primary',
+      manual: true,
+      visible: false,
+      user: @user
+    )
+  end
+
+  def redirect_after_onboarding_payment!(membership_type)
+    if membership_type == 'guest'
+      redirect_to onboard_mail_path(@user), status: :see_other
+    else
+      redirect_to onboard_access_path(@user), status: :see_other
+    end
   end
 
   def onboarding_cash_plan_billing_period_days

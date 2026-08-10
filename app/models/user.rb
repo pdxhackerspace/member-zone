@@ -402,9 +402,7 @@ class User < ApplicationRecord
   def payment_currency_window(billing_plan: nil)
     plan = billing_plan || membership_plan
     cycle = plan&.billing_cycle_duration
-    if cycle
-      return cycle + MembershipSetting.payment_currency_buffer_days.days
-    end
+    return cycle + MembershipSetting.payment_currency_buffer_days.days if cycle
 
     plan&.billing_frequency == 'one-time' ? nil : MembershipSetting.planless_payment_window_days.days
   end
