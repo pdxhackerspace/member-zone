@@ -1,523 +1,280 @@
-# Membership Status State Machine
+# Membership State Machine
 
-This document describes how membership status, dues status, and member activity changes in the MemberZone application.
+A member's standing is one value: `users.membership_state`. Everything else about their
+access — whether the door opens, what the member list shows, whether a reminder goes out —
+is derived from it.
 
-## Overview
-
-The system tracks three key member state fields:
-
-- **`membership_status`** — Overall membership classification (paying, guest, banned, deceased, sponsored, applicant, cancelled, unknown)
-- **`dues_status`** — Payment currency (current, lapsed, inactive, unknown)
-- **`active`** — Boolean flag indicating if member can access resources
-
-These fields are updated automatically through payment linking, manual admin actions, and scheduled jobs.
+This document is the specification. If the code and this document disagree, one of them is
+a bug.
 
 ---
 
-## Core Fields
+## Where the logic lives
 
-### User Model Schema
+All of it is on `User`, split across four concerns so no single file outgrows RuboCop's
+class-length limit:
 
-```ruby
-# Status fields
-membership_status    # string, default: 'unknown'
-dues_status          # string, default: 'unknown'
-active               # boolean, default: false, null: false
-payment_type         # string, default: 'unknown'
+| File | Responsibility |
+| --- | --- |
+| `app/models/concerns/membership_state.rb` | The enum, the `TRANSITIONS` table, the guard that enforces it, and the scopes |
+| `app/models/concerns/membership_transitions.rb` | The transition methods (`approve_application!`, `record_payment!`, …) |
+| `app/models/concerns/membership_state_resolution.rb` | Deadlines: what a state becomes when its clock runs out |
+| `app/models/concerns/membership_state_projection.rb` | Rewriting the cached columns (`active`, `membership_status`, `dues_status`) |
 
-# Payment tracking
-last_payment_date               # date
-membership_start_date           # date
-membership_ended_date           # date
-recharge_most_recent_payment_date  # datetime
-paypal_account_id               # string
-recharge_customer_id            # string
-```
+`Membership::ActiveStatus` still exists as a thin adapter for older callers. It delegates;
+it decides nothing.
 
-### Allowed Values
-
-**membership_status enum:**
-- `paying` — Actively paying member
-- `guest` — Guest access
-- `banned` — Access denied
-- `deceased` — Member passed away
-- `sponsored` — Sponsored membership (free)
-- `applicant` — Pending membership application
-- `cancelled` — Cancelled membership
-- `unknown` — Default/unclear status
-
-**dues_status values:**
-- `current` — Dues paid and current
-- `lapsed` — Previously current, now overdue
-- `inactive` — No active payment history
-- `unknown` — Default/unclear status
-
-**payment_type values:**
-- `paypal` — Pays via PayPal
-- `recharge` — Pays via Recharge
-- `kofi` — Pays via Ko-Fi
-- `cash` — Pays cash (manual)
-- `sponsored` — Sponsored (no payment)
-- `inactive` — No payment
-- `unknown` — Default/unclear type
+Nothing outside `User` computes membership state. Controllers, jobs, rake tasks, and
+webhook handlers call a transition method that names what happened. The UI reads state and
+displays it.
 
 ---
 
-## Automatic State Transitions
+## The states
 
-### The 32-Day Rule
+| State | Access | Ends when |
+| --- | --- | --- |
+| `unknown` | No | An admin reconciles the import against a real membership |
+| `new_member` | **Yes** | Building access training is granted, or `new_member_expiry_days` passes |
+| `provisional_member` | **Yes** | They pay, or `new_member_grace_period_days` passes |
+| `current_member` | **Yes** | `dues_paid_through_at` passes |
+| `overdue_member` | **Yes** | They pay, or `overdue_grace_period_days` passes |
+| `cancelled_member` | **Yes** | `dues_paid_through_at` passes |
+| `inactive_member` | No | A payment lands |
+| `guest_member` | **Yes** | `dues_due_at` passes, if one was set |
+| `sponsored_member` | **Yes** | An admin removes the sponsorship |
+| `banned_member` | No | An admin lifts the ban |
+| `deceased_member` | No | Never — terminal |
 
-The most important state transition rule is the **32-day cutoff**. When a payment is linked and it occurred within the last 32 days:
+`new_member` and `provisional_member` are both pre-payment states. The difference is that
+a new member has not yet been trained on building access, so nothing is counting down
+except the long expiry cap; a provisional member has been trained and is inside the short
+grace window before their first payment is expected.
 
-```ruby
-active = true
-membership_status = 'paying'
-dues_status = 'current'
-membership_ended_date = nil  # cleared if present
-```
+`unknown` is narrower than it sounds. It is the bootstrap value for a record nothing has
+happened to yet, and where an unreconciled legacy import sits. It is *not* where a member
+with no payment history goes — that member is inactive, which is the same conclusion
+`state_from_payment_history` reaches when a ban or a sponsorship is lifted. A member
+showing as undetermined who plainly just never paid is a data bug, not a state.
 
-This rule applies to:
-- PayPal payment linking
-- Recharge payment linking
-- Ko-Fi payment linking
-- Manual dues marking
-- Payment sync rake tasks
+Members turn up in ways that say nothing about whether they pay: a Slack account, a name
+on an unmatched badge scan, the first screen of the onboarding wizard. Those records start
+at `User.initial_membership_state`, which reads the **Inactive synced as active** switch on
+the member list. That switch is the admin saying whether MemberZone's ignorance should cost
+somebody their access, so with it on a discovered member gets the onboarding window and with
+it off they are created inactive. Either way a linked payment overrides it immediately.
 
-### Payment Older Than 32 Days
+There is deliberately no `applicant` state. A membership application is a
+`MembershipApplication`, not a member, and it only becomes a `User` when an Executive
+Director approves it — at which point `FinalizeApproval` creates the record and
+`approve_application!` moves it straight to `new_member`. A rejected application never
+produces a user at all.
 
-If the payment is older than 32 days:
-- Status fields are **not** automatically updated to current
-- The payment is recorded and tracked
-- `dues_status` may be set to `lapsed` (if currently `current`)
+`legacy`, `emergency_active_override`, and `is_sponsored` remain orthogonal boolean
+columns, not states. Service accounts bypass the machine entirely: their `active` flag is
+whatever an admin set, and nothing projects over it.
 
-### Deceased Members
-
-Via `before_save` callback `deactivate_if_deceased`:
-
-```ruby
-if membership_status == 'deceased'
-  active = false
-  payment_type = 'inactive'
-end
-```
-
-This ensures deceased members are always inactive.
-
-### Sponsored Members
-
-Sponsored members are always considered current:
-```ruby
-dues_status = 'current'  # enforced in various places
+```mermaid
+stateDiagram-v2
+    [*] --> new_member: application approved
+    new_member --> provisional_member: building access training
+    new_member --> current_member: payment
+    new_member --> inactive_member: expiry cap
+    provisional_member --> current_member: payment
+    provisional_member --> overdue_member: grace expired
+    current_member --> current_member: payment
+    current_member --> overdue_member: paid-through date passed
+    overdue_member --> current_member: payment
+    overdue_member --> inactive_member: overdue grace expired
+    current_member --> cancelled_member: cancellation received
+    overdue_member --> cancelled_member: cancellation received
+    cancelled_member --> inactive_member: paid-through date passed
+    cancelled_member --> current_member: payment
+    inactive_member --> current_member: payment
+    current_member --> banned_member: admin ban
+    banned_member --> current_member: unban, payments current
+    banned_member --> inactive_member: unban, payments lapsed
+    current_member --> deceased_member: admin marks deceased
+    deceased_member --> [*]
 ```
 
 ---
 
-## Payment Linking Workflow
+## Transitions
 
-### PayPal Payment Linking
+Each method names an event, returns `false` when the move does not apply, and raises on a
+genuinely invalid save.
 
-When a `PaypalPayment` is linked to a user (via `user_id` being set):
+| Method | Event | Result |
+| --- | --- | --- |
+| `approve_application!` | An application is approved | `new_member` |
+| `grant_building_access!` | Building access training recorded | `provisional_member` |
+| `record_payment!(**attrs)` | A payment is linked | `current_member` |
+| `record_cancellation!` | A cancellation notice arrives | `cancelled_member` |
+| `ban!` | Admin bans | `banned_member` |
+| `unban!` | Admin lifts a ban | Recomputed from payment history |
+| `mark_deceased!` | Admin marks deceased | `deceased_member`, `payment_type: inactive` |
+| `mark_sponsored!` | Admin sponsors | `sponsored_member`, `is_sponsored: true` |
+| `unmark_sponsored!` | Sponsorship ends | Recomputed from payment history |
+| `mark_guest!(duration_months:)` | Admin grants guest access | `guest_member` |
+| `expire_membership_state!` | A deadline passed | Whatever the deadline leads to |
 
-1. **Trigger:** `after_save :notify_user_of_link, if: :user_id_changed_to_present?`
-2. **Calls:** `user.on_paypal_payment_linked(payment)`
-3. **Updates:**
-   ```ruby
-   paypal_account_id = payment.payer_id
-   payment_type = 'paypal'
-   # Merge email if different
-   # Apply payment updates (32-day rule)
-   # Link all other PayPal payments with same payer_id
-   ```
+`unban!` and `unmark_sponsored!` both fall back to `state_from_payment_history`: current if
+the member's payments still cover them, inactive otherwise. Never `unknown` — we know what
+happened to them, and a member with nothing paying for them is inactive.
 
-### Recharge Payment Linking
+### Illegal transitions fail validation
 
-When a `RechargePayment` is linked to a user:
+`TRANSITIONS` lists the legal moves out of each state. Assigning a state that is not in the
+list adds a validation error rather than saving, so a stray `update!(membership_state: …)`
+cannot silently corrupt someone's standing. `deceased_member` has no exits at all.
 
-1. **Trigger:** `after_save :notify_user_of_link, if: :user_id_changed_to_present?`
-2. **Calls:** `user.on_recharge_payment_linked(payment)`
-3. **Updates:**
-   ```ruby
-   recharge_customer_id = payment.customer_id
-   payment_type = 'recharge'
-   recharge_most_recent_payment_date = payment.processed_at
-   # Merge email if different
-   # Apply payment updates (32-day rule)
-   # Link all other Recharge payments with same customer_id
-   ```
+Two callers legitimately need to place a member anywhere: the admin edit form and data
+backfills. Both set `allow_any_membership_state_transition = true` on the record first.
 
-### Ko-Fi Payment Linking
+---
 
-When a Ko-Fi payment is manually linked:
+## Deadlines
+
+Three of the timed states run off `membership_state_entered_at`, stamped automatically
+whenever the state changes. The rest run off `dues_paid_through_at`.
+
+| State | Deadline |
+| --- | --- |
+| `new_member` | entered_at + `new_member_expiry_days` (default 90) |
+| `provisional_member` | entered_at + `new_member_grace_period_days` (default 14) |
+| `overdue_member` | entered_at + `overdue_grace_period_days` (default 30) |
+| `current_member`, `cancelled_member`, `guest_member` | `dues_paid_through_at` |
+
+`dues_paid_through_at` prefers `dues_due_at` when it is set. Members with no membership
+plan never got one, so it falls back to their last payment plus the plan's billing window
+(32 days by default). Nil means nothing is counting down: a one-time plan, or no payment
+history to measure from.
+
+### Resolved on read, materialized nightly
+
+`effective_membership_state` applies elapsed deadlines every time it is called, chaining
+through up to four hops so a provisional member whose grace ran out months ago resolves
+through `overdue_member` to `inactive_member` in a single pass. `before_save` writes the
+resolved state back, so any save fixes a stale row.
+
+`User#active?` uses the same resolved state, so building access and Authentik sync stay
+correct between runs even when the cached `active` column has drifted. Reports and member
+list filters read the column directly; those counts catch up when the job runs.
+
+`Membership::TickJob` runs daily at 4:00 AM, ahead of the payment syncs and reminders so
+they see today's states. It materializes expiries into the column and reconciles any
+`active` flag that has drifted from what the state implies. The logic lives in
+`Membership::StateTick`, which the job, the preview rake task, and `membership:reconcile_active`
+(all of which invoke the job) share. It is not what keeps access correct — read-time
+resolution does that — but it is what makes the stored state match reality for reminders,
+reports, and the member list, and what fires the state-entry email for members who fall
+inactive.
+
+---
+
+## The projected columns
+
+`active`, `membership_status`, and `dues_status` are rewritten from `membership_state` on
+every save. They exist so queries, reports, and views written before the state machine keep
+returning what they always returned.
+
+**Do not assign them.** Anything you write is overwritten on the next save. Move the member
+instead, with a transition method.
+
+`membership_status` maps the state onto the old enum; note that members behind on dues stay
+`paying` and are distinguished by `dues_status`, matching pre-state-machine behaviour.
+`dues_status` maps onto `current` / `lapsed` / `inactive` / `unknown`.
+
+`payment_type` is mostly not a projection — it records a real payment channel we learned from
+a payment — but two states settle the question themselves and overwrite it: a sponsored member
+pays by `sponsored` and a deceased one by `inactive`. Without that, a sponsored member whose
+PayPal history turned up in a sync ended up filed under `paypal`, and one who had never paid
+anything sat in the "Payment type unknown" report as though nobody were billing them by
+mistake.
+
+Plan-less payment windows also come from `MembershipSetting`: `planless_payment_window_days`
+(default 32) and `payment_currency_buffer_days` (default 2, added to a plan's billing cycle).
+
+New code should read `membership_state` and use the scopes:
 
 ```ruby
-payment_type = 'kofi'
-# If payment within 32 days:
-active = true
-membership_status = 'paying'
-dues_status = 'current'
-```
-
-### Payment Matching Logic
-
-Payments are matched to users in order of preference:
-
-**PayPal:**
-1. `paypal_account_id` matches `payer_id`
-2. Email matches (primary or extra_emails)
-3. Full name matches
-
-**Recharge:**
-1. `recharge_customer_id` matches `customer_id`
-2. Email matches (primary or extra_emails)
-3. Full name matches
-
----
-
-## Scheduled Jobs
-
-### Daily Payment Synchronization
-
-**Time:** 6:00 AM daily (configured in `config/initializers/sidekiq.rb`)
-
-**Jobs:**
-- `Paypal::PaymentSyncJob` — Fetches new PayPal transactions, matches to users, triggers linking callbacks
-- `Recharge::PaymentSyncJob` — Fetches new Recharge charges (SUCCESS status only), matches to users, triggers linking callbacks
-
-**Effect:**
-- New payments are linked automatically
-- User statuses update via payment linking callbacks (32-day rule applies)
-
----
-
-## Rake Tasks
-
-### `payments:link`
-
-Bulk links existing unlinked payments to users.
-
-**Process:**
-1. Build lookup tables for PayPal (`payer_id` → `user_id`) and Recharge (`customer_id` → `user_id`)
-2. Link PayPal payments (by ID, email, or name)
-3. Link Recharge payments (by ID, email, or name)
-4. Update user statuses based on payment dates:
-   - If payment within 32 days: `active = true`, `membership_status = 'paying'`, `dues_status = 'current'`
-   - If payment older than 32 days: `dues_status = 'lapsed'` (if currently `current`)
-5. Set `payment_type` based on most recent payment source
-6. Update membership dates:
-   - `membership_start_date` = 1 month after earliest payment
-   - `membership_ended_date` = 1 month after last payment (only if > 32 days ago)
-7. Match membership plans from PayPal transaction subjects
-
-**Usage:**
-```bash
-rails payments:link
-rails payments:link_stats  # dry run
-```
-
-### `payments:link_orphans`
-
-Links payments where one payment from a customer is linked but others aren't (same `payer_id` or `customer_id`).
-
-### `membership:recalculate_status`
-
-Resets and recalculates all user statuses based on:
-- Payments
-- Sheet entries
-- Current membership settings
-
----
-
-## Manual Admin Actions
-
-### Users Controller
-
-**Activate/Deactivate:**
-```ruby
-# POST /users/:id/activate
-user.update!(active: true)
-
-# POST /users/:id/deactivate
-user.update!(active: false)
-```
-
-**Ban:**
-```ruby
-# POST /users/:id/ban
-user.update!(
-  membership_status: 'banned',
-  active: false
-)
-```
-
-**Mark Deceased:**
-```ruby
-# POST /users/:id/mark_deceased
-user.update!(
-  membership_status: 'deceased',
-  active: false
-)
-# Callback also sets payment_type = 'inactive'
-```
-
-**Update (Admin only):**
-- Can set any `membership_status`, `payment_type`, `active` value
-- Can change `membership_plan_id`
-
-### Reports Controller (Bulk Actions)
-
-Supports bulk status updates on multiple users:
-
-- **activate** / **deactivate** — Sets `active` flag
-- **ban** — Sets `membership_status = 'banned'`, `active = false`
-- **deceased** — Sets `membership_status = 'deceased'`, `active = false`, `payment_type = 'inactive'`
-- **paying** — Sets `membership_status = 'paying'`
-- **sponsored** — Sets `membership_status = 'sponsored'` or `payment_type = 'sponsored'`
-- **guest** — Sets `membership_status = 'guest'` or `payment_type = 'guest'`
-- **cash** / **paypal** / **recharge** — Sets `payment_type`
-
-### Manual Payment Plans: Mark Dues Received
-
-**Location:** Membership Plans > Manual Payment Plan Members
-
-**Effect:**
-```ruby
-dues_status = 'current'
-last_payment_date = Date.current
-active = true
-membership_status = 'paying'
-# Journal entry created
-```
-
-**Availability:**
-- Only for users on manual payment plans
-- Button enabled when:
-  - Next payment date ≤ 7 days away, OR
-  - Next payment date is overdue, OR
-  - Next payment date is nil
-
----
-
-## Next Payment Date Calculation
-
-The system calculates when the next payment is expected based on:
-
-```ruby
-most_recent_payment = [
-  last_payment_date,
-  recharge_most_recent_payment_date,
-  max(paypal_payments.transaction_time),
-  max(recharge_payments.processed_at)
-].compact.max
-
-case membership_plan.billing_frequency
-when 'monthly'
-  most_recent_payment + 1.month
-when 'yearly'
-  most_recent_payment + 1.year
-when 'one-time'
-  nil  # one-time payments don't renew
-end
-```
-
-Used for:
-- Displaying "Renews on [date]" on member profiles
-- Determining if dues marking button should be enabled
-- Reactivation grace period calculations
-
----
-
-## Reactivation Grace Period
-
-**Setting:** `MembershipSetting.reactivation_grace_period_months` (default: varies by installation)
-
-**Purpose:** Determines if a lapsed member can reactivate without re-orientation.
-
-**Methods:**
-```ruby
-# Check if last payment is within grace period
-user.within_reactivation_grace_period?
-  # true if last_payment >= grace_months.months.ago
-
-# Check if past grace period (needs re-orientation)
-user.past_reactivation_grace_period?
-  # true if dues_status == 'lapsed' AND last_payment < grace_months.months.ago
-
-# When grace period expires
-user.reactivation_expires_on
-  # last_payment + grace_months.months
+User.access_granting          # states that open the door
+User.dues_lapsed              # overdue_member, inactive_member
+User.dues_current             # new, provisional, current
+User.membership_undetermined  # unknown
+User.in_membership_states(%w[overdue_member cancelled_member])
 ```
 
 ---
 
-## Google Sheets Sync
+## Email and reminders
 
-**Controller:** `SheetEntriesController#sync_all`
+Everything here goes through `QueuedMail`, which holds a message in the outbound review
+queue unless its template opts out of review.
 
-Syncs user data from a Google Sheet (legacy system):
+| Trigger | Template | Cadence |
+| --- | --- | --- |
+| Entering `cancelled_member` | `membership_cancelled` | Once, guarded by `membership_cancelled_email_sent_at` |
+| `ban!` | `membership_banned` | Once per ban |
+| Entering `inactive_member` | `membership_lapsed` | Once per lapse |
+| Being in `overdue_member` | `payment_past_due` | Weekly, while the reminder is enabled |
+| `mark_deceased!` | — | No email |
 
-**Updates:**
-- `active` — Sets to false if sheet entry status contains "inactive"
-- `payment_type` — Extracted from sheet entry status
-- `membership_status` — Sets to 'sponsored' if payment_type is sponsored and status is 'unknown'
-- Creates new users with appropriate statuses based on sheet data
+The overdue reminder is a `ReminderSetting` keyed `payment_overdue`, **disabled by
+default**. `PaymentOverdueReminderJob` runs daily at 7:30 AM and
+`Reminders::PaymentOverdueEligibility` decides who is due: members whose resolved state is
+still `overdue_member`, not reminded within `payment_overdue_reminder_repeat_days` (default
+7), with an email address, no reminder already waiting in the queue, and not a service
+account. Reading the resolved state rather than the column means a member whose overdue
+grace has run out does not get one last nag on their way to inactive. Cancelled members are
+excluded by design — they told us they were leaving.
 
-**Frequency:** Manual (triggered by admin via "Sync from Sheet" button)
-
----
-
-## Login Behavior
-
-When a user logs in via OAuth:
-
-```ruby
-# app/controllers/sessions_controller.rb:302
-user.update!(active: true)
-```
-
-This ensures users can access the system after authentication.
-
----
-
-## State Transition Summary
-
-### Automatic Transitions
-
-| Trigger | Effect |
-|---------|--------|
-| Payment within 32 days linked | `active = true`, `membership_status = 'paying'`, `dues_status = 'current'` |
-| Payment > 32 days linked | `dues_status = 'lapsed'` (if currently `current`) |
-| `membership_status = 'deceased'` saved | `active = false`, `payment_type = 'inactive'` |
-| User logs in | `active = true` |
-| Daily PayPal/Recharge sync | Links new payments → triggers payment callbacks |
-
-### Manual Transitions (Admin)
-
-| Action | Effect |
-|--------|--------|
-| Activate | `active = true` |
-| Deactivate | `active = false` |
-| Ban | `membership_status = 'banned'`, `active = false` |
-| Mark Deceased | `membership_status = 'deceased'`, `active = false`, `payment_type = 'inactive'` |
-| Mark Dues Received (Manual Plans) | `active = true`, `membership_status = 'paying'`, `dues_status = 'current'`, `last_payment_date = today` |
-| Edit User (Admin) | Any field can be set to any valid value |
-| Bulk Update (Reports) | Various status changes depending on action |
+The cancellation email promises reactivation without reapplying within
+`reactivation_grace_period_months` (default 12) and points anyone past that at the support
+address.
 
 ---
 
-## Edge Cases and Special Behaviors
+## Settings
 
-### Sponsored Members
-- Always `dues_status = 'current'`
-- `payment_type = 'sponsored'`
-- No payment tracking needed
+Settings → Membership settings, stored on the `MembershipSetting` singleton:
 
-### Deceased Members
-- `before_save` callback enforces `active = false` and `payment_type = 'inactive'`
-- Cannot be overridden unless `membership_status` is changed first
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `new_member_grace_period_days` | 14 | How long a trained member has before their first payment is expected |
+| `new_member_expiry_days` | 90 | How long an approved member who never trains stays active |
+| `overdue_grace_period_days` | 30 | How long an overdue member keeps access |
+| `payment_overdue_reminder_repeat_days` | 7 | Minimum gap between overdue reminders |
+| `reactivation_grace_period_months` | 12 | How long a lapsed member can resubscribe without reapplying |
+| `building_access_training_topic_id` | — | Which training topic triggers `grant_building_access!` |
 
-### Multiple Payment Sources
-- `payment_type` set to most recent payment source
-- All payment dates are tracked independently
-- `last_payment_date` is the maximum of all sources
-
-### Membership Dates
-- `membership_start_date` — 1 month after earliest payment (set by `payments:link` task)
-- `membership_ended_date` — 1 month after last payment, only if last payment > 32 days ago
-- Used for display ("Member since...") not for access control
-
-### Plan Matching
-- PayPal payments match plans via `paypal_transaction_subject`
-- When matched, `membership_plan_id` may be set automatically
-- Plan determines billing frequency for next payment calculation
+Building access used to be found by matching `LOWER(name) LIKE '%building access%'`, which
+meant renaming the topic silently broke onboarding. It is now an explicit setting; if it is
+unset, `Training` creation does not advance anyone out of `new_member`.
 
 ---
 
-## Data Flow Diagram
+## Known gaps
 
-```
-Payment Source (PayPal/Recharge/Ko-Fi)
-    ↓
-Payment Synchronizer (Daily 6am or Manual)
-    ↓
-Payment Matching (ID → Email → Name)
-    ↓
-Payment Linked (user_id set)
-    ↓
-Payment Callback (on_paypal_payment_linked / on_recharge_payment_linked)
-    ↓
-apply_payment_updates(payment_date)
-    ↓
-32-Day Check:
-    If payment ≤ 32 days ago:
-        ✓ active = true
-        ✓ membership_status = 'paying'
-        ✓ dues_status = 'current'
-        ✓ membership_ended_date = nil
-    If payment > 32 days ago:
-        ✓ dues_status = 'lapsed' (if currently 'current')
-        ✓ No other changes
-```
+- **Cancellation is only detected automatically for Recharge.** PayPal and Ko-fi send no
+  cancellation signal, so a member who cancels there goes `overdue_member` →
+  `inactive_member` and gets reminders on the way. Staff can record it by hand from the
+  member page.
+- **Revoking building access training does not move anyone back.** Payment state is
+  independent of training, so a `current_member` who loses the training stays current.
 
 ---
 
-## Testing Scenarios
+## Working on this
 
-### Scenario 1: New Member Signs Up via PayPal
-
-1. Member pays via PayPal
-2. Daily sync job fetches transaction
-3. Payment matched by email
-4. PayPal payment linked → `user.on_paypal_payment_linked(payment)`
-5. Payment is within 32 days → all statuses set to active/current/paying
-6. Membership plan matched from transaction subject
-7. Next payment date calculated
-
-**Expected State:**
-```ruby
-active: true
-membership_status: 'paying'
-dues_status: 'current'
-payment_type: 'paypal'
-last_payment_date: (payment date)
-```
-
-### Scenario 2: Member's Payment Lapses
-
-1. Member's last payment was 35 days ago
-2. Rake task `payments:link` runs (or manual update)
-3. Payment is > 32 days old → `dues_status` set to 'lapsed'
-4. `membership_ended_date` set to 1 month after last payment
-
-**Expected State:**
-```ruby
-active: (unchanged)
-membership_status: (unchanged)
-dues_status: 'lapsed'
-membership_ended_date: last_payment_date + 1.month
-```
-
-### Scenario 3: Manual Payment Plan Member Pays Cash
-
-1. Admin navigates to "Manual Payment Plan Members"
-2. Member's next payment due date is approaching
-3. Admin clicks "Mark Dues Received"
-4. Journal entry created
-
-**Expected State:**
-```ruby
-active: true
-membership_status: 'paying'
-dues_status: 'current'
-last_payment_date: (today)
-```
-
----
-
-## Related Code Locations
-
-- **User Model:** `app/models/user.rb`
-- **Payment Models:** `app/models/paypal_payment.rb`, `app/models/recharge_payment.rb`, `app/models/kofi_payment.rb`
-- **Synchronizers:** `app/services/paypal/payment_synchronizer.rb`, `app/services/recharge/payment_synchronizer.rb`
-- **Controllers:** `app/controllers/users_controller.rb`, `app/controllers/reports_controller.rb`, `app/controllers/membership_plans_controller.rb`
-- **Rake Tasks:** `lib/tasks/link_payments.rake`, `lib/tasks/membership.rake`
-- **Scheduled Jobs:** `config/initializers/sidekiq.rb`
+- Move members with transition methods. Never assign `membership_state`, `active`,
+  `membership_status`, or `dues_status` directly, and never reach for `update_columns` on
+  them — it skips the guard, the stamp, and the projection all at once.
+- In tests, put a member in a state by assigning `membership_state` on creation, or by
+  calling the transition that gets them there. Setting `active: false` does nothing; it is
+  recomputed on save.
+- Adding a state means adding it to `STATES`, giving it a row and the relevant columns in
+  `TRANSITIONS`, deciding whether it belongs in `ACCESS_STATES`, and adding both
+  projections. The projection maps use `fetch` with a default, so a missed entry degrades
+  to `unknown` rather than raising.

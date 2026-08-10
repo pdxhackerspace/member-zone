@@ -1,9 +1,8 @@
 module UsersHelper
-  # Overrides humanize where an enum key reads poorly (an approved applicant is now a member).
-  MEMBERSHIP_STATUS_LABELS = { 'applicant' => 'New Member' }.freeze
-
+  # The legacy membership_status column, which is now a projection of membership_state.
+  # Prefer membership_state_label; this is here for the views still reading the old column.
   def membership_status_label(status)
-    MEMBERSHIP_STATUS_LABELS.fetch(status.to_s, status.to_s.humanize)
+    status.to_s.humanize
   end
 
   # Build a URL that toggles one filter while preserving all other active filters.
@@ -17,16 +16,6 @@ module UsersHelper
       new_params[filter_key] = filter_value
     end
     users_path(new_params)
-  end
-
-  def member_admin_status_pill(user)
-    if user.membership_status.in?(%w[banned deceased inactive]) || !user.active?
-      %w[Inactive status-pill-overdue]
-    elsif user.dues_status == 'lapsed'
-      ['Payment due', 'status-pill-attention']
-    else
-      %w[Active status-pill-active]
-    end
   end
 
   def member_admin_tenure(user)

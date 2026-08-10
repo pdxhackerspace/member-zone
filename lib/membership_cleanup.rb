@@ -42,10 +42,15 @@ class MembershipCleanup
     all_payments = collect_payments(user)
     latest = all_payments.last
 
-    # 1. Sponsored users — always active (check is_sponsored flag, membership_status, payment type, or sheet entry)
+    # 1. Sponsored users — always active (check is_sponsored flag, membership state, payment type, or sheet entry).
+    # An inactive sponsored member is drift: nothing about a sponsorship expires on its own.
     if sponsored?(user)
-      if user.membership_status != 'sponsored' || user.payment_type != 'sponsored' || user.dues_status != 'current'
-        apply(user, membership_status: 'sponsored', payment_type: 'sponsored', dues_status: 'current')
+      if !user.sponsored_member?
+        apply { user.mark_sponsored! }
+        actions << 'set sponsored/active'
+        @changes[:marked_sponsored_active] << user
+      elsif user.payment_type != 'sponsored' || !user.active?
+        apply { user.update!(payment_type: 'sponsored', is_sponsored: true) }
         actions << 'set sponsored/active'
         @changes[:marked_sponsored_active] << user
       end
@@ -53,11 +58,11 @@ class MembershipCleanup
       return
     end
 
-    # 2. No payments and not sponsored → inactive
+    # 2. No payments and not sponsored → inactive. Members who never got as far as a
+    # payment are left where they are; there is nothing to reconcile against.
     if all_payments.empty?
-      if user.dues_status != 'inactive' || user.membership_status == 'paying'
-        new_status = user.membership_status == 'paying' ? 'unknown' : user.membership_status
-        apply(user, dues_status: 'inactive', membership_status: new_status)
+      if user.membership_state.in?(%w[current_member overdue_member provisional_member])
+        apply { Membership::ActiveStatus.assign_and_save!(user, membership_state: 'inactive_member') }
         actions << 'no payments → inactive'
         @changes[:marked_inactive] << user
       end
@@ -69,7 +74,7 @@ class MembershipCleanup
     if user.membership_plan_id.blank? && latest[:amount].present?
       matched = MembershipTaskHelpers.find_matching_plan(@plans, latest[:amount])
       if matched
-        apply(user, membership_plan_id: matched.id)
+        apply { user.update!(membership_plan_id: matched.id) }
         actions << "matched plan: #{matched.name}"
         @changes[:plan_matched] << { user: user, plan: matched }
       end
@@ -84,29 +89,13 @@ class MembershipCleanup
 
     # 4. Has payments but no payment_type → set from payment source
     if %w[unknown inactive].include?(user.payment_type)
-      apply(user, payment_type: latest[:type])
+      apply { user.update!(payment_type: latest[:type]) }
       actions << "payment_type → #{latest[:type]}"
       @changes[:payment_type_set] << { user: user, type: latest[:type] }
     end
 
-    # 5. Check freshness against plan billing period
-    cutoff = MembershipTaskHelpers.cutoff_for_plan(effective_plan)
-
-    dues_at = User.dues_due_at_from_payment_cycle(latest[:time].to_date, effective_plan)
-
-    if latest[:time] >= cutoff
-      # Current
-      if user.membership_status != 'paying' || user.dues_status != 'current'
-        apply(user, membership_status: 'paying', dues_status: 'current', dues_due_at: dues_at)
-        actions << 'paying + current'
-        @changes[:marked_paying] << user
-      end
-    elsif user.dues_status != 'lapsed'
-      # Lapsed
-      apply(user, dues_status: 'lapsed', dues_due_at: dues_at)
-      actions << "lapsed (last payment #{latest[:time].to_date})"
-      @changes[:marked_lapsed] << user
-    end
+    # 5. Record the payment and let User decide whether it still covers them.
+    record_latest_payment(user, latest, effective_plan, actions)
 
     if actions.any?
       plan_label = if effective_plan
@@ -117,6 +106,33 @@ class MembershipCleanup
       puts "  #{user.display_name}: #{actions.join(', ')} [#{plan_label}]"
     else
       @changes[:no_change] << user
+    end
+  end
+
+  def record_latest_payment(user, latest, effective_plan, actions)
+    return if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+
+    attrs = {
+      last_payment_date: latest[:time].to_date,
+      dues_due_at: User.dues_due_at_from_payment_cycle(latest[:time].to_date, effective_plan)
+    }
+
+    if @dry_run
+      user.assign_attributes(attrs.merge(membership_state: 'current_member'))
+      return unless user.changed?
+
+      target = user.effective_membership_state
+    else
+      Membership::ActiveStatus.record_linked_payment!(user, **attrs)
+      target = user.membership_state
+    end
+
+    if target == 'current_member'
+      actions << 'paying + current'
+      @changes[:marked_paying] << user
+    else
+      actions << "#{target.humanize.downcase} (last payment #{latest[:time].to_date})"
+      @changes[:marked_lapsed] << user
     end
   end
 
@@ -140,14 +156,14 @@ class MembershipCleanup
     payments.sort_by { |p| p[:time] }
   end
 
-  def apply(user, attrs)
+  def apply
     return if @dry_run
 
-    Membership::ActiveStatus.assign_and_save!(user, attrs)
+    yield
   end
 
   def sponsored?(user)
-    Membership::ActiveStatus.sponsored?(user) ||
+    user.sponsored? || user.payment_type == 'sponsored' ||
       user.sheet_entry&.status.to_s.downcase.include?('sponsored')
   end
 

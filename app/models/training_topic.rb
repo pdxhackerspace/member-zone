@@ -33,6 +33,17 @@ class TrainingTopic < ApplicationRecord
 
   after_create_commit :provision_authentik_groups
 
+  # The topic whose training moves a new member out of new_member and into their
+  # pre-payment grace period. Configured under Membership Settings; falls back to
+  # matching on name so installs that have not set it yet keep working.
+  def self.building_access
+    MembershipSetting.building_access_training_topic || find_by('LOWER(name) LIKE ?', '%building access%')
+  end
+
+  def building_access?
+    id == TrainingTopic.building_access&.id
+  end
+
   # Privileges this topic confers, optionally limited to one conferral source.
   def conferred_privileges(member_sources: TrainingTopicRole::MEMBER_SOURCES)
     Privilege.joins(roles: :topic_roles)

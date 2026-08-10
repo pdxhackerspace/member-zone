@@ -28,12 +28,55 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'a report with rows renders its table and inline actions' do
+    users(:one).update_columns(membership_state: 'unknown', legacy: true, service_account: false)
+
     get report_url('membership-status-unknown')
 
     assert_response :success
     assert_match users(:one).display_name, response.body
     # The action buttons post back to the report they were used from.
     assert_match 'name="anchor" id="anchor" value="membership-status-unknown"', response.body
+  end
+
+  # Nobody is billing a sponsored member on purpose, so they are not a data problem.
+  test 'payment type unknown leaves sponsored members out' do
+    sponsored = users(:one)
+    sponsored.update_columns(payment_type: 'unknown', active: true, service_account: false)
+    sponsored.update!(membership_state: 'sponsored_member', is_sponsored: true)
+
+    get report_url('payment-type-unknown')
+
+    assert_response :success
+    assert_equal 'sponsored', sponsored.reload.payment_type
+    assert_no_match sponsored.display_name, response.body
+  end
+
+  test 'payment type unknown says whether the member can get into the building' do
+    member = users(:one)
+    member.update_columns(payment_type: 'unknown', active: true, service_account: false)
+    Rfid.create!(user: member, rfid: 'REPORT001')
+
+    get report_url('payment-type-unknown')
+
+    assert_response :success
+    assert_match member.display_name, response.body
+    assert_match 'Building access', response.body
+    assert_match 'Key, not trained', response.body
+  end
+
+  test 'payment type unknown shows when building access training happened' do
+    member = User.create!(authentik_id: "ptu-#{SecureRandom.hex(4)}", full_name: 'Trained No Key',
+                          payment_type: 'unknown', membership_state: 'current_member', active: true)
+    topic = training_topics(:building_access)
+    MembershipSetting.instance.update!(building_access_training_topic: topic)
+    Training.create!(trainee: member, training_topic: topic, trained_at: Time.zone.local(2024, 3, 15, 10, 0))
+
+    get report_url('payment-type-unknown')
+
+    assert_response :success
+    assert_match member.display_name, response.body
+    assert_match 'Trained, no key', response.body
+    assert_match 'Mar 15, 2024', response.body
   end
 
   test 'charts render' do
@@ -59,8 +102,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
 
     unlinked = users(:two)
 
-    inactive = User.create!(authentik_id: 'authentik-no-slack-inactive', full_name: 'Inactive No Slack',
-                            membership_status: 'unknown', dues_status: 'unknown')
+    inactive = User.create!(authentik_id: 'authentik-no-slack-inactive', full_name: 'Inactive No Slack')
     service = User.create!(authentik_id: 'authentik-no-slack-service', full_name: 'Service No Slack',
                            service_account: true, active: true)
 
@@ -83,16 +125,14 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
       authentik_id: 'authentik-no-slack-recent',
       full_name: 'Recent No Slack',
       email: 'recent-no-slack@example.com',
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       created_at: 2.months.ago
     )
     old = User.create!(
       authentik_id: 'authentik-no-slack-old',
       full_name: 'Old No Slack',
       email: 'old-no-slack@example.com',
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       created_at: 8.months.ago
     )
 
@@ -198,7 +238,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_redirected_to report_path('dues-status-lapsed')
-    assert_equal 'paying', user.reload.membership_status
+    assert_equal 'current_member', user.reload.membership_state
   end
 
   private
@@ -207,7 +247,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
   # cutoff under test is not moved by fixture payments.
   def lapsed_member(authentik_id, last_payment_on)
     User.create!(authentik_id: authentik_id, full_name: "Lapsed #{authentik_id}",
-                 membership_status: 'paying', dues_status: 'lapsed', last_payment_date: last_payment_on)
+                 membership_state: 'inactive_member', last_payment_date: last_payment_on)
   end
 
   def sign_in_as_admin

@@ -1,7 +1,8 @@
 <%# Members plus the inline actions that resolve whatever the report is flagging. %>
 <% show_payment_type = local_assigns.fetch(:show_payment_type, false) %>
-<% show_dues_status = local_assigns.fetch(:show_dues_status, false) %>
 <% show_last_payment = local_assigns.fetch(:show_last_payment, false) %>
+<%# Supplied by BuildingAccessScopeQuery#page_locals; absent means the column is not wanted. %>
+<% building_access = local_assigns.fetch(:building_access, nil) %>
 <div class="table-responsive">
   <table class="table table-compact mb-0 align-middle">
     <thead>
@@ -11,7 +12,7 @@
         <th scope="col">Email</th>
         <th scope="col">Status</th>
         <% if show_payment_type %><th scope="col">Payment type</th><% end %>
-        <% if show_dues_status %><th scope="col">Dues status</th><% end %>
+        <% if building_access %><th scope="col">Building access</th><% end %>
         <% if show_last_payment %><th scope="col">Last payment</th><% end %>
         <th scope="col">Actions</th>
       </tr>
@@ -31,15 +32,15 @@
             <% end %>
           </td>
           <td>
-            <span class="badge text-bg-<%= membership_status_badge_class(user.membership_status) %>">
-              <%= membership_status_label(user.membership_status) %>
+            <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+              <%= membership_state_label(user.membership_state) %>
             </span>
           </td>
           <% if show_payment_type %>
             <td><%= user.payment_type.humanize %></td>
           <% end %>
-          <% if show_dues_status %>
-            <td><%= user.dues_status.humanize %></td>
+          <% if building_access %>
+            <td><%= building_access_cell(building_access[user.id]) %></td>
           <% end %>
           <% if show_last_payment %>
             <td>

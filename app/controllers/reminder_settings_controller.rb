@@ -15,6 +15,9 @@ class ReminderSettingsController < AdminController
     @application_link_due_count = Reminders::ApplicationLinkEligibility.count_due
     @application_link_awaiting_count = Reminders::ApplicationLinkEligibility.total_awaiting
     @application_link_email_template = EmailTemplate.find_by(key: 'application_link_reminder')
+    @payment_overdue_due_count = Reminders::PaymentOverdueEligibility.count_due
+    @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
+    @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
     @membership_setting = MembershipSetting.instance
   end
 
@@ -53,6 +56,11 @@ class ReminderSettingsController < AdminController
       @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
     when 'application_link'
       load_application_link_show_data
+    when 'payment_overdue'
+      @pagy, @due_users = pagy(Reminders::PaymentOverdueEligibility.due, limit: PER_PAGE)
+      @payment_overdue_due_count = @pagy.count
+      @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
+      @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
     end
   end
 

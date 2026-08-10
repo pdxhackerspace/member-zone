@@ -5,9 +5,9 @@ class MembershipCleanupTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'cleanup-sponsored',
       full_name: 'Cleanup Sponsored',
-      membership_status: 'sponsored',
-      payment_type: 'sponsored',
-      dues_status: 'lapsed'
+      membership_state: 'sponsored_member',
+      is_sponsored: true,
+      payment_type: 'sponsored'
     )
     user.paypal_payments.create!(
       paypal_id: 'PP-SPONSORED-OLD',
@@ -22,7 +22,6 @@ class MembershipCleanupTest < ActiveSupport::TestCase
 
     user.reload
     assert user.active?, 'sponsored members should remain active during cleanup'
-    assert_equal 'sponsored', user.membership_status
-    assert_equal 'current', user.dues_status
+    assert_equal 'sponsored_member', user.membership_state
   end
 end

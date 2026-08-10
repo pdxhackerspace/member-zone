@@ -17,14 +17,44 @@
           value: safe_join([content_tag(:strong, @membership_setting.payment_grace_period_days), " days"]),
           help: "Days after payment due date before membership is marked as lapsed." %>
       <%= render "show_field",
+          label: "Planless payment window",
+          value: safe_join([content_tag(:strong, @membership_setting.planless_payment_window_days), " days"]),
+          help: "How long a linked payment counts as current when the member has no membership plan assigned." %>
+      <%= render "show_field",
+          label: "Payment currency buffer",
+          value: safe_join([content_tag(:strong, @membership_setting.payment_currency_buffer_days), " days"]),
+          help: "Extra days added to a plan's billing cycle when deciding whether a payment is still current." %>
+      <%= render "show_field",
           label: "Manual payment “due soon” window",
           value: safe_join([content_tag(:strong, @membership_setting.manual_payment_due_soon_days), " ",
                             "day".pluralize(@membership_setting.manual_payment_due_soon_days)]),
           help: "Admin dashboard and manual payments list treat dues as “due soon” when the next due date is today, overdue, or within this many calendar days." %>
       <%= render "show_field",
+          label: "Overdue grace period",
+          value: safe_join([content_tag(:strong, @membership_setting.overdue_grace_period_days), " ",
+                            "day".pluralize(@membership_setting.overdue_grace_period_days)]),
+          help: "How long an overdue member keeps access after their dues date passes." %>
+      <%= render "show_field",
           label: "Reactivation grace period",
           value: safe_join([content_tag(:strong, @membership_setting.reactivation_grace_period_months), " months"]),
           help: "Months a lapsed member can reactivate without needing to reapply." %>
+    <% end %>
+
+    <%= render "setting_group", title: "New members" do %>
+      <%= render "show_field",
+          label: "Building access training topic",
+          value: content_tag(:strong, @membership_setting.building_access_training_topic&.name || "Matched by name"),
+          help: "Recording this training moves a new member into their pre-payment grace period." %>
+      <%= render "show_field",
+          label: "New member grace period",
+          value: safe_join([content_tag(:strong, @membership_setting.new_member_grace_period_days), " ",
+                            "day".pluralize(@membership_setting.new_member_grace_period_days)]),
+          help: "How long a newly trained member stays active before their first payment is expected." %>
+      <%= render "show_field",
+          label: "New member expiry",
+          value: safe_join([content_tag(:strong, @membership_setting.new_member_expiry_days), " ",
+                            "day".pluralize(@membership_setting.new_member_expiry_days)]),
+          help: "Cap on how long an approved member who never took building access training stays active." %>
     <% end %>
 
     <%= render "setting_group", title: "Login / invitations" do %>
@@ -79,6 +109,11 @@
           label: "Application link reminder — maximum",
           value: content_tag(:strong, @membership_setting.application_link_reminder_max_count),
           help: "Stop after this many reminders or when the link expires, whichever comes first." %>
+      <%= render "show_field",
+          label: "Overdue payment reminder — repeat interval",
+          value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_repeat_days), " ",
+                            "day".pluralize(@membership_setting.payment_overdue_reminder_repeat_days)]),
+          help: "Minimum days between overdue payment reminders for the same member." %>
     <% end %>
   </div>
 

@@ -40,6 +40,7 @@
   <%
     filter_labels = []
     filter_labels << "Including legacy" if @include_legacy
+    filter_labels << "Membership: #{membership_state_label(params[:membership_state])}" if params[:membership_state].present?
     filter_labels << "Membership: #{membership_status_label(params[:membership_status])}" if params[:membership_status].present?
     filter_labels << "Payment: #{params[:payment_type].humanize}" if params[:payment_type].present?
     filter_labels << "Dues: #{params[:dues_status].humanize}" if params[:dues_status].present?
@@ -93,23 +94,13 @@
     <div class="d-flex align-items-start gap-3 mb-3">
     <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Membership</h2>
     <div class="d-flex flex-wrap gap-2">
-      <%= link_to stacking_filter_path(:membership_status, 'unknown'), class: "filter-chip text-decoration-none #{'active' if params[:membership_status] == 'unknown'} #{'muted' if @membership_status_unknown.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'unknown' %>Unknown <span class="count"><%= @membership_status_unknown %></span>
-      <% end %>
-      <%= link_to stacking_filter_path(:membership_status, 'sponsored'), class: "filter-chip text-decoration-none #{'active' if params[:membership_status] == 'sponsored'} #{'muted' if @membership_status_sponsored.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'sponsored' %>Sponsored <span class="count"><%= @membership_status_sponsored %></span>
-      <% end %>
-      <%= link_to stacking_filter_path(:membership_status, 'paying'), class: "filter-chip text-decoration-none #{'active' if params[:membership_status] == 'paying'} #{'muted' if @membership_status_paying.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'paying' %>Paying <span class="count"><%= @membership_status_paying %></span>
-      <% end %>
-      <%= link_to stacking_filter_path(:membership_status, 'applicant'), class: "filter-chip warning text-decoration-none #{'active' if params[:membership_status] == 'applicant'} #{'muted' if @membership_status_applicant.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'applicant' %>New Member <span class="count"><%= @membership_status_applicant %></span>
-      <% end %>
-      <%= link_to stacking_filter_path(:membership_status, 'banned'), class: "filter-chip danger text-decoration-none #{'active' if params[:membership_status] == 'banned'} #{'muted' if @membership_status_banned.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'banned' %>Banned <span class="count"><%= @membership_status_banned %></span>
-      <% end %>
-      <%= link_to stacking_filter_path(:membership_status, 'deceased'), class: "filter-chip text-decoration-none #{'active' if params[:membership_status] == 'deceased'} #{'muted' if @membership_status_deceased.zero?}" do %>
-        <%= '✓ ' if params[:membership_status] == 'deceased' %>Deceased <span class="count"><%= @membership_status_deceased %></span>
+      <% User::MEMBERSHIP_STATE_FILTER_ORDER.each do |state| %>
+        <% count = @membership_state_counts.fetch(state, 0) %>
+        <% next if count.zero? && params[:membership_state] != state %>
+        <% selected = params[:membership_state] == state %>
+        <%= link_to stacking_filter_path(:membership_state, state), class: "filter-chip text-decoration-none #{membership_state_filter_chip_class(state)} #{'active' if selected} #{'muted' if count.zero?}" do %>
+          <%= '✓ ' if selected %><%= membership_state_label(state) %> <span class="count"><%= count %></span>
+        <% end %>
       <% end %>
     </div>
     </div>
@@ -152,24 +143,6 @@
     </div>
     </div>
 
-    <div class="d-flex align-items-start gap-3 mb-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Dues status</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <%= link_to stacking_filter_path(:dues_status, 'current'), class: "badge text-bg-success text-decoration-none #{'border border-dark border-2' if params[:dues_status] == 'current'}" do %>
-        Current: <strong><%= @dues_status_current %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:dues_status, 'lapsed'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:dues_status] == 'lapsed'}" do %>
-        Lapsed: <strong><%= @dues_status_lapsed %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:dues_status, 'inactive'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:dues_status] == 'inactive'}" do %>
-        Inactive: <strong><%= @dues_status_inactive %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:dues_status, 'unknown'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:dues_status] == 'unknown'}" do %>
-        Unknown: <strong><%= @dues_status_unknown %></strong>
-      <% end %>
-    </div>
-    </div>
-    
     <div class="d-flex align-items-start gap-3 mb-3">
     <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Account type</h2>
     <div class="d-flex flex-wrap gap-2">
@@ -257,7 +230,7 @@
                   <% end %>
                 </td>
                 <td>
-                  <span class="badge <%= membership_status_badge_subtle_class(user.membership_status) %>"><%= membership_status_label(user.membership_status) %></span>
+                  <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>"><%= membership_state_label(user.membership_state) %></span>
                 </td>
                 <td class="text-muted small"><%= time_ago_in_words(user.created_at) %> ago</td>
               </tr>
@@ -277,7 +250,7 @@
           <th scope="col"><%= sortable_column('username', 'Username', @sort_column, @sort_direction) %></th>
           <th scope="col"><%= sortable_column('full_name', 'Name', @sort_column, @sort_direction) %></th>
           <th scope="col">Email</th>
-          <th scope="col"><%= sortable_column('membership_status', 'Status', @sort_column, @sort_direction) %></th>
+          <th scope="col"><%= sortable_column('membership_state', 'Status', @sort_column, @sort_direction) %></th>
           <th scope="col"><%= sortable_column('payment_type', 'Payment Type', @sort_column, @sort_direction) %></th>
           <th scope="col"><%= sortable_column('last_synced_at', 'Last synced', @sort_column, @sort_direction) %></th>
         </tr>
@@ -315,13 +288,15 @@
             <td>
               <% if user.service_account? %>
                 <span class="text-muted">–</span>
+              <% elsif user.current_member? %>
+                <span class="status-dot <%= membership_state_dot_class(user.membership_state) %>" title="Current"></span>
               <% else %>
-                <span class="badge <%= membership_status_badge_subtle_class(user.membership_status) %>">
-                  <%= membership_status_label(user.membership_status) %>
+                <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+                  <%= membership_state_label(user.membership_state) %>
                 </span>
-                <% if user.active? %>
-                  <span class="badge text-bg-success-subtle ms-1">Active</span>
-                <% end %>
+              <% end %>
+              <% if user.emergency_active_override? %>
+                <span class="badge text-bg-warning-subtle ms-1" title="Access forced on by an admin">Override</span>
               <% end %>
             </td>
             <td>

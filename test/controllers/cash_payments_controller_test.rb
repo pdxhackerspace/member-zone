@@ -89,6 +89,37 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal existing_due_at.to_date, @user.dues_due_at.to_date
   end
 
+  test 'create sets payment due date from the personal plan not the primary membership plan' do
+    monthly = membership_plans(:monthly_standard)
+    personal_plan = MembershipPlan.create!(
+      name: "Semi-annual #{SecureRandom.hex(4)}",
+      cost: 200.00,
+      billing_frequency: 'custom_days',
+      billing_period_days: 180,
+      plan_type: 'primary',
+      user: @user
+    )
+    @user.update_columns(
+      membership_plan_id: monthly.id,
+      dues_due_at: nil,
+      last_payment_date: nil
+    )
+
+    post cash_payments_path, params: {
+      cash_payment: {
+        user_id: @user.id,
+        membership_plan_id: personal_plan.id,
+        amount: 200.00,
+        paid_on: Date.current
+      }
+    }
+
+    assert_redirected_to cash_payment_path(CashPayment.last)
+    @user.reload
+    assert_equal monthly.id, @user.membership_plan_id
+    assert_equal Date.current + 180.days, @user.dues_due_at.to_date
+  end
+
   test 'create rejects invalid data' do
     assert_no_difference('CashPayment.count') do
       post cash_payments_path, params: {
@@ -147,8 +178,7 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
       recorded_by: users(:one)
     )
     @user.update!(
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       active: true,
       payment_type: 'cash',
       dues_due_at: 1.month.from_now

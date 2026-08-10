@@ -42,8 +42,7 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
       full_name: 'Settings Reminder Attention',
       active: true,
       service_account: false,
-      membership_status: 'paying',
-      dues_status: 'current',
+      membership_state: 'current_member',
       payment_type: 'unknown'
     )
     MembershipApplication.create!(

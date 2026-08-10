@@ -90,7 +90,9 @@ Rails.application.routes.draw do
       post :enable_emergency_active_override
       post :clear_emergency_active_override
       post :ban
+      post :unban
       post :mark_deceased
+      post :record_cancellation
       post :mark_sponsored
       post :unmark_sponsored
       post :sync_to_authentik

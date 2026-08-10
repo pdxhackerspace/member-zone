@@ -10,7 +10,7 @@ module Authentik
         full_name: 'Member Zone Name',
         username: 'memberzone',
         active: true,
-        membership_status: 'paying',
+        membership_state: 'current_member',
         payment_type: 'paypal',
         authentik_attributes: {}
       )

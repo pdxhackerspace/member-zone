@@ -9,7 +9,7 @@ class UsersController < AuthenticatedController
   before_action :set_user,
                 only: %i[edit update activate deactivate
                          enable_emergency_active_override clear_emergency_active_override
-                         ban mark_deceased mark_sponsored
+                         ban unban mark_deceased record_cancellation mark_sponsored
                          unmark_sponsored destroy
                          sync_to_authentik sync_from_authentik
                          unlink_slack unlink_authentik unlink_sheet
@@ -23,8 +23,9 @@ class UsersController < AuthenticatedController
   before_action -> { require_privilege!(:'members.toggle_active') }, only: %i[activate deactivate]
   before_action -> { require_privilege!(:'members.emergency_active_override') },
                 only: %i[enable_emergency_active_override clear_emergency_active_override]
-  before_action -> { require_privilege!(:'members.ban') }, only: :ban
+  before_action -> { require_privilege!(:'members.ban') }, only: %i[ban unban]
   before_action -> { require_privilege!(:'members.mark_deceased') }, only: :mark_deceased
+  before_action -> { require_privilege!(:'members.edit_membership') }, only: :record_cancellation
   before_action -> { require_privilege!(:'members.sponsor') }, only: %i[mark_sponsored unmark_sponsored]
   before_action -> { require_privilege!(:'members.delete') }, only: :destroy
   before_action -> { require_privilege!(:'members.sync_authentik') },
@@ -37,7 +38,7 @@ class UsersController < AuthenticatedController
 
   # email is absent deliberately: the column holds ciphertext, so ordering by it returns
   # rows in an order unrelated to the addresses shown.
-  SORTABLE_COLUMNS = %w[username full_name membership_status payment_type last_synced_at].freeze
+  SORTABLE_COLUMNS = %w[username full_name membership_state membership_status payment_type last_synced_at].freeze
 
   def index
     # Start with all users for the "all" count
@@ -54,6 +55,7 @@ class UsersController < AuthenticatedController
     # Build the base filter params hash (used for stacking links)
     @filter_params = {}
     @filter_params[:include_legacy] = '1' if @include_legacy
+    @filter_params[:membership_state] = params[:membership_state] if params[:membership_state].present?
     @filter_params[:membership_status] = params[:membership_status] if params[:membership_status].present?
     @filter_params[:payment_type] = params[:payment_type] if params[:payment_type].present?
     @filter_params[:dues_status] = params[:dues_status] if params[:dues_status].present?
@@ -84,6 +86,9 @@ class UsersController < AuthenticatedController
       ).or(default_users.merge(User.by_any_email(params[:q])))
     end
 
+    if params[:membership_state].present?
+      @users = @users.non_service_accounts.where(membership_state: params[:membership_state])
+    end
     if params[:membership_status].present?
       @users = @users.non_service_accounts.where(membership_status: params[:membership_status])
     end
@@ -126,12 +131,7 @@ class UsersController < AuthenticatedController
     # Badge counts from the filtered set so they reflect stacked filters
     filtered_members = @users.non_service_accounts
 
-    @membership_status_unknown = filtered_members.where(membership_status: 'unknown', is_sponsored: false).count
-    @membership_status_sponsored = filtered_members.where(membership_status: 'sponsored').count
-    @membership_status_paying = filtered_members.where(membership_status: 'paying').count
-    @membership_status_banned = filtered_members.where(membership_status: 'banned').count
-    @membership_status_deceased = filtered_members.where(membership_status: 'deceased').count
-    @membership_status_applicant = filtered_members.where(membership_status: 'applicant').count
+    @membership_state_counts = filtered_members.group(:membership_state).count
 
     @payment_type_unknown = filtered_members.where(payment_type: 'unknown').count
     @payment_type_sponsored = filtered_members.where(payment_type: 'sponsored').count
@@ -145,11 +145,6 @@ class UsersController < AuthenticatedController
                                      .where.not(membership_status: %w[guest sponsored])
                                      .where(is_sponsored: false)
                                      .count
-
-    @dues_status_current = filtered_members.where(dues_status: 'current').count
-    @dues_status_lapsed = filtered_members.where(dues_status: 'lapsed').count
-    @dues_status_inactive = filtered_members.where(dues_status: 'inactive').count
-    @dues_status_unknown = filtered_members.where(dues_status: 'unknown').count
 
     @no_rfid_count = filtered_members.where.missing(:rfids).count
     @no_email_count = filtered_members.where("email IS NULL OR email = ''").count
@@ -167,7 +162,8 @@ class UsersController < AuthenticatedController
     @users = @users.order(Arel::Nodes::NullsLast.new(direction_node))
 
     # Track if any filter is active (including legacy toggle)
-    @filter_active = params[:membership_status].present? || params[:payment_type].present? ||
+    @filter_active = params[:membership_state].present? || params[:membership_status].present? ||
+                     params[:payment_type].present? ||
                      params[:dues_status].present? || params[:active].present? ||
                      params[:missing].present? || params[:account_type].present? ||
                      params[:membership_plan_id].present? || params[:q].present? ||
@@ -284,6 +280,7 @@ class UsersController < AuthenticatedController
       nav_query = User.all
 
       # Apply filters if present
+      nav_query = nav_query.where(membership_state: params[:membership_state]) if params[:membership_state].present?
       nav_query = nav_query.where(membership_status: params[:membership_status]) if params[:membership_status].present?
       nav_query = nav_query.where(payment_type: params[:payment_type]) if params[:payment_type].present?
       nav_query = nav_query.where(dues_status: params[:dues_status]) if params[:dues_status].present?
@@ -313,6 +310,7 @@ class UsersController < AuthenticatedController
 
       # Store filter/sort params for use in view links
       @nav_params = {}
+      @nav_params[:membership_state] = params[:membership_state] if params[:membership_state].present?
       @nav_params[:membership_status] = params[:membership_status] if params[:membership_status].present?
       @nav_params[:payment_type] = params[:payment_type] if params[:payment_type].present?
       @nav_params[:dues_status] = params[:dues_status] if params[:dues_status].present?
@@ -470,7 +468,7 @@ class UsersController < AuthenticatedController
       redirect_to user_path(@user), alert: 'Service accounts use Activate / Deactivate instead.'
       return
     end
-    if @user.membership_status.in?(%w[banned deceased])
+    if @user.terminal_membership_state?
       redirect_to user_path(@user), alert: 'Active override is not available for banned or deceased members.'
       return
     end
@@ -499,25 +497,47 @@ class UsersController < AuthenticatedController
                 notice: 'Active override cleared; active status was recalculated from membership.'
   end
 
+  # The ban email is queued by the state machine and held for review before it is sent.
   def ban
-    @user.update!(membership_status: 'banned')
-    QueuedMail.enqueue(:membership_banned, @user, reason: 'Member banned') if @user.email.present?
+    @user.ban!
     redirect_to user_path(@user), notice: 'Member banned.'
   end
 
+  def unban
+    unless @user.banned?
+      redirect_to user_path(@user), alert: 'Member is not banned.'
+      return
+    end
+
+    @user.unban!
+    recalculated = @user.membership_state.humanize.downcase
+    redirect_to user_path(@user), notice: "Ban lifted; membership recalculated as #{recalculated}."
+  end
+
   def mark_deceased
-    @user.update!(membership_status: 'deceased')
+    @user.mark_deceased!
     redirect_to user_path(@user), notice: 'Member marked as deceased.'
   end
 
+  # Recorded when we learn a member cancelled outside a provider we get webhooks from.
+  # They keep access until their paid-through date.
+  def record_cancellation
+    unless @user.record_cancellation!
+      redirect_to user_path(@user), alert: 'Cancellation cannot be recorded for this member.'
+      return
+    end
+
+    redirect_to user_path(@user), notice: 'Cancellation recorded. Access continues until their paid-through date.'
+  end
+
   def mark_sponsored
-    @user.update!(is_sponsored: true)
+    @user.mark_sponsored!
     QueuedMail.enqueue(:membership_sponsored, @user, reason: 'Membership sponsored') if @user.email.present?
     redirect_to user_path(@user), notice: 'Member marked as sponsored.'
   end
 
   def unmark_sponsored
-    @user.update!(is_sponsored: false)
+    @user.unmark_sponsored!
     redirect_to user_path(@user), notice: 'Member sponsorship removed.'
   end
 
@@ -1045,7 +1065,7 @@ class UsersController < AuthenticatedController
     # editing, so the fields are what carry the authority. Keep this in step with
     # app/views/users/_form.html.erb, or the form offers inputs that are then dropped.
     if can?(:'members.edit_membership')
-      permitted += %i[membership_status payment_type membership_plan_id dues_due_at
+      permitted += %i[membership_state payment_type membership_plan_id dues_due_at
                       sponsored_guest_duration_months]
     end
 
@@ -1062,29 +1082,32 @@ class UsersController < AuthenticatedController
   def resolved_user_params
     attrs = user_params.to_h.symbolize_keys
     apply_greeting_option!(attrs)
-    filter_restricted_membership_status!(attrs)
+    filter_restricted_membership_state!(attrs)
+    # An admin editing the form is making a deliberate correction, so it is allowed to
+    # cross the transition table the automated paths are held to.
+    attrs[:allow_any_membership_state_transition] = true if attrs.key?(:membership_state)
     attrs
   end
 
-  # Banned and deceased statuses require their dedicated privileges and flows.
-  def filter_restricted_membership_status!(attrs)
-    return unless attrs.key?(:membership_status)
+  # Banned and deceased states require their dedicated privileges and flows.
+  def filter_restricted_membership_state!(attrs)
+    return unless attrs.key?(:membership_state)
 
-    new_status = attrs[:membership_status].to_s
-    current = @user&.membership_status.to_s
+    new_state = attrs[:membership_state].to_s
+    current = @user&.membership_state.to_s
 
     restricted_targets = []
-    restricted_targets << 'banned' unless can?(:'members.ban')
-    restricted_targets << 'deceased' unless can?(:'members.mark_deceased')
+    restricted_targets << 'banned_member' unless can?(:'members.ban')
+    restricted_targets << 'deceased_member' unless can?(:'members.mark_deceased')
 
-    if restricted_targets.include?(new_status)
-      attrs.delete(:membership_status)
+    if restricted_targets.include?(new_state)
+      attrs.delete(:membership_state)
       return
     end
 
-    locked = (current == 'banned' && !can?(:'members.ban')) ||
-             (current == 'deceased' && !can?(:'members.mark_deceased'))
-    attrs.delete(:membership_status) if locked && new_status != current
+    locked = (current == 'banned_member' && !can?(:'members.ban')) ||
+             (current == 'deceased_member' && !can?(:'members.mark_deceased'))
+    attrs.delete(:membership_state) if locked && new_state != current
   end
 
   def apply_greeting_option!(attrs)

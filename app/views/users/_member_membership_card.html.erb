@@ -2,18 +2,8 @@
 <% plan = user.membership_plan || user.supplementary_plans.ordered.first %>
 <% next_payment = user.next_payment_date %>
 <% days_until_payment = next_payment.present? ? (next_payment - Date.current).to_i : nil %>
-<% payment_due = user.dues_status == 'lapsed' || days_until_payment.to_i.negative? %>
-<% inactive = user.dues_status == 'inactive' || user.membership_status.in?(%w[banned deceased inactive]) %>
-<% pill_text, pill_class, card_class =
-  if inactive
-    ['Inactive', 'status-pill-overdue', 'status-overdue']
-  elsif payment_due
-    ['Payment due', 'status-pill-attention', 'status-attention']
-  elsif user.is_sponsored?
-    ['Sponsored', 'status-pill-active', '']
-  else
-    ['Active', 'status-pill-active', '']
-  end %>
+<% pill_text, pill_class, card_class = member_membership_card_status(user) %>
+<% payment_due = pill_text == 'Payment due' %>
 <% plan_name = plan&.name || (user.is_sponsored? ? 'Sponsored membership' : 'Membership') %>
 <% payment_method = user.payment_type.to_s.humanize %>
 

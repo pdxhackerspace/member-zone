@@ -66,7 +66,7 @@ class TrainingRecorderTest < ActiveSupport::TestCase
   test 'skips already trained inactive and missing trainees' do
     already_trained = users(:two)
     inactive = users(:three)
-    inactive.update_columns(active: false)
+    inactive.update_columns(active: false, membership_state: 'inactive_member')
     Training.create!(
       trainee: already_trained,
       trainer: @trainer,

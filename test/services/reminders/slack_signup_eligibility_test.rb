@@ -89,7 +89,7 @@ module Reminders
 
     test 'due excludes banned members' do
       now = Time.zone.local(2026, 8, 5, 7, 0, 0)
-      user = eligible_user(now: now, email: 'banned-nag@example.com', membership_status: 'banned')
+      user = eligible_user(now: now, email: 'banned-nag@example.com', membership_state: 'banned_member')
 
       travel_to now do
         assert_not_includes SlackSignupEligibility.due(now: now), user
@@ -99,7 +99,7 @@ module Reminders
 
     test 'due excludes deceased members' do
       now = Time.zone.local(2026, 8, 5, 7, 0, 0)
-      user = eligible_user(now: now, email: 'deceased-nag@example.com', membership_status: 'deceased')
+      user = eligible_user(now: now, email: 'deceased-nag@example.com', membership_state: 'deceased_member')
 
       travel_to now do
         assert_not_includes SlackSignupEligibility.due(now: now), user
@@ -223,6 +223,7 @@ module Reminders
         avatar: nil,
         dues_status: 'current',
         membership_status: 'paying',
+        membership_state: 'current_member',
         created_at: now - 10.days,
         slack_signup_reminder_sent_at: nil
       )
@@ -245,8 +246,7 @@ module Reminders
           full_name: 'Slack Reminder Candidate',
           active: true,
           service_account: false,
-          membership_status: 'paying',
-          dues_status: 'current',
+          membership_state: 'current_member',
           payment_type: 'unknown'
         }.merge(attrs)
       )

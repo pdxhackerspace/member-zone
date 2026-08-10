@@ -31,7 +31,9 @@ class EmailTemplate < ApplicationRecord
     '{{days_since_approval}}' => 'Days since the member was approved (Slack signup reminder only)',
     '{{slack_link_url}}' => 'URL to associate a Slack account (Slack signup nag only; blank when unavailable)',
     '{{slack_link_html}}' => 'Slack self-link paragraph for HTML bodies (blank when unavailable)',
-    '{{slack_link_text}}' => 'Slack self-link line for plain-text bodies (blank when unavailable)'
+    '{{slack_link_text}}' => 'Slack self-link line for plain-text bodies (blank when unavailable)',
+    '{{support_email}}' => 'Address members should write to for help',
+    '{{reactivation_months}}' => 'Months a lapsed member can resubscribe without reapplying'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
@@ -172,30 +174,33 @@ class EmailTemplate < ApplicationRecord
     },
     'membership_cancelled' => {
       name: 'Membership Cancelled',
-      description: 'Sent when a membership is cancelled',
-      subject: '{{organization_name}}: Membership Cancelled',
+      description: 'Sent when we learn a membership has been cancelled. The member keeps access until their ' \
+                   'paid-through date.',
+      subject: '{{organization_name}}: Sorry to see you go',
       body_html: <<~HTML,
-        <h1>Membership Cancelled</h1>
+        <h1>Sorry to see you go</h1>
         <p>Hello {{member_name}},</p>
-        <p>This email confirms that your membership with {{organization_name}} has been cancelled.</p>
+        <p>This email confirms that your {{organization_name}} membership has been cancelled.</p>
         {{reason}}
-        <p>Your access to member-only facilities and resources has been deactivated.</p>
-        <p>If you believe this was done in error, or if you'd like to rejoin in the future, please contact us.</p>
+        <p>Your access continues until the end of the period you have already paid for.</p>
+        <p>You can reactivate any time within the next {{reactivation_months}} months just by subscribing again —
+        there is no need to reapply. After that, or if you run into any difficulty,
+        email <a href="mailto:{{support_email}}">{{support_email}}</a> and we will help.</p>
         <p>Thank you for being part of our community.</p>
         <p>Best regards,<br>The {{organization_name}} Team</p>
       HTML
       body_text: <<~TEXT
-        Membership Cancelled
+        Sorry to see you go
 
         Hello {{member_name}},
 
-        This email confirms that your membership with {{organization_name}} has been cancelled.
+        This email confirms that your {{organization_name}} membership has been cancelled.
 
         {{reason}}
 
-        Your access to member-only facilities and resources has been deactivated.
+        Your access continues until the end of the period you have already paid for.
 
-        If you believe this was done in error, or if you'd like to rejoin in the future, please contact us.
+        You can reactivate any time within the next {{reactivation_months}} months just by subscribing again — there is no need to reapply. After that, or if you run into any difficulty, email {{support_email}} and we will help.
 
         Thank you for being part of our community.
 

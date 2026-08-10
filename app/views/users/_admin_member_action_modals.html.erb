@@ -63,6 +63,36 @@
 </div>
 
 <% end %>
+<% if @profile_caps[:edit_membership] %>
+<div class="modal fade" id="recordCancellationModal" tabindex="-1" aria-labelledby="recordCancellationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <%= form_with url: record_cancellation_user_path(user), method: :post, local: true do %>
+        <div class="modal-header">
+          <h5 class="modal-title" id="recordCancellationModalLabel">Record cancellation for <%= user.display_name %>?</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-13">
+            Use this when you learn a member cancelled through a provider we do not receive
+            cancellation notices from, such as PayPal or Ko-fi.
+          </p>
+          <ul class="text-13 text-secondary">
+            <li>They keep access until <%= user.dues_paid_through_at&.to_date&.strftime("%b %-d, %Y") || "their next dues date" %></li>
+            <li>They stop receiving overdue payment reminders</li>
+            <li>A "sorry to see you go" email is queued for review</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Record cancellation</button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<% end %>
 <% if @profile_caps[:delete] %>
 <div class="modal fade" id="deleteMemberModal" tabindex="-1" aria-labelledby="deleteMemberModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

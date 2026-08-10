@@ -79,7 +79,8 @@ class CashPaymentsController < AuthenticatedController
 
     updates = user.apply_payment_updates(
       { time: cash_payment.paid_on.beginning_of_day, amount: cash_payment.amount },
-      { payment_type: 'cash', last_payment_date: cash_payment.paid_on }
+      { payment_type: 'cash', last_payment_date: cash_payment.paid_on },
+      billing_plan: cash_payment.membership_plan
     )
     keep_later_dues_due_at!(updates, current_dues_due_at)
 
@@ -118,22 +119,21 @@ class CashPaymentsController < AuthenticatedController
     return if latest_payment.blank?
 
     due_at = User.dues_due_at_from_payment_cycle(latest_payment.paid_on, latest_payment.membership_plan)
-    updates = {
+    unless user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+      user.record_payment!(
+        payment_type: 'cash',
+        last_payment_date: latest_payment.paid_on,
+        dues_due_at: due_at
+      )
+      user.update!(membership_ended_date: nil) if user.membership_ended_date.present?
+      return
+    end
+
+    user.update!(
       payment_type: 'cash',
       last_payment_date: latest_payment.paid_on,
-      dues_due_at: due_at,
-      dues_status: cash_dues_status(due_at)
-    }
-    updates[:membership_status] = 'paying' unless user.membership_status.in?(%w[cancelled banned deceased sponsored])
-    updates[:membership_ended_date] = nil if updates[:dues_status] == 'current' && user.membership_ended_date.present?
-
-    user.update!(updates)
-  end
-
-  def cash_dues_status(due_at)
-    return 'current' if due_at.blank? || due_at.to_date >= Date.current
-
-    'lapsed'
+      dues_due_at: due_at
+    )
   end
 
   def keep_later_dues_due_at!(updates, current_dues_due_at)

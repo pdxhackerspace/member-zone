@@ -114,12 +114,12 @@ class PrivilegeRolloutPhase6Test < ActionDispatch::IntegrationTest
   end
 
   test 'reports.edit_users edits from a report' do
-    @member.update!(active: true)
     holder('reports.view', 'reports.edit_users')
 
-    post reports_update_user_path, params: { user_id: @member.id, action_type: 'deactivate' }
+    post reports_update_user_path, params: { user_id: @member.id, action_type: 'ban' }
 
-    assert_not_predicate @member.reload, :active?
+    assert_not_equal DENIAL, flash[:alert]
+    assert_predicate @member.reload, :banned?
   end
 
   test 'onboarding.run runs the wizard but does not approve the mail it queues' do

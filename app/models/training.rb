@@ -7,12 +7,21 @@ class Training < ApplicationRecord
 
   scope :recent, -> { order(trained_at: :desc) }
 
-  after_create :sync_trained_in_group, :clear_pending_training_requests
+  after_create :sync_trained_in_group, :clear_pending_training_requests, :start_membership_grace_period
   after_destroy :sync_trained_in_group
   after_commit :enqueue_trainee_authentik_sync, on: %i[create destroy]
   after_commit :sync_required_access_controllers, on: %i[create destroy]
 
   private
+
+  # Building access training is what turns an approved applicant into a member who is
+  # expected to start paying, so it opens their grace period. No-op for every other
+  # topic and for anyone who is not a new member.
+  def start_membership_grace_period
+    return unless training_topic_id == TrainingTopic.building_access&.id
+
+    trainee.grant_building_access!
+  end
 
   # When a topic is required by an access controller type, a training change alters who
   # is authorized, so re-sync every controller of that type.

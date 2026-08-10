@@ -24,7 +24,7 @@ class AccessControllerPayloadBuilderTest < ActiveSupport::TestCase
   end
 
   test 'excludes inactive users by default' do
-    @user_one.update!(active: false)
+    @user_one.update!(membership_state: 'inactive_member')
 
     payload = parse_payload
     uids = payload.pluck('uid')
@@ -32,7 +32,7 @@ class AccessControllerPayloadBuilderTest < ActiveSupport::TestCase
   end
 
   test 'includes inactive users when sync_inactive_members is enabled' do
-    @user_one.update!(active: false)
+    @user_one.update!(membership_state: 'inactive_member')
     DefaultSetting.instance.update!(sync_inactive_members: true)
 
     payload = parse_payload
@@ -191,8 +191,7 @@ class AccessControllerPayloadBuilderTest < ActiveSupport::TestCase
     @user_one.update_columns(
       active: true,
       key_access_paused: false,
-      membership_status: 'paying',
-      dues_status: 'current'
+      membership_state: 'current_member'
     )
     return if @user_one.rfids.exists?
 

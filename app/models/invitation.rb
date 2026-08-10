@@ -96,17 +96,8 @@ class Invitation < ApplicationRecord
 
   def apply_membership_type!(user)
     case membership_type
-    when 'sponsored'
-      user.update!(
-        is_sponsored: true,
-        membership_status: 'sponsored',
-        dues_status: 'current'
-      )
-    when 'guest'
-      user.update!(
-        membership_status: 'guest',
-        dues_status: 'current'
-      )
+    when 'sponsored' then user.mark_sponsored!
+    when 'guest' then user.mark_guest!
     end
   end
 end

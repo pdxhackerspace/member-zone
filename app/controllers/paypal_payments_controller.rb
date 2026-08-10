@@ -140,9 +140,7 @@ class PaypalPaymentsController < AuthenticatedController
       email: @payment.payer_email,
       paypal_account_id: @payment.payer_id,
       payment_type: 'paypal',
-      membership_status: 'unknown',
-      dues_status: 'unknown',
-      active: false
+      membership_state: User.initial_membership_state
     )
 
     if user.save

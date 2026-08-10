@@ -1,5 +1,6 @@
 class User < ApplicationRecord
   include SensitiveFields
+  include MembershipState
 
   encrypts_sensitive_string :email, :mailing_address, :phone_number
   encrypts_sensitive_string_array :extra_emails
@@ -49,16 +50,6 @@ class User < ApplicationRecord
             }
   validates :email_lookup_digest, uniqueness: true, allow_blank: true
   validates :payment_type, inclusion: { in: %w[unknown sponsored paypal recharge kofi cash inactive] }
-  enum :membership_status, {
-    paying: 'paying',
-    guest: 'guest',
-    banned: 'banned',
-    deceased: 'deceased',
-    sponsored: 'sponsored',
-    applicant: 'applicant',
-    cancelled: 'cancelled',
-    unknown: 'unknown'
-  }, default: 'unknown'
 
   PROFILE_VISIBILITY_OPTIONS = %w[public members private].freeze
 
@@ -400,17 +391,22 @@ class User < ApplicationRecord
     dues_due_at.present? && dues_due_at < Time.current
   end
 
-  PAYMENT_GRACE_DAYS = 2
+  # States a linked payment must not overwrite: each was set deliberately, and a payment
+  # discovered by a sync is not evidence that the decision has been reversed.
+  PAYMENT_IMMUNE_STATES = %w[cancelled_member banned_member deceased_member sponsored_member].freeze
 
   # How long after a payment the user is still considered current.
   # Based on the membership plan's billing cycle plus a small grace window.
   # Returns nil for one-time plans (payment never expires).
-  # Falls back to 32 days when no plan is assigned.
-  def payment_currency_window
-    cycle = membership_plan&.billing_cycle_duration
-    return cycle + PAYMENT_GRACE_DAYS.days if cycle
+  # Falls back to MembershipSetting.planless_payment_window_days when no plan is assigned.
+  def payment_currency_window(billing_plan: nil)
+    plan = billing_plan || membership_plan
+    cycle = plan&.billing_cycle_duration
+    if cycle
+      return cycle + MembershipSetting.payment_currency_buffer_days.days
+    end
 
-    membership_plan&.billing_frequency == 'one-time' ? nil : 32.days
+    plan&.billing_frequency == 'one-time' ? nil : MembershipSetting.planless_payment_window_days.days
   end
 
   # Check if user is within the reactivation grace period
@@ -552,7 +548,8 @@ class User < ApplicationRecord
   # Used by payment linking callbacks and synchronizer reconciliation.
   # Updates last_payment_date, membership status, and membership plan if needed.
   # Can accept either a time or a hash with :time and :amount.
-  def apply_payment_updates(payment_time_or_options, updates = {})
+  # billing_plan: plan that governs this payment's cycle (e.g. a personal plan on a cash payment)
+  def apply_payment_updates(payment_time_or_options, updates = {}, billing_plan: nil)
     return updates if payment_time_or_options.blank?
 
     # Support both simple time and options hash
@@ -571,35 +568,33 @@ class User < ApplicationRecord
     # Update last_payment_date if this payment is more recent
     updates[:last_payment_date] = payment_date if last_payment_date.nil? || payment_date > last_payment_date
 
-    # If payment is within the billing cycle window, update membership and dues status.
-    # (active will be computed automatically by the before_save callback)
-    window = payment_currency_window
+    # A payment inside the billing window makes them a current member. membership_status,
+    # dues_status, and active are projections of that and are rewritten on save.
+    window = payment_currency_window(billing_plan: billing_plan)
     payment_is_current = window.nil? || payment_date >= window.ago.to_date
     if payment_is_current
-      # Don't override deliberate statuses — these are set by admin actions,
-      # webhooks, or subscription sync and should not be reverted by the
-      # presence of a historical payment.
-      if !membership_status.in?(%w[cancelled banned deceased sponsored]) && (membership_status != 'paying')
-        updates[:membership_status] = 'paying'
+      # Don't override deliberate states — these are set by admin actions, webhooks, or
+      # subscription sync and should not be reverted by a historical payment turning up
+      # in a sync. A cancelled member's last payment is expected to still be recent.
+      unless membership_state.in?(PAYMENT_IMMUNE_STATES) || current_member?
+        updates[:membership_state] = 'current_member'
       end
-      updates[:dues_status] = 'current' if dues_status != 'current'
       updates[:membership_ended_date] = nil if membership_ended_date.present?
     end
 
     maybe_match_plan_from_payment_amount!(updates, payment_amount)
 
-    merge_dues_due_at_after_payment!(updates, payment_date)
+    merge_dues_due_at_after_payment!(updates, payment_date, billing_plan: billing_plan)
 
     updates
   end
 
-  def merge_dues_due_at_after_payment!(updates, payment_date)
-    status = updates[:membership_status] || membership_status
-    return if status.in?(%w[guest sponsored banned deceased])
+  def merge_dues_due_at_after_payment!(updates, payment_date, billing_plan: nil)
+    state = updates[:membership_state] || membership_state
+    return if state.in?(%w[guest_member sponsored_member banned_member deceased_member])
 
     anchor = [last_payment_date, payment_date, updates[:last_payment_date]].compact.max
-    plan_id = updates[:membership_plan_id] || membership_plan_id
-    plan = MembershipPlan.find_by(id: plan_id)
+    plan = billing_plan || MembershipPlan.find_by(id: updates[:membership_plan_id] || membership_plan_id)
     updates[:dues_due_at] = User.dues_due_at_from_payment_cycle(anchor, plan)
   end
 
@@ -676,7 +671,6 @@ class User < ApplicationRecord
   before_save :ensure_greeting_name_mutual_exclusivity
   before_save :clear_greeting_name_if_do_not_greet
   before_save :auto_fill_greeting_name
-  before_save :compute_active_status
   before_save :clear_legacy_if_meaningful_data
   before_save :clear_mailing_coordinates_if_address_changed
   before_save :mark_authentik_dirty_if_needed
@@ -688,7 +682,6 @@ class User < ApplicationRecord
   after_update_commit :journal_updated!
   after_update_commit :sync_authentik_user_if_needed
   after_update_commit :sync_application_group_memberships_on_update
-  after_update_commit :queue_lapsed_email_if_needed
   after_update_commit :enqueue_mailing_geocoding_if_needed
 
   private
@@ -894,12 +887,8 @@ class User < ApplicationRecord
     end
   end
 
-  def compute_active_status
-    Membership::ActiveStatus.apply_to(self)
-  end
-
   def apply_sponsored_guest_duration_months
-    return unless membership_status.in?(%w[guest sponsored])
+    return unless membership_state.in?(%w[guest_member sponsored_member])
     return if sponsored_guest_duration_months.blank?
 
     months = sponsored_guest_duration_months.to_i
@@ -914,16 +903,15 @@ class User < ApplicationRecord
     return unless legacy?
 
     # Only auto-clear if one of the meaningful data fields is changing in this save
-    meaningful_fields = %w[membership_plan_id dues_status last_payment_date recharge_most_recent_payment_date
-                           membership_status is_sponsored dues_due_at]
+    meaningful_fields = %w[membership_plan_id last_payment_date recharge_most_recent_payment_date
+                           membership_state is_sponsored dues_due_at]
     return unless changes.keys.intersect?(meaningful_fields)
 
     has_plan = membership_plan_id.present?
-    has_non_unknown_dues = dues_status.present? && dues_status != 'unknown'
     has_payment_date = last_payment_date.present? || recharge_most_recent_payment_date.present?
-    has_paying_status = membership_status.in?(%w[paying sponsored])
+    has_determined_membership = membership_state != 'unknown'
 
-    return unless has_plan || has_non_unknown_dues || has_payment_date || has_paying_status || is_sponsored?
+    return unless has_plan || has_payment_date || has_determined_membership || is_sponsored?
 
     self.legacy = false
   end
@@ -1054,13 +1042,5 @@ class User < ApplicationRecord
 
     sources << 'all_members'
     Authentik::ApplicationGroupMembershipSyncJob.perform_later(sources.uniq)
-  end
-
-  def queue_lapsed_email_if_needed
-    return unless saved_change_to_dues_status?
-    return unless dues_status == 'lapsed'
-    return if email.blank?
-
-    QueuedMail.enqueue(:membership_lapsed, self, reason: "Membership dues lapsed for #{display_name}")
   end
 end
