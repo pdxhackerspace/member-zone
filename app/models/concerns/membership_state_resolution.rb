@@ -45,6 +45,19 @@ module MembershipStateResolution
     effective_membership_state != membership_state
   end
 
+  # The next state after one elapsed deadline — what materialization should persist per
+  # save or tick. Read-time resolution still chains through effective_membership_state.
+  def next_expiry_membership_state(from_state: membership_state, entered: nil)
+    entered ||= membership_state_entered_at_for(from_state)
+    deadline = membership_state_deadline(from_state, entered)
+    return from_state if deadline.nil? || deadline > Time.current
+
+    target = EXPIRY_TARGETS[from_state]
+    return from_state if target.nil? || target == from_state
+
+    target
+  end
+
   # When the current state runs out, or nil if nothing is counting down.
   def membership_state_expires_at
     membership_state_deadline(membership_state, membership_state_anchor)
@@ -74,6 +87,14 @@ module MembershipStateResolution
 
   private
 
+  def membership_state_entered_at_for(state)
+    if state == membership_state_was
+      membership_state_entered_at_was || created_at || Time.current
+    else
+      membership_state_anchor
+    end
+  end
+
   def membership_state_deadline(state, entered)
     case state
     when 'new_member' then entered + MembershipSetting.new_member_expiry_days.days
@@ -90,13 +111,22 @@ module MembershipStateResolution
   def resolve_expired_membership_state
     return if service_account?
 
-    resolved = effective_membership_state
-    self.membership_state = resolved if resolved != membership_state
-  end
+    if new_record?
+      from_state = membership_state
+      next_state = next_expiry_membership_state(from_state: from_state)
+      if next_state != from_state
+        self.expiry_materialized_from_state = from_state
+        self.membership_state = next_state
+      end
+      return
+    end
 
-  def stamp_membership_state_entered_at
-    return unless will_save_change_to_membership_state? || membership_state_entered_at.blank?
+    return if membership_state_was != membership_state
 
-    self.membership_state_entered_at = Time.current
+    next_state = next_expiry_membership_state(
+      from_state: membership_state_was,
+      entered: membership_state_entered_at_was || created_at || Time.current
+    )
+    self.membership_state = next_state if next_state != membership_state
   end
 end

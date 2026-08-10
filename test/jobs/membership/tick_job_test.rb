@@ -111,6 +111,23 @@ module Membership
       assert service.reload.active?
     end
 
+    test 'a long-delayed tick materializes overdue before inactive' do
+      user = member(state: 'provisional_member', entered_at: 200.days.ago)
+
+      TickJob.new.perform
+
+      assert_equal 'overdue_member', user.reload.membership_state
+    end
+
+    test 'a long-delayed current member lands in overdue not inactive' do
+      user = member(state: 'current_member')
+      user.update_columns(dues_due_at: 60.days.ago, last_payment_date: 90.days.ago.to_date)
+
+      TickJob.new.perform
+
+      assert_equal 'overdue_member', user.reload.membership_state
+    end
+
     test 'falling inactive queues the lapsed-membership email' do
       member(state: 'overdue_member', entered_at: 31.days.ago, email: 'tick-lapsed@example.com')
 

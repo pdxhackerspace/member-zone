@@ -24,11 +24,13 @@ class UserComputeActiveTest < ActiveSupport::TestCase
   end
 
   test 'guest membership ends when its access window closes' do
-    user = build_user(membership_state: 'guest_member', dues_due_at: 2.days.ago)
+    access_end = 2.days.ago.beginning_of_day
+    user = build_user(membership_state: 'guest_member', dues_due_at: access_end)
     user.save!
 
     assert_not user.active?
     assert_equal 'inactive_member', user.membership_state
+    assert_equal access_end.to_i, user.membership_state_entered_at.to_i
   end
 
   test 'sponsored membership has no access window to run out' do
