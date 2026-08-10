@@ -110,7 +110,13 @@ module MembershipStateResolution
 
   def resolve_expired_membership_state
     return if service_account?
-    return if membership_state_was.blank?
+
+    if new_record?
+      next_state = next_expiry_membership_state
+      self.membership_state = next_state if next_state != membership_state
+      return
+    end
+
     return if membership_state_was != membership_state
 
     next_state = next_expiry_membership_state(
