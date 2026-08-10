@@ -70,9 +70,13 @@ module Reminders
     # Reads the resolved state rather than the column: a member whose overdue grace ran
     # out is on their way to inactive and should not get one last nag.
     def self.base_user?(user)
-      !user.service_account? &&
-        user.email.present? &&
-        user.effective_membership_state == 'overdue_member'
+      return false if user.service_account?
+      return false if user.email.blank?
+      return false unless user.effective_membership_state == 'overdue_member'
+
+      # Someone who told us they were leaving is not someone to chase for a payment,
+      # whether or not the notice has been processed yet.
+      !user.cancellation_on_file?
     end
 
     private_class_method :base_user?

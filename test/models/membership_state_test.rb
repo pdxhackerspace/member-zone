@@ -347,6 +347,58 @@ class MembershipStateTest < ActiveSupport::TestCase
 
   private
 
+  # ─── Refusing illegal moves ────────────────────────────────────────
+
+  # Nothing exits deceased_member, and callers ask anyway — a bulk report action, a
+  # Recharge cancellation for someone we buried. Every transition method has to answer
+  # that the same way record_payment! does.
+  test 'transitions out of deceased return false instead of raising' do
+    %i[ban! mark_sponsored! record_cancellation! record_payment! approve_application!
+       grant_building_access! unmark_sponsored!].each do |transition|
+      user = create_member(state: 'deceased_member')
+
+      assert_not user.public_send(transition), "#{transition} should decline a deceased member"
+      assert_equal 'deceased_member', user.reload.membership_state
+    end
+  end
+
+  test 'marking a deceased member as a guest returns false instead of raising' do
+    user = create_member(state: 'deceased_member')
+
+    assert_not user.mark_guest!(duration_months: 3)
+    assert_equal 'deceased_member', user.reload.membership_state
+  end
+
+  test 'a move the transition table forbids is declined without touching other attributes' do
+    user = create_member(state: 'cancelled_member', dues_due_at: 1.month.from_now)
+
+    assert_not user.mark_guest!(duration_months: 6)
+    assert_equal 'cancelled_member', user.reload.membership_state
+  end
+
+  test 'banning a deceased member is refused but banning a live one is not' do
+    assert_not create_member(state: 'deceased_member').ban!
+    assert create_member(state: 'current_member').ban!
+  end
+
+  # The refusal is the transition table talking, not a hard stop: a backfill that says so
+  # out loud still gets through.
+  test 'a backfill may still cross the transition table deliberately' do
+    user = create_member(state: 'deceased_member')
+    user.allow_any_membership_state_transition = true
+
+    assert user.transition_to!('current_member')
+    assert_equal 'current_member', user.reload.membership_state
+  end
+
+  test 'direct assignment of an illegal state still fails validation' do
+    user = create_member(state: 'deceased_member')
+    user.membership_state = 'current_member'
+
+    assert_not user.valid?
+    assert_includes user.errors[:membership_state].join, 'cannot change from deceased_member'
+  end
+
   def create_member(state:, **attrs)
     User.create!(
       {

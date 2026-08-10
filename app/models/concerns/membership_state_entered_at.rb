@@ -10,13 +10,16 @@ module MembershipStateEnteredAt
     return unless will_save_change_to_membership_state? || membership_state_entered_at.blank?
 
     from_state = expiry_materialized_from_state || membership_state_was
-    self.membership_state_entered_at = if expiry_driven_state_change?
+    self.membership_state_entered_at = if backdated_membership_state_entered_at.present?
+                                         backdated_membership_state_entered_at
+                                       elsif expiry_driven_state_change?
                                          resolved_membership_state_entered_at(from_state: from_state)
                                        else
                                          Time.current
                                        end
   ensure
     self.expiry_materialized_from_state = nil
+    self.backdated_membership_state_entered_at = nil
   end
 
   def expiry_driven_state_change?

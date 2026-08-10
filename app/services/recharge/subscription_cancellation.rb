@@ -20,7 +20,8 @@ module Recharge
 
       old_state = @user.membership_state
       event_is_new = create_payment_event
-      @user.record_cancellation!
+      return state_locked(old_state) unless @user.record_cancellation!
+
       create_journal_entry(old_state) if event_is_new
       @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
                    "(#{old_state} -> #{@user.membership_state})")
@@ -28,6 +29,15 @@ module Recharge
     end
 
     private
+
+    # A ban or a death outranks a cancellation notice. The payment event still stands —
+    # the subscription really did end at Recharge — but the member's standing is not the
+    # notice's to change, and no journal entry claims otherwise.
+    def state_locked(old_state)
+      @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
+                   "cancelled at Recharge; left in #{old_state}")
+      :state_locked
+    end
 
     def subscription_id
       @subscription[:recharge_subscription_id] || @subscription['id']

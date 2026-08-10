@@ -102,8 +102,9 @@ stateDiagram-v2
 
 ## Transitions
 
-Each method names an event, returns `false` when the move does not apply, and raises on a
-genuinely invalid save.
+Each method names an event and returns `false` when the move does not apply — either
+because the member is already there, or because `TRANSITIONS` forbids it. Callers should
+check the result; a refused move is an ordinary answer, not an exception.
 
 | Method | Event | Result |
 | --- | --- | --- |
@@ -123,14 +124,25 @@ genuinely invalid save.
 the member's payments still cover them, inactive otherwise. Never `unknown` — we know what
 happened to them, and a member with nothing paying for them is inactive.
 
-### Illegal transitions fail validation
+### Illegal transitions are refused, not raised
 
-`TRANSITIONS` lists the legal moves out of each state. Assigning a state that is not in the
-list adds a validation error rather than saving, so a stray `update!(membership_state: …)`
-cannot silently corrupt someone's standing. `deceased_member` has no exits at all.
+`TRANSITIONS` lists the legal moves out of each state, and `deceased_member` has no exits at
+all. The rule is enforced in two places against the same predicate, `can_transition_to?`:
+
+- **Transition methods** check it before assigning, in `transition_to!`, and return `false`.
+  Callers ask for impossible moves routinely — a bulk action on a report row, a Recharge
+  cancellation for someone we buried — so `ban!` on a deceased member is a question with the
+  answer "no", not a 500.
+- **Validation** catches everything else. A stray `update!(membership_state: …)` adds a
+  validation error rather than saving, so nothing can silently corrupt someone's standing.
 
 Two callers legitimately need to place a member anywhere: the admin edit form and data
-backfills. Both set `allow_any_membership_state_transition = true` on the record first.
+backfills. Both set `allow_any_membership_state_transition = true` on the record first,
+which lifts both checks.
+
+Because a refusal is silent, anything with a UI has to look at the return value.
+`UsersController` and `ReportsController` both flash the failure instead of reporting
+success over a no-op.
 
 ---
 
@@ -217,7 +229,7 @@ queue unless its template opts out of review.
 | --- | --- | --- |
 | Entering `cancelled_member` | `membership_cancelled` | Once, guarded by `membership_cancelled_email_sent_at` |
 | `ban!` | `membership_banned` | Once per ban |
-| Entering `inactive_member` | `membership_lapsed` | Once per lapse |
+| Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled** |
 | Being in `overdue_member` | `payment_past_due` | Weekly, while the reminder is enabled |
 | `mark_deceased!` | — | No email |
 
@@ -228,11 +240,96 @@ still `overdue_member`, not reminded within `payment_overdue_reminder_repeat_day
 7), with an email address, no reminder already waiting in the queue, and not a service
 account. Reading the resolved state rather than the column means a member whose overdue
 grace has run out does not get one last nag on their way to inactive. Cancelled members are
-excluded by design — they told us they were leaving.
+excluded by design — they told us they were leaving — as are members with a cancellation on
+file that has not been reconciled yet (see below).
 
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
 address.
+
+### A cancellation outlives `cancelled_member`
+
+`cancelled_member` is a waiting room. When the paid-through date passes, the member becomes
+`inactive_member` — the same state as someone who quietly stopped paying — and the state
+alone can no longer tell the two apart. Left there, the lapse email chases someone who
+chose to leave, told us so, and was already told their access ran to a date that has now
+arrived.
+
+So the fact is kept separately from the state, on `users.membership_cancelled_at`:
+
+- `record_cancellation!(cancelled_at:)` stamps it alongside the transition.
+- `note_cancellation!(cancelled_at:)` stamps it for a member whose standing has nowhere to
+  go — already lapsed, banned, dead. Nothing moves.
+- `cancellation_recorded?` asks whether the stamp is set — the question for code deciding
+  whether there is bookkeeping left to do.
+- `cancellation_on_file?` is the broader question, and the one anything about to mail a
+  member asks. It is true for the stamp **or** for an unprocessed `subscription_cancelled`
+  payment event newer than the member's last payment. `notify_membership_lapsed` and
+  `PaymentOverdueEligibility` both use it, because `Membership::TickJob` walks members from
+  `overdue_member` to `inactive_member` without passing through `cancelled_member` — a
+  filed notice nobody has reconciled yet has to be enough on its own.
+- Entering `current_member` clears it, along with `membership_cancelled_email_sent_at`. A
+  member who came back is not a member who left, so a later lapse reads as a lapse and a
+  second cancellation mails them again. The clearing is bookkeeping rather than mail, so it
+  happens even under `Current.skip_membership_state_email`.
+
+---
+
+## Catching up on filed cancellations
+
+Recharge has been telling us about cancellations since long before the state machine
+existed. Each notice was filed as a `subscription_cancelled` payment event, but nothing
+consumed it, so the member's standing never moved: they stayed `current_member`, went
+`overdue_member` on their own clock, and collected past-due reminders for a membership they
+had already ended.
+
+`Membership::CancellationReconciler` walks the filed notices and plays each one forward
+from the day it arrived rather than treating an old cancellation as today's news:
+
+```bash
+rake membership:preview_cancellations   # dry run — what would change
+rake membership:process_cancellations   # apply
+```
+
+For each member it takes the most recent notice on file — an older one from a subscription
+they already replaced says nothing about where they stand — and:
+
+- Moves them to `cancelled_member` with `membership_state_entered_at` set to the
+  cancellation date, then materializes any deadline that has since passed, so a member
+  whose paid-through date ran out lands in `inactive_member` in the same pass.
+- Withdraws `payment_past_due` mail still waiting in the review queue. An approved-but-unsent
+  reminder is rejected too; `QueuedMailDeliveryJob` re-checks the status before sending.
+- Suppresses state-entry email for the whole run via `Current.skip_membership_state_email`.
+  Nobody should get "sorry to see you go" about a subscription they ended two years ago.
+
+Members who lapsed long before anyone processed their notice have no state left to move —
+`inactive_member` is where the cancellation would have put them anyway. They still get
+`membership_cancelled_at` recorded, which is the whole point: it is the only thing that
+stops the lapse email finding them.
+
+It leaves alone anyone who paid or opened a new subscription after cancelling, anyone whose
+cancellation is already recorded, service accounts, and the states a person chose
+deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
+
+Leaving a member's standing alone is not the same as deciding the notice was wrong, and the
+two have different consequences for queued past-due mail. A member who came back keeps
+their reminders — they may genuinely owe us again. Everyone else loses them: the
+cancellation stands, there is simply no state left to change.
+
+One case is deliberately not guessed at. `last_payment_on` is a date and the notice is a
+timestamp, so a payment on the same calendar day is either a same-day resubscribe or the
+renewal they cancelled straight afterwards, and the records cannot say which. Those members
+are listed in the report for an admin to sort out by hand. Nothing chases them in the
+meantime, because the mail guards read the payment event ledger directly.
+
+The live path draws the same line. `Recharge::SubscriptionCancellation` files the payment
+event — the subscription really did end at Recharge — but returns `:state_locked` without a
+journal entry when `record_cancellation!` declines, so a billing notice never overrides a
+ban or a death.
+
+Until a notice is reconciled, `PaymentOverdueEligibility` skips members whose most recent
+cancellation is newer than their last payment. That keeps the reminders quiet if a webhook
+goes missing and the sync's lookback window closes before anyone notices.
 
 ---
 
@@ -261,6 +358,10 @@ unset, `Training` creation does not advance anyone out of `new_member`.
   cancellation signal, so a member who cancels there goes `overdue_member` →
   `inactive_member` and gets reminders on the way. Staff can record it by hand from the
   member page.
+- **Recharge cancellations are reconciled on demand, not on a schedule.**
+  `Recharge::SubscriptionSynchronizer` only looks back seven days, so a notice missed for
+  longer needs `rake membership:process_cancellations`. The eligibility guard keeps the
+  reminders quiet in the meantime, but the member's state stays wrong until it runs.
 - **Revoking building access training does not move anyone back.** Payment state is
   independent of training, so a `current_member` who loses the training stays current.
 
