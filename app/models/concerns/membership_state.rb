@@ -138,13 +138,11 @@ module MembershipState
 
   private
 
+  # Backstop for direct assignment. Transition methods pre-check the same rule through
+  # can_transition_to? so they can decline rather than raise; this catches everything else.
   def membership_state_transition_is_allowed
     return unless will_save_change_to_membership_state?
-    return if allow_any_membership_state_transition
-    return if membership_state_was.blank?
-
-    allowed = TRANSITIONS.fetch(membership_state_was, [])
-    return if allowed == ANY_STATE || allowed.include?(membership_state)
+    return if can_transition_to?(membership_state)
 
     errors.add(:membership_state, "cannot change from #{membership_state_was} to #{membership_state}")
   end

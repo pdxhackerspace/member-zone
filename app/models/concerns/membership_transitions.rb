@@ -43,6 +43,19 @@ module MembershipTransitions
     transition_to!('banned_member')
   end
 
+  # Whether the guard would accept this move, asked before attempting it. A transition
+  # method is a question as much as an order — "can this member be banned?" — so an
+  # illegal move comes back as false rather than raising out of save!.
+  def can_transition_to?(state)
+    return true if allow_any_membership_state_transition
+
+    from = membership_state_was
+    return true if from.blank? || from == state
+
+    allowed = MembershipState::TRANSITIONS.fetch(from, [])
+    allowed == MembershipState::ANY_STATE || allowed.include?(state)
+  end
+
   # Lifting a ban hands the member back to the clock: their payment history decides
   # where they land.
   def unban!
@@ -87,7 +100,13 @@ module MembershipTransitions
     transition_to!(next_state)
   end
 
+  # Every transition method funnels through here, so all of them answer an illegal move the
+  # same way. Nothing exits deceased_member, and callers ask for moves out of it — a report
+  # bulk action, a Recharge cancellation for someone we buried — often enough that raising
+  # is the wrong answer.
   def transition_to!(state, **attrs)
+    return false unless can_transition_to?(state)
+
     assign_attributes(attrs.merge(membership_state: state))
     save!
   end

@@ -499,7 +499,11 @@ class UsersController < AuthenticatedController
 
   # The ban email is queued by the state machine and held for review before it is sent.
   def ban
-    @user.ban!
+    unless @user.ban!
+      redirect_to user_path(@user), alert: "#{@user.display_name} cannot be banned from #{current_state_phrase}."
+      return
+    end
+
     redirect_to user_path(@user), notice: 'Member banned.'
   end
 
@@ -515,7 +519,11 @@ class UsersController < AuthenticatedController
   end
 
   def mark_deceased
-    @user.mark_deceased!
+    unless @user.mark_deceased!
+      redirect_to user_path(@user), alert: "#{@user.display_name} is already recorded as deceased."
+      return
+    end
+
     redirect_to user_path(@user), notice: 'Member marked as deceased.'
   end
 
@@ -531,13 +539,21 @@ class UsersController < AuthenticatedController
   end
 
   def mark_sponsored
-    @user.mark_sponsored!
+    unless @user.mark_sponsored!
+      redirect_to user_path(@user), alert: "#{@user.display_name} cannot be sponsored from #{current_state_phrase}."
+      return
+    end
+
     QueuedMail.enqueue(:membership_sponsored, @user, reason: 'Membership sponsored') if @user.email.present?
     redirect_to user_path(@user), notice: 'Member marked as sponsored.'
   end
 
   def unmark_sponsored
-    @user.unmark_sponsored!
+    unless @user.unmark_sponsored!
+      redirect_to user_path(@user), alert: "#{@user.display_name} is not sponsored."
+      return
+    end
+
     redirect_to user_path(@user), notice: 'Member sponsorship removed.'
   end
 
@@ -653,6 +669,12 @@ class UsersController < AuthenticatedController
   end
 
   private
+
+  # Names the state a refused transition was blocked by, so the alert says why rather than
+  # just that it did not work.
+  def current_state_phrase
+    @user.membership_state.humanize.downcase
+  end
 
   # Pause/resume can be triggered from the member profile or the Add Key Fob screen.
   # Return to the originating screen so the toggled button stays in context.

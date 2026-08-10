@@ -102,8 +102,9 @@ stateDiagram-v2
 
 ## Transitions
 
-Each method names an event, returns `false` when the move does not apply, and raises on a
-genuinely invalid save.
+Each method names an event and returns `false` when the move does not apply — either
+because the member is already there, or because `TRANSITIONS` forbids it. Callers should
+check the result; a refused move is an ordinary answer, not an exception.
 
 | Method | Event | Result |
 | --- | --- | --- |
@@ -123,14 +124,25 @@ genuinely invalid save.
 the member's payments still cover them, inactive otherwise. Never `unknown` — we know what
 happened to them, and a member with nothing paying for them is inactive.
 
-### Illegal transitions fail validation
+### Illegal transitions are refused, not raised
 
-`TRANSITIONS` lists the legal moves out of each state. Assigning a state that is not in the
-list adds a validation error rather than saving, so a stray `update!(membership_state: …)`
-cannot silently corrupt someone's standing. `deceased_member` has no exits at all.
+`TRANSITIONS` lists the legal moves out of each state, and `deceased_member` has no exits at
+all. The rule is enforced in two places against the same predicate, `can_transition_to?`:
+
+- **Transition methods** check it before assigning, in `transition_to!`, and return `false`.
+  Callers ask for impossible moves routinely — a bulk action on a report row, a Recharge
+  cancellation for someone we buried — so `ban!` on a deceased member is a question with the
+  answer "no", not a 500.
+- **Validation** catches everything else. A stray `update!(membership_state: …)` adds a
+  validation error rather than saving, so nothing can silently corrupt someone's standing.
 
 Two callers legitimately need to place a member anywhere: the admin edit form and data
-backfills. Both set `allow_any_membership_state_transition = true` on the record first.
+backfills. Both set `allow_any_membership_state_transition = true` on the record first,
+which lifts both checks.
+
+Because a refusal is silent, anything with a UI has to look at the return value.
+`UsersController` and `ReportsController` both flash the failure instead of reporting
+success over a no-op.
 
 ---
 
@@ -267,6 +279,11 @@ they already replaced says nothing about where they stand — and:
 It leaves alone anyone who paid or opened a new subscription after cancelling, anyone
 already `cancelled_member` or `inactive_member`, service accounts, and the states a person
 chose deliberately (`banned_member`, `deceased_member`, `sponsored_member`, `guest_member`).
+
+The live path draws the same line. `Recharge::SubscriptionCancellation` files the payment
+event — the subscription really did end at Recharge — but returns `:state_locked` without a
+journal entry when `record_cancellation!` declines, so a billing notice never overrides a
+ban or a death.
 
 Until a notice is reconciled, `PaymentOverdueEligibility` skips members whose most recent
 cancellation is newer than their last payment. That keeps the reminders quiet if a webhook
