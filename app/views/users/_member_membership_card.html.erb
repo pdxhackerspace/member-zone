@@ -3,6 +3,7 @@
 <% next_payment = user.next_payment_date %>
 <% days_until_payment = next_payment.present? ? (next_payment - Date.current).to_i : nil %>
 <% pill_text, pill_class, card_class = member_membership_card_status(user) %>
+<% cancellation_phrase, cancellation_note = member_cancellation_line(user) %>
 <% payment_due = pill_text == 'Payment due' %>
 <% plan_name = plan&.name || (user.is_sponsored? ? 'Sponsored membership' : 'Membership') %>
 <% payment_method = user.payment_type.to_s.humanize %>
@@ -24,7 +25,17 @@
     <% end %>
   </div>
 
-  <% if next_payment.present? %>
+  <%# A cancelled membership has no next payment. Showing one — worse, showing it as
+      overdue — asks them for money they already told us they were done paying. %>
+  <% if cancellation_phrase.present? %>
+    <div class="text-12 text-secondary mb-1">Cancelled</div>
+    <div class="text-13 mb-3">
+      <%= cancellation_phrase %>
+      <% if cancellation_note.present? %>
+        <span class="text-secondary">· <%= cancellation_note %></span>
+      <% end %>
+    </div>
+  <% elsif next_payment.present? %>
     <div class="text-12 text-secondary mb-1">Next payment</div>
     <div class="text-13 mb-3">
       <%= next_payment.strftime('%b %-d') %>

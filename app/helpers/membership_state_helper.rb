@@ -62,6 +62,33 @@ module MembershipStateHelper
     end
   end
 
+  # A cancellation only describes where someone stands until something replaces it. A
+  # sponsorship or guest pass granted afterwards says more than the older notice.
+  CANCELLATION_STANDS_STATES = %w[cancelled_member inactive_member].freeze
+
+  # What the membership card says in place of "Next payment" once a member has cancelled.
+  # There is no next payment — the subscription will not renew — so the date that matters
+  # is when the payment they already made stops covering them.
+  #
+  # Returns [phrase, muted note] to match the card's existing two-part layout, or nil when
+  # the member has not cancelled and the ordinary renewal line should show instead.
+  def member_cancellation_line(user)
+    return nil unless user.cancellation_recorded?
+    return nil unless user.effective_membership_state.in?(CANCELLATION_STANDS_STATES)
+
+    access_until = user.dues_paid_through_at
+    return ['No end date on record', nil] if access_until.blank?
+    return ["Ended #{card_date(access_until)}", nil] if access_until <= Time.current
+
+    days = (access_until.to_date - Date.current).to_i
+    ["Active until #{card_date(access_until)}", "in #{days} #{'day'.pluralize(days)}"]
+  end
+
+  # Day and month, with the year only when it is not this one.
+  def card_date(time)
+    time.year == Date.current.year ? time.strftime('%b %-d') : time.strftime('%b %-d, %Y')
+  end
+
   # The member's own view of their standing: friendly wording, and no distinction drawn
   # between the several ways a membership can end.
   def member_membership_card_status(user)
