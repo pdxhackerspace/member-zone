@@ -27,6 +27,38 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Slack signup reminder', response.body
     assert_match 'would be emailed today', response.body
     assert_match 'Application link reminder', response.body
+    assert_match 'Orientation reminder', response.body
+  end
+
+  test 'show lists members waiting on their orientation' do
+    now = Time.zone.local(2026, 8, 5, 7, 45, 0)
+    MembershipSetting.instance.update!(
+      orientation_reminder_repeat_days: 14,
+      new_member_expiry_days: 90,
+      building_access_training_topic: training_topics(:building_access)
+    )
+    user = User.create!(
+      email: 'awaiting-orientation-preview@example.com',
+      full_name: 'Awaiting Orientation User',
+      service_account: false,
+      membership_state: 'new_member',
+      payment_type: 'unknown'
+    )
+    user.update_columns(membership_state_entered_at: now - 20.days)
+    MembershipApplication.create!(
+      user: user,
+      email: user.email,
+      status: 'approved',
+      reviewed_at: now - 20.days,
+      submitted_at: now - 22.days
+    )
+
+    travel_to now do
+      get reminder_setting_url('orientation')
+    end
+
+    assert_response :success
+    assert_match 'Awaiting Orientation User', response.body
   end
 
   test 'show lists due members for slack signup' do

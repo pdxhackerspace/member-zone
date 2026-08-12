@@ -1,0 +1,39 @@
+<%# Approved members with no building access orientation on record. The wait is measured from
+    when they became a new member, which is the clock that eventually drops them to inactive;
+    the accepted date is shown separately because members onboarded without an application
+    have no accepted date at all. %>
+<% approved_at = local_assigns.fetch(:approved_at, {}) %>
+<div class="table-responsive">
+  <table class="table table-compact mb-0 align-middle">
+    <thead>
+      <tr>
+        <th scope="col" style="width: 48px;"></th>
+        <th scope="col">Name</th>
+        <th scope="col">Email</th>
+        <th scope="col">Accepted</th>
+        <th scope="col" class="num">Waiting</th>
+        <th scope="col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.each do |user| %>
+        <tr>
+          <td><%= render 'shared/user_avatar', user: user %></td>
+          <td class="fw-medium">
+            <%= link_to user.display_name, user_path(user), class: "text-decoration-none" %>
+          </td>
+          <td>
+            <% if user.email.present? %>
+              <%= mail_to user.email %>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+          <td><%= admin_profile_time(approved_at[user.id], empty: 'No application') %></td>
+          <td class="num"><%= orientation_wait_cell(user.membership_state_entered_at || user.created_at) %></td>
+          <td><%= render 'user_actions', user: user, anchor: report.key %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

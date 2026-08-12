@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_10_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_12_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -619,6 +619,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_10_210000) do
     t.integer "manual_payment_due_soon_days", default: 7, null: false
     t.integer "new_member_expiry_days", default: 90, null: false
     t.integer "new_member_grace_period_days", default: 14, null: false
+    t.integer "orientation_reminder_repeat_days", default: 14, null: false
     t.integer "overdue_grace_period_days", default: 30, null: false
     t.integer "payment_currency_buffer_days", default: 2, null: false
     t.integer "payment_grace_period_days", default: 14, null: false
@@ -1139,6 +1140,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_10_210000) do
     t.datetime "membership_state_entered_at"
     t.string "membership_status", default: "unknown"
     t.text "notes"
+    t.datetime "orientation_reminder_sent_at"
     t.datetime "payment_overdue_reminder_sent_at"
     t.string "payment_type", default: "unknown"
     t.string "paypal_account_id"
@@ -1171,6 +1173,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_10_210000) do
     t.index ["membership_plan_id"], name: "index_users_on_membership_plan_id"
     t.index ["membership_state", "membership_state_entered_at"], name: "idx_on_membership_state_membership_state_entered_at_31ea7f1f2e"
     t.index ["membership_state"], name: "index_users_on_membership_state"
+    t.index ["orientation_reminder_sent_at"], name: "index_users_on_orientation_reminder_sent_at"
     t.index ["paypal_account_id"], name: "index_users_on_paypal_account_id"
     t.index ["recharge_customer_id"], name: "index_users_on_recharge_customer_id"
     t.index ["slack_signup_reminder_sent_at"], name: "index_users_on_slack_signup_reminder_sent_at"

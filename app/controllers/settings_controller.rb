@@ -41,7 +41,8 @@ class SettingsController < AuthenticatedController
                   0
                 end
     application_link_due = Reminders::ApplicationLinkEligibility.count_due
+    orientation_due = ReminderSetting.enabled?('orientation') ? Reminders::OrientationEligibility.count_due : 0
 
-    slack_due + application_link_due
+    slack_due + application_link_due + orientation_due
   end
 end

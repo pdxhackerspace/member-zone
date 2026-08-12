@@ -28,7 +28,7 @@ class EmailTemplate < ApplicationRecord
     '{{recipient_role}}' => 'Whether this notification is for a member or trainer',
     '{{trainer_names}}' => 'Comma-separated trainer names notified for a request',
     '{{contact_details}}' => 'Rendered contact details block for training request notifications',
-    '{{days_since_approval}}' => 'Days since the member was approved (Slack signup reminder only)',
+    '{{days_since_approval}}' => 'Days since the member was approved (Slack signup and orientation reminders)',
     '{{slack_link_url}}' => 'URL to associate a Slack account (Slack signup nag only; blank when unavailable)',
     '{{slack_link_html}}' => 'Slack self-link paragraph for HTML bodies (blank when unavailable)',
     '{{slack_link_text}}' => 'Slack self-link line for plain-text bodies (blank when unavailable)',
@@ -622,6 +622,30 @@ class EmailTemplate < ApplicationRecord
         This link expires soon. If you no longer wish to apply, you can ignore this email.
 
         Best regards,
+        The {{organization_name}} Team
+      TEXT
+    },
+    'orientation_reminder' => {
+      name: 'Orientation Reminder',
+      description: 'Reminder to approved members who have not had their building access orientation yet',
+      subject: '{{organization_name}}: Book your building access orientation',
+      body_html: <<~HTML,
+        <p>Hi {{member_name}},</p>
+        <p>Welcome to {{organization_name}}! Your membership was approved {{days_since_approval}} days ago, but we have not recorded your building access orientation yet.</p>
+        <p>Orientation is a short walkthrough covering how to get in, how to stay safe, and how the space works. We cannot issue you a key until you have done it, so it is the one thing standing between you and the shop.</p>
+        <p>Reply to this email and we will find you a time.</p>
+        <p>See you soon,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Hi {{member_name}},
+
+        Welcome to {{organization_name}}! Your membership was approved {{days_since_approval}} days ago, but we have not recorded your building access orientation yet.
+
+        Orientation is a short walkthrough covering how to get in, how to stay safe, and how the space works. We cannot issue you a key until you have done it, so it is the one thing standing between you and the shop.
+
+        Reply to this email and we will find you a time.
+
+        See you soon,
         The {{organization_name}} Team
       TEXT
     }

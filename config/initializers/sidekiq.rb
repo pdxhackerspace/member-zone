@@ -119,6 +119,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Orientation Reminder - Daily at 7:45am (cadence enforced per member)
+  Sidekiq::Cron::Job.create(
+    name: 'Orientation Reminder - Daily at 7:45am',
+    cron: '45 7 * * *',
+    class: 'OrientationReminderJob',
+    active_job: true
+  )
+
   # Login Link Expiration - Daily at 8am
   Sidekiq::Cron::Job.create(
     name: 'Login Link Expiration - Daily at 8am',

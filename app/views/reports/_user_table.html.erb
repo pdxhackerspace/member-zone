@@ -1,8 +1,11 @@
 <%# Members plus the inline actions that resolve whatever the report is flagging. %>
 <% show_payment_type = local_assigns.fetch(:show_payment_type, false) %>
 <% show_last_payment = local_assigns.fetch(:show_last_payment, false) %>
+<% show_approved = local_assigns.fetch(:show_approved, false) %>
 <%# Supplied by BuildingAccessScopeQuery#page_locals; absent means the column is not wanted. %>
 <% building_access = local_assigns.fetch(:building_access, nil) %>
+<%# Supplied by the query's page_locals; nil for a member who never had an application. %>
+<% approved_at = local_assigns.fetch(:approved_at, {}) %>
 <div class="table-responsive">
   <table class="table table-compact mb-0 align-middle">
     <thead>
@@ -14,6 +17,7 @@
         <% if show_payment_type %><th scope="col">Payment type</th><% end %>
         <% if building_access %><th scope="col">Building access</th><% end %>
         <% if show_last_payment %><th scope="col">Last payment</th><% end %>
+        <% if show_approved %><th scope="col">Accepted</th><% end %>
         <th scope="col">Actions</th>
       </tr>
     </thead>
@@ -50,6 +54,9 @@
                 <span class="text-secondary">Never</span>
               <% end %>
             </td>
+          <% end %>
+          <% if show_approved %>
+            <td><%= admin_profile_time(approved_at[user.id], empty: 'No application') %></td>
           <% end %>
           <td><%= render 'user_actions', user: user, anchor: report.key %></td>
         </tr>

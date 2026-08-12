@@ -17,6 +17,18 @@ module ReportsHelper
     end
   end
 
+  # How long a member has been waiting for their orientation. Most waits are short and stay
+  # muted; once someone is over halfway to the point where an un-oriented member falls
+  # inactive, the number is worth reading twice.
+  def orientation_wait_cell(since)
+    return tag.span('—', class: 'text-secondary') if since.blank?
+
+    days = ((Time.current - since) / 1.day).floor
+    halfway = MembershipSetting.new_member_expiry_days / 2
+    css = days >= halfway ? 'fw-medium text-warning' : 'text-secondary'
+    tag.span("#{days} #{'day'.pluralize(days)}", class: css)
+  end
+
   private
 
   def building_access_label(status)

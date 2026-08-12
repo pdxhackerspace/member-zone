@@ -18,6 +18,10 @@ class ReminderSettingsController < AdminController
     @payment_overdue_due_count = Reminders::PaymentOverdueEligibility.count_due
     @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
     @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
+    @orientation_due_count = Reminders::OrientationEligibility.count_due
+    @orientation_awaiting_count = Reminders::OrientationEligibility.total_awaiting
+    @orientation_email_template = EmailTemplate.find_by(key: 'orientation_reminder')
+    @building_access_topic = TrainingTopic.building_access
     @membership_setting = MembershipSetting.instance
   end
 
@@ -61,6 +65,12 @@ class ReminderSettingsController < AdminController
       @payment_overdue_due_count = @pagy.count
       @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
       @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
+    when 'orientation'
+      @pagy, @due_users = pagy(Reminders::OrientationEligibility.due, limit: PER_PAGE)
+      @orientation_due_count = @pagy.count
+      @orientation_awaiting_count = Reminders::OrientationEligibility.total_awaiting
+      @orientation_email_template = EmailTemplate.find_by(key: 'orientation_reminder')
+      @building_access_topic = TrainingTopic.building_access
     end
   end
 
