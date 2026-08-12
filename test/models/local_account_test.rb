@@ -45,6 +45,21 @@ class LocalAccountTest < ActiveSupport::TestCase
     assert_equal existing.id, provisioned.id
   end
 
+  # Rotating DATABASE_FIELD_ENCRYPTION_KEY while leaving EMAIL_LOOKUP_HMAC_KEY alone leaves the
+  # digest matching an address nothing can read, so provisioning finds the account and must
+  # then overwrite it rather than compare against it.
+  test 'provisioning repairs an account whose address no longer decrypts' do
+    account = local_accounts(:active_admin)
+    account.update_columns(email: "#{SensitiveData::STRING_PREFIX}encrypted-under-another-key",
+                           email_lookup_digest: SensitiveData.email_digest('admin@example.com'))
+
+    provisioned = LocalAccount.provision!(email: 'admin@example.com', password: 'repairedpassword123')
+
+    assert_equal account.id, provisioned.id
+    assert_equal 'admin@example.com', provisioned.reload.email
+    assert provisioned.authenticate('repairedpassword123')
+  end
+
   test 'an account encrypted under another key is reported as unreadable' do
     account = local_accounts(:regular_member)
     readable = local_accounts(:active_admin)
