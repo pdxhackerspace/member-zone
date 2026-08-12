@@ -65,6 +65,19 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Setting the encryption keys for the first time orphans the digest every local account was
+  # found by. The form can only say "Invalid email or password", so the log has to say more.
+  test 'a sign-in refused because the keys changed says so in the log' do
+    @local_account.update_columns(email: "#{SensitiveData::STRING_PREFIX}encrypted-under-another-key")
+
+    logged = capture_rails_log do
+      post local_login_path, params: { session: { email: 'admin@example.com', password: 'localpassword123' } }
+    end
+
+    assert_response :unprocessable_entity
+    assert_match 'DATABASE_FIELD_ENCRYPTION_KEY', logged
+  end
+
   test 'login page renders no error before anything is submitted' do
     get login_path
 
@@ -124,5 +137,17 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to rfid_wait_path
     follow_redirect!
     assert_response :success
+  end
+
+  private
+
+  def capture_rails_log
+    buffer = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(buffer))
+    yield
+    buffer.string
+  ensure
+    Rails.logger = original
   end
 end

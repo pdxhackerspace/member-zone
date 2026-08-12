@@ -37,6 +37,7 @@ class SessionsController < ApplicationController
       session[:user_id] = user.id
       redirect_to root_path, notice: "Signed in locally as #{user.display_name}."
     else
+      LocalAuth::UnreadableAccounts.warn_if_any if account.nil?
       # Rendered beside the sign-in form rather than as a page-level flash, which
       # lands far above the form and reads as no response at all.
       @login_error = 'Invalid email or password.'
