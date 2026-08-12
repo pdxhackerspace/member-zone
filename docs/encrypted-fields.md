@@ -129,6 +129,28 @@ ciphertext undecryptable; changing `EMAIL_LOOKUP_HMAC_KEY` invalidates every sto
 Rotating either requires decrypting with the old key and re-encrypting with the new one in a
 single pass.
 
+**Setting the keys for the first time counts as rotating them.** A deployment running on the
+`secret_key_base` fallback has real digests and real ciphertext derived from it; writing
+explicit keys into the environment orphans all of it. The first thing to notice is usually
+local sign-in: `LocalAccount.by_email` looks for a digest that no longer matches, the sign-in
+form answers "Invalid email or password", and nothing about the account looks wrong. Rebuild
+it from `LOCAL_AUTH_EMAIL` / `LOCAL_AUTH_PASSWORD`, then clear out what was orphaned:
+
+```bash
+bin/rails local_auth:provision
+bin/rails local_auth:prune_unreadable   # reports; PRUNE=1 deletes
+```
+
+Pruning is opt-in because a *missing* key looks identical to a changed one, and an
+unreadable-looking account may simply be a correct account read with the wrong key.
+
+### Looking records up
+
+`find_or_initialize_by(email:)`, `find_by(email:)`, and `where(email:)` all compare plaintext
+against ciphertext and silently match nothing — on a `find_or_*` that means quietly building a
+duplicate, which the digest's unique index then rejects at save time. Always go through the
+generated `by_<field>` scope.
+
 > **The derivation salts are pinned and must stay that way.**
 > `SensitiveData::ENCRYPTION_KEY_SALT` and `SensitiveData::HMAC_KEY_SALT` still read
 > `member-manager-*`; the Member Zone rename deliberately skipped them. A salt is a pure

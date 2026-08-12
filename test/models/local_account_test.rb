@@ -21,6 +21,41 @@ class LocalAccountTest < ActiveSupport::TestCase
     end
   end
 
+  # Seeding and bin/dev-db-restore both re-run against databases that already hold the
+  # account. Looking it up on the encrypted column matched nothing, so they built a duplicate
+  # the digest index refused, and the restore died on its last step.
+  test 'provisioning twice updates the account rather than duplicating it' do
+    first = LocalAccount.provision!(email: 'bootstrap@example.com', password: 'bootstrappass123',
+                                    full_name: 'Bootstrap Admin')
+
+    second = assert_no_difference -> { LocalAccount.count } do
+      LocalAccount.provision!(email: 'bootstrap@example.com', password: 'rotatedpassword123',
+                              full_name: 'Bootstrap Admin')
+    end
+
+    assert_equal first.id, second.id
+    assert second.reload.authenticate('rotatedpassword123')
+  end
+
+  test 'provisioning finds the account it already encrypted' do
+    existing = local_accounts(:active_admin)
+
+    provisioned = LocalAccount.provision!(email: existing.email.upcase, password: 'freshpassword123')
+
+    assert_equal existing.id, provisioned.id
+  end
+
+  test 'an account encrypted under another key is reported as unreadable' do
+    account = local_accounts(:regular_member)
+    readable = local_accounts(:active_admin)
+    account.update_columns(email: "#{SensitiveData::STRING_PREFIX}not-ciphertext-from-this-key")
+
+    assert_not account.reload.email_readable?
+    assert_predicate readable, :email_readable?
+    assert_includes LocalAuth::UnreadableAccounts.ids, account.id
+    assert_not_includes LocalAuth::UnreadableAccounts.ids, readable.id
+  end
+
   test 'enforces minimum password length' do
     account = LocalAccount.new(email: 'new@example.com', password: 'short')
 

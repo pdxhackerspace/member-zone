@@ -1,24 +1,17 @@
 if LocalAuthConfig.enabled? && LocalAuthConfig.settings.default_email.present?
-  account = LocalAccount.find_or_initialize_by(email: LocalAuthConfig.settings.default_email)
+  email = LocalAuthConfig.settings.default_email
   password = LocalAuthConfig.settings.default_password || SecureRandom.base58(24)
+  existed = LocalAccount.by_email(email).exists?
 
-  account.assign_attributes(
-    full_name: LocalAuthConfig.settings.default_full_name,
+  LocalAccount.provision!(
+    email: email,
     password: password,
-    password_confirmation: password,
-    admin: true,
-    active: true
+    full_name: LocalAuthConfig.settings.default_full_name
   )
 
-  if account.new_record?
-    account.save!
-    Rails.logger.debug { "Local admin created: #{account.email} / #{password}" }
-  elsif account.changed?
-    account.save!
-    Rails.logger.debug { "Local admin updated: #{account.email}" }
-  else
-    Rails.logger.debug { "Local admin already present: #{account.email}" }
-  end
+  Rails.logger.debug { existed ? "Local admin updated: #{email}" : "Local admin created: #{email} / #{password}" }
+
+  LocalAuth::UnreadableAccounts.warn_if_any
 else
   Rails.logger.debug 'Local auth disabled or missing credentials; skipping local admin seed.'
 end

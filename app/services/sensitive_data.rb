@@ -25,6 +25,18 @@ class SensitiveData
       value.is_a?(String) && value.start_with?(STRING_PREFIX)
     end
 
+    # A value encrypted under a different key than the one currently configured cannot be
+    # told apart from a well-formed one without trying to decrypt it, and the attempt raises
+    # with an empty message. Callers that need to survive the mismatch ask first.
+    def readable_string?(value)
+      return true unless encrypted_string?(value)
+
+      decode_string(value)
+      true
+    rescue ActiveSupport::MessageEncryptor::InvalidMessage
+      false
+    end
+
     def encode_string(value)
       return nil if value.nil?
 

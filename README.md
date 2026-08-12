@@ -90,6 +90,13 @@ Drops and recreates `member_zone_development`, loads the backup, applies any mig
 
 That last step matters: production authenticates through Authentik, so its backups contain no `local_accounts` rows and there is no way to sign in to a freshly restored copy. Running `db:seed` would also create the account, but it seeds training topics and other defaults on top of the production data — use this script instead.
 
+If local sign-in stops working without the account changing, the field-encryption keys probably did. Email addresses are encrypted at rest and looked up through a keyed digest (see [docs/encrypted-fields.md](docs/encrypted-fields.md)), so setting or changing `DATABASE_FIELD_ENCRYPTION_KEY` / `EMAIL_LOOKUP_HMAC_KEY` leaves every existing account unfindable. Rebuild one without reloading the database:
+
+```bash
+docker compose -f docker-compose.dev.yml exec web bin/rails local_auth:provision
+docker compose -f docker-compose.dev.yml exec web bin/rails local_auth:prune_unreadable   # PRUNE=1 to delete
+```
+
 Backups are produced by a pg_dump 18 client, whose custom-format archives the PostgreSQL 16 server cannot read directly — `pg_restore` fails with `unsupported version (1.16) in file header`. The script reads the archive with an 18 client container and pipes plain SQL into the dev server, so restore it with this rather than calling `pg_restore` against the `db` container.
 
 ### Tests (Docker)
