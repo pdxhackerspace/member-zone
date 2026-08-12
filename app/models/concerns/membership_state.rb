@@ -79,6 +79,9 @@ module MembershipState
   }.freeze
 
   included do
+    # Declared explicitly so the enum has a type to decorate in migrations that predate
+    # the membership_state column; without it those migrations cannot load User at all.
+    attribute :membership_state, :string
     enum :membership_state, STATES.index_by(&:itself), default: 'unknown', validate: true
 
     # Set by the admin edit form and by backfills, which may place a member in any state.
