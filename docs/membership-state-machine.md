@@ -330,10 +330,20 @@ renewal they cancelled straight afterwards, and the records cannot say which. Th
 are listed in the report for an admin to sort out by hand. Nothing chases them in the
 meantime, because the mail guards read the payment event ledger directly.
 
-The live path draws the same line. `Recharge::SubscriptionCancellation` files the payment
-event — the subscription really did end at Recharge — but returns `:state_locked` without a
-journal entry when `record_cancellation!` declines, so a billing notice never overrides a
-ban or a death.
+The live path draws the same line, reading `NOTE_ONLY_STATES` from the reconciler so a
+webhook and a later reconcile cannot disagree. `Recharge::SubscriptionCancellation` files
+the payment event either way — the subscription really did end at Recharge — and then, when
+`record_cancellation!` declines:
+
+- A member already in `inactive_member` gets `membership_cancelled_at` stamped and nothing
+  else, returning `:noted`. Skipping the stamp would leave the notice for a rake reconcile
+  to find, and the lapse email chasing them until it ran.
+- A `banned_member`, `deceased_member`, `sponsored_member`, or `guest_member` is left
+  entirely alone, returning `:state_locked` with no journal entry, so a billing notice never
+  overrides a decision a person made.
+
+Both the event and the stamp are dated from the subscription's own `cancelled_at`, not from
+when the notice was read.
 
 Until a notice is reconciled, `PaymentOverdueEligibility` skips members whose most recent
 cancellation is newer than their last payment. That keeps the reminders quiet if a webhook

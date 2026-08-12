@@ -76,6 +76,67 @@ module Recharge
       assert_equal 'deceased_member', user.reload.membership_state
     end
 
+    # inactive_member is where the cancellation would have put them anyway, so nothing moves
+    # — but the date is the only thing that tells them apart from a member who quietly
+    # stopped paying, and the lapse email reads it. Membership::CancellationReconciler exists
+    # to stamp these; a live notice must not leave one behind for it to find.
+    test 'a cancellation for a lapsed member records the date without moving them' do
+      user = User.create!(
+        authentik_id: 'recharge-cancel-inactive',
+        full_name: 'Lapsed Cancel',
+        membership_state: 'inactive_member',
+        payment_type: 'recharge'
+      )
+      cancelled_at = 3.days.ago
+      subscription = { recharge_subscription_id: '666', product_title: 'Monthly', price: 40.0,
+                       cancelled_at: cancelled_at }
+
+      assert_equal :noted, SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
+
+      user.reload
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+      assert_predicate user, :cancellation_recorded?
+      assert_equal 1, user.payment_events.where(event_type: 'subscription_cancelled').count
+      assert_equal 0, user.journals.where(action: 'subscription_cancelled').count
+    end
+
+    # The states a person chose deliberately are the ones the reconciler refuses to stamp, so
+    # the live path must not stamp them either.
+    test 'a cancellation for a sponsored member is filed without recording a date' do
+      user = User.create!(
+        authentik_id: 'recharge-cancel-sponsored',
+        full_name: 'Sponsored Cancel',
+        membership_state: 'sponsored_member',
+        payment_type: 'sponsored'
+      )
+      subscription = { recharge_subscription_id: '444', product_title: 'Monthly', price: 40.0 }
+
+      assert_equal :state_locked,
+                   SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
+
+      user.reload
+      assert_equal 'sponsored_member', user.membership_state
+      assert_nil user.membership_cancelled_at
+      assert_equal 1, user.payment_events.where(event_type: 'subscription_cancelled').count
+    end
+
+    test 'the member is stamped with the date they cancelled, not the date we read the notice' do
+      user = User.create!(
+        authentik_id: 'recharge-cancel-backdated',
+        full_name: 'Backdated Cancel',
+        membership_state: 'current_member',
+        last_payment_date: 5.days.ago.to_date,
+        payment_type: 'recharge'
+      )
+      cancelled_at = 2.days.ago
+
+      SubscriptionCancellation.call(user: user, subscription: { recharge_subscription_id: '333',
+                                                                cancelled_at: cancelled_at }, source: 'test')
+
+      assert_equal cancelled_at.to_i, user.reload.membership_cancelled_at.to_i
+    end
+
     test 'duplicate webhook deliveries do not create duplicate events' do
       user = User.create!(
         authentik_id: 'recharge-cancel-dup',
