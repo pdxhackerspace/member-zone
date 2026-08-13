@@ -50,6 +50,16 @@ module MembershipState
   # Members who are expected to pay and whose payments are up to date.
   PAYING_STATES = %w[new_member provisional_member current_member].freeze
 
+  # States that say a member is back, and so clear the record of them having cancelled. An
+  # approved application, building access training, and a payment each say the membership is
+  # live again; overdue_member does not, because that is the same membership falling behind
+  # rather than a new one starting.
+  #
+  # sponsored_member and guest_member deliberately keep the record. Either may end and leave
+  # the member exactly where the cancellation left them, and the membership card reads the
+  # stamp to decide what to show in the meantime.
+  REJOINED_STATES = %w[new_member provisional_member current_member].freeze
+
   ANY_STATE = :any
 
   # Legal moves. Payments and admin actions can arrive at any time, so most states are
