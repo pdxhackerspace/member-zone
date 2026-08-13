@@ -21,6 +21,56 @@ class LocalAccountTest < ActiveSupport::TestCase
     end
   end
 
+  # Seeding and bin/dev-db-restore both re-run against databases that already hold the
+  # account. Looking it up on the encrypted column matched nothing, so they built a duplicate
+  # the digest index refused, and the restore died on its last step.
+  test 'provisioning twice updates the account rather than duplicating it' do
+    first = LocalAccount.provision!(email: 'bootstrap@example.com', password: 'bootstrappass123',
+                                    full_name: 'Bootstrap Admin')
+
+    second = assert_no_difference -> { LocalAccount.count } do
+      LocalAccount.provision!(email: 'bootstrap@example.com', password: 'rotatedpassword123',
+                              full_name: 'Bootstrap Admin')
+    end
+
+    assert_equal first.id, second.id
+    assert second.reload.authenticate('rotatedpassword123')
+  end
+
+  test 'provisioning finds the account it already encrypted' do
+    existing = local_accounts(:active_admin)
+
+    provisioned = LocalAccount.provision!(email: existing.email.upcase, password: 'freshpassword123')
+
+    assert_equal existing.id, provisioned.id
+  end
+
+  # Rotating DATABASE_FIELD_ENCRYPTION_KEY while leaving EMAIL_LOOKUP_HMAC_KEY alone leaves the
+  # digest matching an address nothing can read, so provisioning finds the account and must
+  # then overwrite it rather than compare against it.
+  test 'provisioning repairs an account whose address no longer decrypts' do
+    account = local_accounts(:active_admin)
+    account.update_columns(email: "#{SensitiveData::STRING_PREFIX}encrypted-under-another-key",
+                           email_lookup_digest: SensitiveData.email_digest('admin@example.com'))
+
+    provisioned = LocalAccount.provision!(email: 'admin@example.com', password: 'repairedpassword123')
+
+    assert_equal account.id, provisioned.id
+    assert_equal 'admin@example.com', provisioned.reload.email
+    assert provisioned.authenticate('repairedpassword123')
+  end
+
+  test 'an account encrypted under another key is reported as unreadable' do
+    account = local_accounts(:regular_member)
+    readable = local_accounts(:active_admin)
+    account.update_columns(email: "#{SensitiveData::STRING_PREFIX}not-ciphertext-from-this-key")
+
+    assert_not account.reload.email_readable?
+    assert_predicate readable, :email_readable?
+    assert_includes LocalAuth::UnreadableAccounts.ids, account.id
+    assert_not_includes LocalAuth::UnreadableAccounts.ids, readable.id
+  end
+
   test 'enforces minimum password length' do
     account = LocalAccount.new(email: 'new@example.com', password: 'short')
 

@@ -110,6 +110,35 @@ class SensitiveFieldsTest < ActiveSupport::TestCase
     assert_equal 'after@example.com', user.reload.email
   end
 
+  # Recovering from a key change means assigning over ciphertext the current key cannot read.
+  # Comparing the incoming value against it — the dirty check every writer does — is a
+  # decryption, so the writers have to treat unreadable as unsettled rather than raise.
+  test 'assigning over ciphertext encrypted under another key overwrites it' do
+    user = User.create!(full_name: 'Orphaned User', username: 'orphaned-user', email: 'orphaned@example.com',
+                        extra_emails: ['orphaned-alt@example.com'])
+    user.update_columns(email: unreadable_ciphertext, extra_emails: [unreadable_ciphertext])
+
+    user.reload
+    user.email = 'orphaned@example.com'
+    user.extra_emails = ['orphaned-alt@example.com']
+
+    assert user.changed?
+    assert_equal 'orphaned@example.com', user.email
+    assert_equal ['orphaned-alt@example.com'], user.extra_emails
+  end
+
+  test 'assigning over a json payload encrypted under another key overwrites it' do
+    payload = { 'payer_info' => { 'email_address' => 'orphaned@example.com' } }
+    payment = PaypalPayment.create!(paypal_id: 'PAY-ORPHANED', raw_attributes: payload)
+    payment.update_columns(raw_attributes: { SensitiveData::JSON_MARKER => 'not-ciphertext-from-this-key' })
+
+    payment.reload
+    payment.raw_attributes = payload
+
+    assert payment.changed?
+    assert_equal payload, payment.raw_attributes
+  end
+
   test 'a column still holding plaintext is encrypted on assignment' do
     entry = SheetEntry.create!(name: 'Legacy', email: 'legacy@example.com')
     entry.update_columns(email: 'legacy@example.com')
@@ -122,6 +151,10 @@ class SensitiveFieldsTest < ActiveSupport::TestCase
   end
 
   private
+
+  def unreadable_ciphertext
+    "#{SensitiveData::STRING_PREFIX}not-ciphertext-from-this-key"
+  end
 
   def updates_issued(&block)
     count = 0

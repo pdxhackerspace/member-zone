@@ -31,16 +31,71 @@ module MembershipTransitions
 
   # A cancellation notice. The member keeps access until their paid-through date;
   # Membership::TickJob moves them to inactive when it passes.
-  def record_cancellation!
+  #
+  # The date is kept on its own column as well as in the state, because the fact outlives
+  # cancelled_member: once they expire into inactive_member they look exactly like someone
+  # who quietly stopped paying, and we would mail them a lapse notice for a decision they
+  # made deliberately and already told us about.
+  def record_cancellation!(cancelled_at: Time.current)
     return false if terminal_membership_state? || cancelled_member?
 
-    transition_to!('cancelled_member')
+    transition_to!('cancelled_member', membership_cancelled_at: cancelled_at)
+  end
+
+  # The same fact for a member whose standing has nowhere to go — they lapsed months before
+  # anyone processed the notice, or a ban outranks it. Nothing moves; we just stop treating
+  # them as someone who forgot to pay.
+  def note_cancellation!(cancelled_at: Time.current)
+    return false if cancellation_recorded?
+
+    update!(membership_cancelled_at: cancelled_at)
+  end
+
+  # Have we processed a cancellation for this member? The stamp is what
+  # Membership::CancellationReconciler writes and what a payment clears, so this is the
+  # question to ask when deciding whether there is bookkeeping left to do.
+  def cancellation_recorded?
+    membership_cancelled_at.present?
+  end
+
+  # Did this member tell us they were leaving? The broader question, and the one anything
+  # about to mail them should ask. The stamp covers cancellations we have processed; the
+  # payment event ledger covers a notice nobody has reached yet, or a webhook that went
+  # missing after the subscription sync's lookback window closed. True through
+  # cancelled_member and onwards into the inactive state it expires to.
+  def cancellation_on_file?
+    return true if cancellation_recorded?
+
+    filed_at = filed_cancellation_at
+    return false if filed_at.blank?
+
+    # A payment after the notice means they came back and the notice is stale history.
+    last_paid = last_payment_on
+    last_paid.blank? || last_paid <= filed_at.to_date
+  end
+
+  # The most recent cancellation notice in the payment event ledger, processed or not.
+  def filed_cancellation_at
+    payment_events.by_type('subscription_cancelled').maximum(:occurred_at)
   end
 
   def ban!
     return false if banned_member?
 
     transition_to!('banned_member')
+  end
+
+  # Whether the guard would accept this move, asked before attempting it. A transition
+  # method is a question as much as an order — "can this member be banned?" — so an
+  # illegal move comes back as false rather than raising out of save!.
+  def can_transition_to?(state)
+    return true if allow_any_membership_state_transition
+
+    from = membership_state_was
+    return true if from.blank? || from == state
+
+    allowed = MembershipState::TRANSITIONS.fetch(from, [])
+    allowed == MembershipState::ANY_STATE || allowed.include?(state)
   end
 
   # Lifting a ban hands the member back to the clock: their payment history decides
@@ -87,7 +142,13 @@ module MembershipTransitions
     transition_to!(next_state)
   end
 
+  # Every transition method funnels through here, so all of them answer an illegal move the
+  # same way. Nothing exits deceased_member, and callers ask for moves out of it — a report
+  # bulk action, a Recharge cancellation for someone we buried — often enough that raising
+  # is the wrong answer.
   def transition_to!(state, **attrs)
+    return false unless can_transition_to?(state)
+
     assign_attributes(attrs.merge(membership_state: state))
     save!
   end

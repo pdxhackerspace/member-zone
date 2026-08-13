@@ -51,6 +51,11 @@ module SensitiveFields
     #
     # A column still holding plaintext is never left alone: assigning to it encrypts it,
     # which is what lets the values written before the backfill settle over time.
+    #
+    # Neither is ciphertext the configured key can no longer read. Comparing against it is
+    # impossible — decrypting is how you find out — so an unreadable value counts as unsettled
+    # and gets overwritten. Without that, assignment raises, and the recovery from a key
+    # change is exactly the code that has to assign over the orphaned value.
     def define_sensitive_string_accessors(field_name)
       define_method(field_name) do
         SensitiveData.decode_string(self[field_name])
@@ -59,8 +64,9 @@ module SensitiveFields
       define_method("#{field_name}=") do |value|
         normalized = value.presence
         stored = self[field_name]
-        settled = normalized.nil? ? stored.nil? : SensitiveData.encrypted_string?(stored)
-        next if settled && normalized == SensitiveData.decode_string(stored)
+        current = SensitiveData.decode_string_if_readable(stored)
+        settled = normalized.nil? ? stored.nil? : SensitiveData.encrypted_string?(stored) && !current.nil?
+        next if settled && normalized == current
 
         self[field_name] = normalized.nil? ? nil : SensitiveData.encode_string(normalized)
       end
@@ -73,11 +79,12 @@ module SensitiveFields
 
       define_method("#{field_name}=") do |value|
         stored = self[field_name]
-        settled = value.nil? ? stored.nil? : SensitiveData.encrypted_json?(stored)
+        current = SensitiveData.decode_json_if_readable(stored)
+        settled = value.nil? ? stored.nil? : SensitiveData.encrypted_json?(stored) && !current.nil?
         # Round-tripped so a payload keyed by symbols compares equal to the stored one,
         # which JSON always gives back keyed by strings.
         incoming = value.nil? ? nil : JSON.parse(JSON.generate(value))
-        next if settled && incoming == SensitiveData.decode_json(stored)
+        next if settled && incoming == current
 
         self[field_name] = value.nil? ? nil : SensitiveData.encode_json(value)
       end
@@ -91,8 +98,9 @@ module SensitiveFields
       define_method("#{field_name}=") do |values|
         normalized = Array(values).filter_map { |value| value.to_s.strip.presence }
         stored = Array(self[field_name])
-        settled = stored.all? { |value| SensitiveData.encrypted_string?(value) }
-        next if settled && normalized == stored.map { |value| SensitiveData.decode_string(value) }
+        current = stored.map { |value| SensitiveData.decode_string_if_readable(value) }
+        settled = stored.all? { |value| SensitiveData.encrypted_string?(value) } && current.none?(&:nil?)
+        next if settled && normalized == current
 
         self[field_name] = normalized.map { |value| SensitiveData.encode_string(value) }
       end

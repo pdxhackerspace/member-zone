@@ -101,16 +101,13 @@ compose --profile tools run --rm --no-deps migrate bin/rails runner '
   elsif email.blank? || password.blank?
     puts "LOCAL_AUTH_EMAIL/LOCAL_AUTH_PASSWORD not set; skipping."
   else
-    account = LocalAccount.find_or_initialize_by(email: email)
-    account.assign_attributes(
-      full_name: LocalAuthConfig.settings.default_full_name,
+    account = LocalAccount.provision!(
+      email: email,
       password: password,
-      password_confirmation: password,
-      admin: true,
-      active: true
+      full_name: LocalAuthConfig.settings.default_full_name
     )
-    account.save!
     puts "Local sign-in ready: #{account.email}"
+    puts LocalAuth::UnreadableAccounts.message if LocalAuth::UnreadableAccounts.any?
   end
 '
 

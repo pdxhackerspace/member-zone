@@ -26,7 +26,9 @@ module Recharge
       subscriptions = @client.subscriptions(start_time: @lookback.ago)
       @logger.info("[Recharge::SubscriptionSynchronizer] Fetched #{subscriptions.size} recently updated subscriptions")
 
-      stats = { created: 0, cancelled: 0, skipped: 0 }
+      # Defaults to zero so a status SubscriptionCancellation adds later still counts
+      # instead of blowing up the whole sync run.
+      stats = Hash.new(0).merge(created: 0, cancelled: 0, skipped: 0)
 
       subscriptions.each do |sub|
         result = process_subscription(sub)

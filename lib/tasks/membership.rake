@@ -489,4 +489,14 @@ namespace :membership do
   task reconcile_active: :environment do
     Membership::TickJob.perform_now
   end
+
+  desc 'Preview recording of filed subscription cancellations (dry run, no changes)'
+  task preview_cancellations: :environment do
+    MembershipCancellationReport.new(dry_run: true).run
+  end
+
+  desc 'Record filed subscription cancellations and play their timing forward from the cancellation date'
+  task process_cancellations: :environment do
+    MembershipCancellationReport.new(dry_run: false).run
+  end
 end

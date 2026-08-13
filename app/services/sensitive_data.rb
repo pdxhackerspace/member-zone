@@ -25,6 +25,31 @@ class SensitiveData
       value.is_a?(String) && value.start_with?(STRING_PREFIX)
     end
 
+    # A value encrypted under a different key than the one currently configured cannot be told
+    # apart from a well-formed one without trying to decrypt it, and the attempt raises with an
+    # empty message. These two survive the mismatch, for callers that must keep going: code
+    # rewriting the value anyway, and code reporting on what has been orphaned.
+    #
+    # nil means unreadable rather than empty — nothing ever encrypts nil, so ciphertext always
+    # decodes to a value.
+    def decode_string_if_readable(value)
+      decode_string(value)
+    rescue ActiveSupport::MessageEncryptor::InvalidMessage
+      nil
+    end
+
+    def decode_json_if_readable(value)
+      decode_json(value)
+    rescue ActiveSupport::MessageEncryptor::InvalidMessage
+      nil
+    end
+
+    def readable_string?(value)
+      return true unless encrypted_string?(value)
+
+      !decode_string_if_readable(value).nil?
+    end
+
     def encode_string(value)
       return nil if value.nil?
 
