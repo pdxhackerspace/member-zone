@@ -268,10 +268,17 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
   `PaymentOverdueEligibility` both use it, because `Membership::TickJob` walks members from
   `overdue_member` to `inactive_member` without passing through `cancelled_member` — a
   filed notice nobody has reconciled yet has to be enough on its own.
-- Entering `current_member` clears it, along with `membership_cancelled_email_sent_at`. A
-  member who came back is not a member who left, so a later lapse reads as a lapse and a
-  second cancellation mails them again. The clearing is bookkeeping rather than mail, so it
-  happens even under `Current.skip_membership_state_email`.
+- Entering any of `REJOINED_STATES` — `new_member`, `provisional_member`, `current_member` —
+  clears it, along with `membership_cancelled_email_sent_at`. A member who came back is not a
+  member who left, so a later lapse reads as a lapse and a second cancellation mails them
+  again. A payment is the usual way back, but someone who lapsed and later reapplied is a
+  member again from the moment their application is approved, before any money arrives; left
+  on file, the old stamp would suppress the new membership's mail indefinitely. The clearing
+  is bookkeeping rather than mail, so it happens even under
+  `Current.skip_membership_state_email`.
+- `overdue_member` does not clear it — that is the same membership falling behind, not a new
+  one — and neither do `sponsored_member` or `guest_member`, which may end and leave the
+  member exactly where the cancellation left them.
 
 The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
 the card's "Next payment" line with "Cancelled / Active until *date*", because there is no

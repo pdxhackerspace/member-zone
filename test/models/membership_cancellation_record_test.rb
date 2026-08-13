@@ -103,6 +103,40 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
     assert_not_predicate user.reload, :cancellation_on_file?
   end
 
+  # Reapplying is the other way back, and it arrives before any money does. Left on file, the
+  # stamp from a membership that already ended goes on suppressing the mail for the new one.
+  test 'the cancellation is forgotten when someone who left is approved again' do
+    user = member(state: 'cancelled_member', email: 'rejoined@example.com')
+    user.update!(membership_cancelled_at: 2.months.ago)
+    user.transition_to!('inactive_member')
+
+    assert user.reload.approve_application!
+
+    assert_equal 'new_member', user.membership_state
+    assert_not_predicate user.reload, :cancellation_on_file?
+  end
+
+  test 'a member who rejoined and drifts off again hears that their membership lapsed' do
+    user = member(state: 'cancelled_member', email: 'rejoined-then-lapsed@example.com')
+    user.update!(membership_cancelled_at: 2.months.ago)
+    user.transition_to!('inactive_member')
+    user.reload.approve_application!
+
+    assert_difference -> { lapsed_mail_count(user) }, 1 do
+      user.reload.transition_to!('inactive_member')
+    end
+  end
+
+  # Not a rejoin: a sponsorship can end and leave them exactly where the cancellation did, and
+  # the membership card reads the stamp to decide what to show while it lasts.
+  test 'a sponsorship granted after a cancellation keeps it on file' do
+    user = member(state: 'cancelled_member', email: 'sponsored-after-cancelling@example.com')
+    user.update!(membership_cancelled_at: 1.month.ago)
+
+    assert user.mark_sponsored!
+    assert_predicate user.reload, :cancellation_recorded?
+  end
+
   test 'noting a cancellation records the date without moving the member' do
     user = member(state: 'inactive_member')
 
