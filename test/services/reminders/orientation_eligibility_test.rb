@@ -37,11 +37,16 @@ module Reminders
       assert_not_includes OrientationEligibility.due(now: @now), user
     end
 
+    # The column still says new_member until Membership::TickJob catches up, so the list has to
+    # apply the deadline itself. Otherwise every "would be emailed today" figure counts a
+    # member NotifyOrientation then declines to write to.
     test 'due excludes a member whose new-member window has already run out' do
       user = awaiting_user(email: 'window-expired@example.com')
       user.update_columns(membership_state_entered_at: @now - 91.days)
 
       assert_not OrientationEligibility.due?(user.reload, now: @now)
+      assert_not_includes OrientationEligibility.due(now: @now), user
+      assert_equal 0, OrientationEligibility.count_due(now: @now)
     end
 
     test 'due excludes a member approved more recently than the interval' do

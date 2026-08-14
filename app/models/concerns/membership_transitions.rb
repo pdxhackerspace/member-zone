@@ -5,6 +5,11 @@
 module MembershipTransitions
   extend ActiveSupport::Concern
 
+  # Payment events that say a member came back. Recharge opens a fresh subscription rather
+  # than reviving the cancelled one, so a later start is a return rather than a duplicate of
+  # the notice.
+  RETURN_EVENT_TYPES = %w[payment subscription_started subscription_resumed].freeze
+
   # An approved application makes someone a member immediately, before any payment:
   # they are active while they arrange building access training. Approval is also where
   # the User record is first created, hence 'unknown'. Approving an application for
@@ -58,25 +63,46 @@ module MembershipTransitions
     membership_cancelled_at.present?
   end
 
-  # Did this member tell us they were leaving? The broader question, and the one anything
-  # about to mail them should ask. The stamp covers cancellations we have processed; the
-  # payment event ledger covers a notice nobody has reached yet, or a webhook that went
-  # missing after the subscription sync's lookback window closed. True through
-  # cancelled_member and onwards into the inactive state it expires to.
+  # Did this member tell us they were leaving, and stay gone? The broader question, and the
+  # one anything about to mail them should ask. The stamp covers cancellations we have
+  # processed; the payment event ledger covers a notice nobody has reached yet, or a webhook
+  # that went missing after the subscription sync's lookback window closed. True through
+  # cancelled_member and onwards into the inactive state it expires to, and false again once
+  # anything says they came back.
   def cancellation_on_file?
-    return true if cancellation_recorded?
+    notice_at = latest_cancellation_at
+    return false if notice_at.blank?
 
-    filed_at = filed_cancellation_at
-    return false if filed_at.blank?
+    !returned_after?(notice_at)
+  end
 
-    # A payment after the notice means they came back and the notice is stale history.
-    last_paid = last_payment_on
-    last_paid.blank? || last_paid <= filed_at.to_date
+  # The most recent word that this member cancelled, from either source.
+  def latest_cancellation_at
+    [membership_cancelled_at, filed_cancellation_at].compact.max
   end
 
   # The most recent cancellation notice in the payment event ledger, processed or not.
   def filed_cancellation_at
     payment_events.by_type('subscription_cancelled').maximum(:occurred_at)
+  end
+
+  # Evidence the member came back after a given moment. A payment recorded on the row is the
+  # obvious one, but the ledger carries returns the columns never hear about: a subscription
+  # started or resumed against a member whose last_payment_date nobody updated.
+  #
+  # Membership::CancellationReconciler asks the same question before deciding to leave a
+  # member's standing alone, and the two answers have to match. A return the reconciler
+  # honours but the mail guards ignore is a member in a deadlock: the reconciler will not
+  # touch their standing because they came back, and the reminders stay switched off because
+  # the notice still looks live.
+  def returned_after?(moment)
+    return false if moment.blank?
+
+    last_paid = last_payment_on
+    return true if last_paid.present? && last_paid > moment.to_date
+
+    payment_events.where(event_type: RETURN_EVENT_TYPES)
+                  .exists?(['payment_events.occurred_at > ?', moment])
   end
 
   def ban!
