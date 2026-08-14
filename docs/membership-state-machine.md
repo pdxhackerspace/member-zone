@@ -279,11 +279,20 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
 - `cancellation_recorded?` asks whether the stamp is set — the question for code deciding
   whether there is bookkeeping left to do.
 - `cancellation_on_file?` is the broader question, and the one anything about to mail a
-  member asks. It is true for the stamp **or** for an unprocessed `subscription_cancelled`
-  payment event newer than the member's last payment. `notify_membership_lapsed` and
-  `PaymentOverdueEligibility` both use it, because `Membership::TickJob` walks members from
-  `overdue_member` to `inactive_member` without passing through `cancelled_member` — a
-  filed notice nobody has reconciled yet has to be enough on its own.
+  member asks. It takes the most recent word that they cancelled — the stamp **or** an
+  unprocessed `subscription_cancelled` payment event — and is true unless something says they
+  came back since. `notify_membership_lapsed` and `PaymentOverdueEligibility` both use it,
+  because `Membership::TickJob` walks members from `overdue_member` to `inactive_member`
+  without passing through `cancelled_member`, so a filed notice nobody has reconciled yet has
+  to be enough on its own.
+- `returned_after?(moment)` is what "came back" means, in one place. A payment on the row is
+  the obvious evidence; `RETURN_EVENT_TYPES` (`payment`, `subscription_started`,
+  `subscription_resumed`) covers the returns the columns never hear about, since Recharge
+  opens a fresh subscription rather than reviving the cancelled one.
+  `Membership::CancellationReconciler` asks the same method before leaving a member's standing
+  alone. The two have to agree: a return the reconciler honours but the mail guards ignore
+  leaves the member in a deadlock, with nothing to move their standing and nothing willing to
+  chase them again.
 - Entering any of `REJOINED_STATES` — `new_member`, `provisional_member`, `current_member` —
   clears it, along with `membership_cancelled_email_sent_at`. A member who came back is not a
   member who left, so a later lapse reads as a lapse and a second cancellation mails them

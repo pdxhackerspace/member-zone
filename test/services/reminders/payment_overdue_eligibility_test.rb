@@ -121,6 +121,18 @@ module Reminders
       assert PaymentOverdueEligibility.due?(user.reload, now: @now)
     end
 
+    # Membership::CancellationReconciler counts a subscription started or resumed after the
+    # notice as a return and leaves the member's standing alone. If this disagreed, such a
+    # member would be stuck: nothing would move them, and nothing would ever chase them again.
+    test 'due includes an overdue member who resubscribed without the payment columns catching up' do
+      user = overdue_user(email: 'restarted-subscription@example.com')
+      file_cancellation(user, at: @now - 1.year)
+      file_event(user, event_type: 'subscription_resumed', at: @now - 30.days)
+
+      assert PaymentOverdueEligibility.due?(user.reload, now: @now)
+      assert_includes PaymentOverdueEligibility.due(now: @now), user
+    end
+
     test 'total_overdue counts every overdue member regardless of reminder history' do
       overdue_user(email: 'overdue-a@example.com')
       reminded = overdue_user(email: 'overdue-b@example.com')
@@ -145,13 +157,17 @@ module Reminders
     end
 
     def file_cancellation(user, at:)
+      file_event(user, event_type: 'subscription_cancelled', at: at)
+    end
+
+    def file_event(user, event_type:, at:)
       PaymentEvent.create!(
         user: user,
-        event_type: 'subscription_cancelled',
+        event_type: event_type,
         source: 'recharge',
         occurred_at: at,
-        external_id: "recharge-sub-#{SecureRandom.hex(4)}-subscription_cancelled",
-        details: 'Recharge subscription cancelled'
+        external_id: "recharge-sub-#{SecureRandom.hex(4)}-#{event_type}",
+        details: "Recharge #{event_type.humanize.downcase}"
       )
     end
 

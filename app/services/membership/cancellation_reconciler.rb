@@ -21,10 +21,6 @@ module Membership
     # each decided by a person, and a guest was never on a subscription to cancel.
     PROTECTED_STATES = %w[banned_member deceased_member sponsored_member guest_member].freeze
 
-    # Evidence the member came back after the notice. Recharge opens a fresh subscription
-    # rather than reviving the cancelled one, so a later start is a return, not a duplicate.
-    RETURN_EVENT_TYPES = %w[payment subscription_started subscription_resumed].freeze
-
     # Nowhere left to go. inactive_member is where a cancellation ends up anyway, and a
     # cancelled_member missing its date only needs the date.
     NOTE_ONLY_STATES = %w[cancelled_member inactive_member].freeze
@@ -96,24 +92,12 @@ module Membership
     # a membership they ended is the thing this whole pass exists to stop.
     def skip_decision(user, cancelled_at)
       return Skip.new('service account', false) if user.service_account?
-      return Skip.new('paid or resubscribed since cancelling', false) if returned_after?(user, cancelled_at)
+      return Skip.new('paid or resubscribed since cancelling', false) if user.returned_after?(cancelled_at)
       return Skip.new(SAME_DAY_PAYMENT_REASON, false) if paid_on_cancellation_date?(user, cancelled_at)
       return Skip.new('cancellation already recorded', true) if user.cancellation_recorded?
       return unless user.membership_state.in?(PROTECTED_STATES)
 
       Skip.new("#{user.membership_state.humanize.downcase} set deliberately", true)
-    end
-
-    # Columns first, because a payment recorded straight onto the member never becomes a
-    # payment event; then the event ledger, which is where a fresh subscription shows up
-    # and where the timestamps are precise enough to order same-day activity.
-    def returned_after?(user, cancelled_at)
-      last_paid = user.last_payment_on
-      return true if last_paid.present? && last_paid > cancelled_at.to_date
-
-      PaymentEvent.for_user(user)
-                  .where(event_type: RETURN_EVENT_TYPES)
-                  .exists?(['payment_events.occurred_at > ?', cancelled_at])
     end
 
     # last_payment_on is a date and the notice is a timestamp, so a payment on the same day

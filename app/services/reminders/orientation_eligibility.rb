@@ -45,6 +45,16 @@ module Reminders
     end
 
     def self.due(now: Time.current)
+      ids = []
+      candidates(now: now).find_each { |user| ids << user.id if due?(user, now: now) }
+      User.where(id: ids).order(:full_name)
+    end
+
+    # Members the column says are still waiting. Expiry is a matter of arithmetic on
+    # membership_state_entered_at rather than anything SQL can select on, so due? sifts these
+    # in Ruby — otherwise a member whose new-member window ran out yesterday would count
+    # towards every "due today" figure until Membership::TickJob got round to them.
+    def self.candidates(now: Time.current)
       cutoff = repeat_cutoff(now: now)
 
       awaiting_orientation_scope

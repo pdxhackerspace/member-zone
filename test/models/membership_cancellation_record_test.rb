@@ -137,6 +137,35 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
     assert_predicate user.reload, :cancellation_recorded?
   end
 
+  # Membership::CancellationReconciler reads a subscription started after the notice as a
+  # return even when nothing updated the payment columns. Answering that differently here left
+  # the member in a deadlock: the reconciler would not touch their standing because they had
+  # come back, and the mail guards went on treating the notice as live.
+  test 'a subscription started after the notice takes the cancellation off file' do
+    user = member(state: 'overdue_member', email: 'restarted-subscription@example.com')
+    file_cancellation(user, at: 6.months.ago)
+    file_event(user, event_type: 'subscription_started', at: 5.months.ago)
+
+    assert_not_predicate user.reload, :cancellation_on_file?
+  end
+
+  test 'a payment event after a recorded cancellation takes it off file' do
+    user = member(state: 'inactive_member', email: 'stamped-then-paid@example.com')
+    user.update!(membership_cancelled_at: 6.months.ago)
+    file_event(user, event_type: 'payment', at: 2.months.ago)
+
+    assert_predicate user.reload, :cancellation_recorded?
+    assert_not_predicate user, :cancellation_on_file?
+  end
+
+  test 'a return before the notice says nothing about it' do
+    user = member(state: 'overdue_member', email: 'restarted-then-cancelled@example.com')
+    file_event(user, event_type: 'subscription_started', at: 8.months.ago)
+    file_cancellation(user, at: 6.months.ago)
+
+    assert_predicate user.reload, :cancellation_on_file?
+  end
+
   test 'noting a cancellation records the date without moving the member' do
     user = member(state: 'inactive_member')
 
@@ -161,13 +190,17 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
   end
 
   def file_cancellation(user, at:)
+    file_event(user, event_type: 'subscription_cancelled', at: at)
+  end
+
+  def file_event(user, event_type:, at:)
     PaymentEvent.create!(
       user: user,
-      event_type: 'subscription_cancelled',
+      event_type: event_type,
       source: 'recharge',
       occurred_at: at,
-      external_id: "recharge-sub-#{SecureRandom.hex(4)}-subscription_cancelled",
-      details: 'Recharge subscription cancelled'
+      external_id: "recharge-sub-#{SecureRandom.hex(4)}-#{event_type}",
+      details: "Recharge #{event_type.humanize.downcase}"
     )
     user.reload
   end
