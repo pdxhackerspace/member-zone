@@ -10,8 +10,10 @@ module MembershipNotifications
     return unless saved_change_to_membership_state?
 
     # Bookkeeping, not mail: a member who is back stops being a member who left, whether or
-    # not we are sending anything about it.
-    clear_cancellation_record if current_member?
+    # not we are sending anything about it. A payment is the usual way back, but not the only
+    # one — someone who lapsed and later reapplied is a member again from the moment their
+    # application is approved, before any money arrives.
+    clear_cancellation_record if membership_state.in?(MembershipState::REJOINED_STATES)
 
     return if email.blank?
     return if Current.skip_membership_state_email
@@ -47,8 +49,8 @@ module MembershipNotifications
     QueuedMail.enqueue(:membership_lapsed, self, reason: "Membership lapsed for #{display_name}")
   end
 
-  # A member who resubscribes is no longer someone who left: forget the cancellation, so a
-  # later lapse reads as a lapse and a second cancellation mails them again.
+  # A member who rejoins is no longer someone who left: forget the cancellation, so a later
+  # lapse reads as a lapse and a second cancellation mails them again.
   def clear_cancellation_record
     stamps = { membership_cancelled_at: nil, membership_cancelled_email_sent_at: nil }
     stamps = stamps.reject { |column, _| self[column].nil? }

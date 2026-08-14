@@ -20,7 +20,7 @@ module Recharge
 
       old_state = @user.membership_state
       event_is_new = create_payment_event
-      return state_locked(old_state) unless @user.record_cancellation!
+      return declined(old_state) unless @user.record_cancellation!(cancelled_at: cancelled_at)
 
       create_journal_entry(old_state) if event_is_new
       @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
@@ -30,9 +30,26 @@ module Recharge
 
     private
 
-    # A ban or a death outranks a cancellation notice. The payment event still stands —
-    # the subscription really did end at Recharge — but the member's standing is not the
-    # notice's to change, and no journal entry claims otherwise.
+    # Where record_cancellation! will not follow, which is two different situations wearing
+    # the same false. A member who lapsed before anyone processed the notice is already
+    # where it would have put them and needs only the date — without it they look exactly
+    # like someone who quietly stopped paying, and the lapse email chases them for a
+    # decision they told us about. A ban, a death, a sponsorship, or a guest pass was
+    # decided by a person and outranks the notice entirely.
+    #
+    # Membership::CancellationReconciler draws the line in the same place for the backlog;
+    # it reads from the same list so a webhook and a later reconcile cannot disagree.
+    def declined(old_state)
+      return state_locked(old_state) unless old_state.in?(Membership::CancellationReconciler::NOTE_ONLY_STATES)
+
+      @user.note_cancellation!(cancelled_at: cancelled_at)
+      @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
+                   "cancelled at Recharge; recorded against #{old_state}")
+      :noted
+    end
+
+    # The payment event still stands — the subscription really did end at Recharge — but the
+    # member's standing is not the notice's to change, and no journal entry claims otherwise.
     def state_locked(old_state)
       @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
                    "cancelled at Recharge; left in #{old_state}")
@@ -41,6 +58,13 @@ module Recharge
 
     def subscription_id
       @subscription[:recharge_subscription_id] || @subscription['id']
+    end
+
+    # When the member cancelled, not when we got around to reading the notice. The payment
+    # event and the stamp on the member both date from it, so a webhook and the reconcile
+    # that would have caught the same notice later record the same day.
+    def cancelled_at
+      subscription_cancelled_at || Time.current
     end
 
     def create_payment_event
@@ -54,7 +78,7 @@ module Recharge
         source: 'recharge',
         amount: subscription_amount,
         currency: 'USD',
-        occurred_at: subscription_cancelled_at || Time.current,
+        occurred_at: cancelled_at,
         external_id: external_id,
         details: "Recharge subscription cancelled: #{subscription_title}"
       )
