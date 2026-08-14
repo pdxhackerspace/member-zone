@@ -14,6 +14,11 @@ class ReminderSetting < ApplicationRecord
       name: 'Overdue payment reminder',
       description: 'Weekly reminder to members whose dues are past due. Members who have cancelled are not reminded.',
       enabled: false
+    },
+    'orientation' => {
+      name: 'Orientation reminder',
+      description: 'Reminder to approved members who have not had their building access orientation yet.',
+      enabled: false
     }
   }.freeze
 

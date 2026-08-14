@@ -327,6 +327,22 @@ class MemberMailer < ApplicationMailer
     end
   end
 
+  def orientation_reminder(user, opts = {})
+    @user = user
+    @organization = organization_name
+    extras = self.class.orientation_template_extras(user, now: opts[:now] || Time.current)
+
+    if send_from_template('orientation_reminder', user, extras)
+      # Email sent from database template
+    else
+      @days_since_approval = extras[:days_since_approval]
+      mail(
+        to: @user.email,
+        subject: "#{@organization}: Book your building access orientation"
+      )
+    end
+  end
+
   def application_link_reminder(recipient, opts = {})
     @user = recipient
     @organization = organization_name
@@ -416,6 +432,12 @@ class MemberMailer < ApplicationMailer
     end
 
     extras
+  end
+
+  def self.orientation_template_extras(user, now: Time.current)
+    anchor = user.membership_approved_at
+    days = anchor ? ((now - anchor) / 1.day).floor : 0
+    { days_since_approval: days.to_s }
   end
 
   def self.slack_link_url_for_template

@@ -6,6 +6,7 @@ module QueuedMailReminderDeliveries
   def record_reminder_deliveries!(sent_time)
     record_slack_signup_reminder_delivery!(sent_time) if slack_signup_reminder_delivery?
     record_application_link_reminder_delivery!(sent_time) if application_link_reminder_delivery?
+    record_orientation_reminder_delivery!(sent_time) if orientation_reminder_delivery?
   end
 
   private
@@ -19,6 +20,20 @@ module QueuedMailReminderDeliveries
   rescue StandardError => e
     Rails.logger.error(
       "[QueuedMail] slack_signup_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
+      "#{e.class}: #{e.message}"
+    )
+    raise
+  end
+
+  def orientation_reminder_delivery?
+    mailer_action == 'orientation_reminder' && recipient.present?
+  end
+
+  def record_orientation_reminder_delivery!(sent_time)
+    Reminders::NotifyOrientation.record_delivery!(recipient, at: sent_time)
+  rescue StandardError => e
+    Rails.logger.error(
+      "[QueuedMail] orientation_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
       "#{e.class}: #{e.message}"
     )
     raise

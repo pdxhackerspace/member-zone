@@ -114,6 +114,11 @@
           value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_repeat_days), " ",
                             "day".pluralize(@membership_setting.payment_overdue_reminder_repeat_days)]),
           help: "Minimum days between overdue payment reminders for the same member." %>
+      <%= render "show_field",
+          label: "Orientation reminder — interval",
+          value: safe_join([content_tag(:strong, @membership_setting.orientation_reminder_repeat_days), " ",
+                            "day".pluralize(@membership_setting.orientation_reminder_repeat_days)]),
+          help: "How long after approval the first orientation reminder goes out, and the gap between them after that." %>
     <% end %>
   </div>
 
