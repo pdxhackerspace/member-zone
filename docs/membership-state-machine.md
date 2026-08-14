@@ -304,6 +304,14 @@ The date is `dues_paid_through_at`, the day their last payment stops covering th
 sponsorship or guest pass granted after the cancellation supersedes it and the ordinary line
 returns.
 
+The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
+the card's "Next payment" line with "Cancelled / Active until *date*", because there is no
+next payment coming and presenting the paid-through date as one — as a renewal, or once it
+passes, as an overdue bill — asks the member for money they told us they were done paying.
+The date is `dues_paid_through_at`, the day their last payment stops covering them. A
+sponsorship or guest pass granted after the cancellation supersedes it and the ordinary line
+returns.
+
 ---
 
 ## Catching up on filed cancellations
