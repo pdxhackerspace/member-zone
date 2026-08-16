@@ -1,10 +1,10 @@
 # syntax = docker/dockerfile:1
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
-ARG RUBY_VERSION=3.3.11
+ARG RUBY_VERSION=4.0.6
 FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim AS base
 # Re-declare for this stage so build-args apply; fail fast if the image Ruby ≠ Gemfile (see .ruby-version).
-ARG RUBY_VERSION=3.3.11
+ARG RUBY_VERSION=4.0.6
 RUN test "$(ruby -e 'print RUBY_VERSION')" = "${RUBY_VERSION}" || \
     (echo "Expected Ruby ${RUBY_VERSION}, got $(ruby -v)" >&2; exit 1)
 
