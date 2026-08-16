@@ -45,7 +45,17 @@ module Reminders
     # leaves untrained members out on the understanding that they appear here instead, so
     # anyone this list drops is a member no report is watching at all.
     def self.awaiting_orientation_scope
-      untrained.where(membership_state: AWAITING_ORIENTATION_STATES)
+      untrained.where(membership_state: report_states)
+    end
+
+    # The wider states only say anything alongside a missing training record. With no building
+    # access topic configured there is nothing to be missing — awaiting_building_access_training
+    # matches everybody — and the state is the whole test, where only new_member means a member
+    # has yet to come in. Reading the states literally in that case would put the entire paying
+    # roster on the report and list every overdue member on the dues-lapsed report as well,
+    # which the two reports are meant never to do.
+    def self.report_states
+      TrainingTopic.building_access ? AWAITING_ORIENTATION_STATES : %w[new_member]
     end
 
     # Who the reminder is for. Its email is addressed to someone whose membership was just
@@ -119,6 +129,6 @@ module Reminders
       !user.building_access_trained?
     end
 
-    private_class_method :base_user?
+    private_class_method :base_user?, :report_states
   end
 end

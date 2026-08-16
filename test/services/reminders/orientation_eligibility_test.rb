@@ -169,6 +169,25 @@ module Reminders
       assert_includes OrientationEligibility.due(now: @now), user.reload
     end
 
+    # ...and with no training to be missing, the state has to carry the whole question. Reading
+    # the wider states then would put every paying member on the report, and every overdue one
+    # on the dues-lapsed report at the same time.
+    test 'with no building access topic configured the report stays at new members' do
+      MembershipSetting.instance.update!(building_access_training_topic: nil)
+      @topic.update!(name: 'Unrelated Topic')
+      awaiting = awaiting_user(email: 'no-topic-new@example.com')
+      paying = awaiting_user(email: 'no-topic-paying@example.com')
+      paying.update_columns(membership_state: 'current_member')
+      overdue = awaiting_user(email: 'no-topic-overdue@example.com')
+      overdue.update_columns(membership_state: 'overdue_member')
+
+      scope = OrientationEligibility.awaiting_orientation_scope
+
+      assert_includes scope, awaiting
+      assert_not_includes scope, paying.reload
+      assert_not_includes scope, overdue.reload
+    end
+
     private
 
     def awaiting_user(email:, approved_ago: 20.days)

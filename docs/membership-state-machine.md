@@ -270,6 +270,12 @@ Ended and deliberate states — `inactive_member`, `cancelled_member`, `banned_m
 `guest_member`, `sponsored_member` — stay off it, because nobody is booking an orientation for
 a membership that is over.
 
+The wider states apply only when a building access topic is configured. With none set there is
+no training record to be missing, both training scopes match everybody, and the state is the
+whole test — so the report falls back to `new_member`, the one state that says on its own that
+a member has not been in yet. Otherwise the entire paying roster would land on the report and
+every overdue member would appear on the dues-lapsed report at the same time.
+
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
 address.
