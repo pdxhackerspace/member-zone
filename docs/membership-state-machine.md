@@ -259,6 +259,17 @@ point.
 Members still waiting on their orientation are also left out of the dues-lapsed report:
 somebody who was never let into the building is not a billing problem yet.
 
+That exemption only holds because the awaiting-orientation report is wider than the reminder.
+The reminder writes to `new_member` alone (`OrientationEligibility.reminder_scope`), but the
+report covers every untrained member in `AWAITING_ORIENTATION_STATES` — `new_member`,
+`provisional_member`, `current_member`, `overdue_member`. Paying before booking an orientation
+moves a member straight to `current_member`, and from there they can lapse to `overdue_member`
+without ever having been let into the building; if the report still listed only `new_member`,
+that member would be missing from the dues-lapsed report and the orientation report at once.
+Ended and deliberate states — `inactive_member`, `cancelled_member`, `banned_member`,
+`guest_member`, `sponsored_member` — stay off it, because nobody is booking an orientation for
+a membership that is over.
+
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
 address.

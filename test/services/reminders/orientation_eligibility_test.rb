@@ -118,6 +118,46 @@ module Reminders
       assert_equal 1, OrientationEligibility.count_due(now: @now)
     end
 
+    # The report has to be wider than the reminder. Paying before booking an orientation takes
+    # a member out of new_member, and the dues-lapsed report leaves untrained members off
+    # expecting to see them here, so dropping them would leave them on no list at all.
+    test 'the report keeps untrained members who have moved past new_member' do
+      paying = awaiting_user(email: 'paid-before-orientation@example.com')
+      paying.update_columns(membership_state: 'current_member')
+      overdue = awaiting_user(email: 'lapsed-before-orientation@example.com')
+      overdue.update_columns(membership_state: 'overdue_member')
+
+      scope = OrientationEligibility.awaiting_orientation_scope
+
+      assert_includes scope, paying.reload
+      assert_includes scope, overdue.reload
+    end
+
+    test 'the report leaves out untrained members whose membership is over' do
+      gone = awaiting_user(email: 'never-came-in@example.com')
+      gone.update_columns(membership_state: 'inactive_member')
+      quit = awaiting_user(email: 'quit-before-orientation@example.com')
+      quit.update_columns(membership_state: 'cancelled_member')
+
+      scope = OrientationEligibility.awaiting_orientation_scope
+
+      assert_not_includes scope, gone.reload
+      assert_not_includes scope, quit.reload
+    end
+
+    # The email is addressed to somebody who was just approved. Somebody a year into paying
+    # needs a different conversation, so widening the report must not widen the mail.
+    test 'the reminder still writes only to new members' do
+      awaiting = awaiting_user(email: 'still-new@example.com')
+      paying = awaiting_user(email: 'paying-and-untrained@example.com')
+      paying.update_columns(membership_state: 'current_member')
+
+      assert_equal [awaiting], OrientationEligibility.due(now: @now).to_a
+      assert_not OrientationEligibility.due?(paying.reload, now: @now)
+      assert_equal 1, OrientationEligibility.total_awaiting
+      assert_includes OrientationEligibility.awaiting_orientation_scope, paying
+    end
+
     # Without a topic there is nothing to have been trained on, so the state is all we have
     # to go on and filtering on training would silently empty the list.
     test 'with no building access topic configured every new member is still waiting' do
