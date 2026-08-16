@@ -233,6 +233,34 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Apr 27', response.body
   end
 
+  # The dues report drops untrained members on the promise that this one picks them up. Paying
+  # before an orientation moves a member out of new_member, so while this list read new_member
+  # only, that member was on neither report and nobody was chasing them for anything.
+  test 'awaiting orientation carries the untrained members the dues report leaves out' do
+    MembershipSetting.instance.update!(building_access_training_topic: training_topics(:building_access))
+    overdue = overdue_member('authentik-overdue-never-oriented')
+    paying = member_in_state('authentik-paying-never-oriented', 'current_member', 'Paying Never Oriented', nil)
+
+    get report_url('awaiting-orientation')
+
+    assert_response :success
+    assert_match overdue.display_name, response.body
+    assert_match paying.display_name, response.body
+    assert_match 'Overdue', response.body
+  end
+
+  test 'awaiting orientation leaves out untrained members whose membership is over' do
+    MembershipSetting.instance.update!(building_access_training_topic: training_topics(:building_access))
+    gone = member_in_state('authentik-inactive-never-oriented', 'inactive_member', 'Inactive Never Oriented', nil)
+    quit = member_in_state('authentik-cancelled-never-oriented', 'cancelled_member', 'Cancelled Never Oriented', nil)
+
+    get report_url('awaiting-orientation')
+
+    assert_response :success
+    assert_no_match(/#{Regexp.escape(gone.display_name)}/, response.body)
+    assert_no_match(/#{Regexp.escape(quit.display_name)}/, response.body)
+  end
+
   test 'report counts match the number of rows each report returns' do
     counts = Reports::Catalog.counts
 

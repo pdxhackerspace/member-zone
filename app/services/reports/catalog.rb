@@ -95,7 +95,8 @@ module Reports
         key: 'awaiting-orientation',
         title: 'Approved members awaiting orientation',
         description: 'Members whose membership was approved but who have not been through ' \
-                     'building access orientation, so no key can be issued to them yet.',
+                     'building access orientation, so no key can be issued to them yet — ' \
+                     'including anyone paying, or behind on dues, who has still never come in.',
         category: 'access',
         partial: 'awaiting_orientation_table',
         empty_message: 'Every approved member has been through building access orientation.',
