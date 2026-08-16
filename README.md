@@ -1,9 +1,9 @@
 # MemberZone
 
-![CI](https://github.com/pdxhackerspace/member-manager/actions/workflows/ci.yml/badge.svg)
-![Staging image](https://github.com/pdxhackerspace/member-manager/actions/workflows/staging.yml/badge.svg)
-![Production image](https://github.com/pdxhackerspace/member-manager/actions/workflows/production.yml/badge.svg)
-![Version](https://img.shields.io/github/v/release/pdxhackerspace/member-manager?label=version)
+![CI](https://github.com/pdxhackerspace/member-zone/actions/workflows/ci.yml/badge.svg)
+![Staging image](https://github.com/pdxhackerspace/member-zone/actions/workflows/staging.yml/badge.svg)
+![Production image](https://github.com/pdxhackerspace/member-zone/actions/workflows/production.yml/badge.svg)
+![Version](https://img.shields.io/github/v/release/pdxhackerspace/member-zone?label=version)
 ![Ruby](https://img.shields.io/badge/Ruby-3.3.11-red?logo=ruby)
 ![Rails](https://img.shields.io/badge/Rails-8.1-red?logo=rubyonrails)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)
