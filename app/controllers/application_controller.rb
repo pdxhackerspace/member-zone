@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   include Pagy::Method
+  include MemberVisibility
 
   protect_from_forgery with: :exception
 

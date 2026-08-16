@@ -54,6 +54,11 @@ class User < ApplicationRecord
 
   PROFILE_VISIBILITY_OPTIONS = %w[public members private].freeze
 
+  # The settings by which a member has opted into being shown to other members. 'private'
+  # is the absent one: those profiles are for their owner and for the roles entitled to
+  # read any profile.
+  SHARED_PROFILE_VISIBILITIES = %w[public members].freeze
+
   # Lookup digests are derived from email and carry no meaning in a member's history.
   JOURNAL_DERIVED_ATTRIBUTES = %w[email_lookup_digest extra_email_lookup_digests].freeze
   validates :profile_visibility, inclusion: { in: PROFILE_VISIBILITY_OPTIONS }
@@ -125,6 +130,13 @@ class User < ApplicationRecord
       '(SELECT 1 FROM unnest(aliases) AS a WHERE LOWER(a) = :name)',
       name: normalized
     )
+  }
+
+  # The members a viewer who is not entitled to read every profile may be shown: the ones
+  # who opted into sharing, plus the viewer themselves, who is always allowed to find their
+  # own name. `where(id: nil)` for a missing viewer matches nobody.
+  scope :profile_visible_to, lambda { |viewer|
+    where(profile_visibility: SHARED_PROFILE_VISIBILITIES).or(where(id: viewer))
   }
 
   scope :active, -> { where(active: true) }
