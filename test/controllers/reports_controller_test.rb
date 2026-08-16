@@ -193,6 +193,46 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes Reports::LapsedWithAccessQuery.new.entries.keys, user.id
   end
 
+  test 'awaiting orientation lists approved members with no building access training' do
+    MembershipSetting.instance.update!(building_access_training_topic: training_topics(:building_access))
+    waiting = new_member('authentik-awaiting-orientation', approved_at: Time.zone.local(2026, 4, 27, 10, 0))
+    oriented = new_member('authentik-oriented')
+    Training.create!(trainee: oriented, training_topic: training_topics(:building_access), trained_at: 1.day.ago)
+
+    get report_url('awaiting-orientation')
+
+    assert_response :success
+    assert_match waiting.display_name, response.body
+    assert_no_match(/#{Regexp.escape(oriented.display_name)}/, response.body)
+    assert_match 'Apr 27', response.body
+  end
+
+  test 'awaiting orientation says so when a member never had an application' do
+    MembershipSetting.instance.update!(building_access_training_topic: training_topics(:building_access))
+    onboarded = new_member('authentik-no-application')
+
+    get report_url('awaiting-orientation')
+
+    assert_response :success
+    assert_match onboarded.display_name, response.body
+    assert_match 'No application', response.body
+  end
+
+  # Somebody who was never let into the building is not a billing problem yet.
+  test 'dues lapsed leaves out members still waiting on their orientation' do
+    MembershipSetting.instance.update!(building_access_training_topic: training_topics(:building_access))
+    trained = overdue_member('authentik-overdue-trained', approved_at: Time.zone.local(2026, 4, 27, 10, 0))
+    Training.create!(trainee: trained, training_topic: training_topics(:building_access), trained_at: 30.days.ago)
+    untrained = overdue_member('authentik-overdue-untrained')
+
+    get report_url('dues-status-lapsed')
+
+    assert_response :success
+    assert_match trained.display_name, response.body
+    assert_no_match(/#{Regexp.escape(untrained.display_name)}/, response.body)
+    assert_match 'Apr 27', response.body
+  end
+
   test 'report counts match the number of rows each report returns' do
     counts = Reports::Catalog.counts
 
@@ -248,6 +288,24 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
   def lapsed_member(authentik_id, last_payment_on)
     User.create!(authentik_id: authentik_id, full_name: "Lapsed #{authentik_id}",
                  membership_state: 'inactive_member', last_payment_date: last_payment_on)
+  end
+
+  def new_member(authentik_id, approved_at: nil)
+    member_in_state(authentik_id, 'new_member', "New #{authentik_id}", approved_at)
+  end
+
+  def overdue_member(authentik_id, approved_at: nil)
+    member_in_state(authentik_id, 'overdue_member', "Overdue #{authentik_id}", approved_at)
+  end
+
+  def member_in_state(authentik_id, state, name, approved_at)
+    user = User.create!(authentik_id: authentik_id, full_name: name,
+                        email: "#{authentik_id}@example.com", membership_state: state)
+    if approved_at
+      MembershipApplication.create!(user: user, email: user.email, status: 'approved',
+                                    reviewed_at: approved_at, submitted_at: approved_at - 2.days)
+    end
+    user
   end
 
   def sign_in_as_admin

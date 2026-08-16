@@ -36,6 +36,7 @@ class MembershipSettingsController < AuthenticatedController
                                          new_member_expiry_days
                                          overdue_grace_period_days
                                          payment_overdue_reminder_repeat_days
+                                         orientation_reminder_repeat_days
                                          planless_payment_window_days
                                          payment_currency_buffer_days
                                          building_access_training_topic_id])

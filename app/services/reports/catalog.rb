@@ -65,16 +65,14 @@ module Reports
       Definition.new(
         key: 'dues-status-lapsed',
         title: 'Dues lapsed',
-        description: 'Members who are behind on dues but still inside their grace period.',
+        description: 'Members who are behind on dues but still inside their grace period. ' \
+                     'Members still waiting on their building access orientation are left out — ' \
+                     'they are on the awaiting-orientation report instead.',
         category: 'billing',
         partial: 'user_table',
-        locals: { show_last_payment: true },
+        locals: { show_last_payment: true, show_approved: true },
         empty_message: 'No member is behind on dues.'
-      ) do
-        ScopeQuery.new(
-          User.where(membership_state: 'overdue_member').non_service_accounts.order(NAME_ORDER)
-        )
-      end,
+      ) { DuesLapsedQuery.new },
 
       Definition.new(
         key: 'sponsored-and-paying',
@@ -92,6 +90,17 @@ module Reports
               .non_service_accounts.non_legacy.order(NAME_ORDER)
         )
       end,
+
+      Definition.new(
+        key: 'awaiting-orientation',
+        title: 'Approved members awaiting orientation',
+        description: 'Members whose membership was approved but who have not been through ' \
+                     'building access orientation, so no key can be issued to them yet.',
+        category: 'access',
+        partial: 'awaiting_orientation_table',
+        empty_message: 'Every approved member has been through building access orientation.',
+        attention: true
+      ) { AwaitingOrientationQuery.new },
 
       Definition.new(
         key: 'lapsed-with-access',

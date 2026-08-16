@@ -16,6 +16,7 @@ class MembershipSetting < ApplicationRecord
   validates :new_member_expiry_days, presence: true, numericality: { greater_than: 0 }
   validates :overdue_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :payment_overdue_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
+  validates :orientation_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :planless_payment_window_days, presence: true, numericality: { greater_than: 0 }
   validates :payment_currency_buffer_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
@@ -41,6 +42,7 @@ class MembershipSetting < ApplicationRecord
       new_member_expiry_days: 90,
       overdue_grace_period_days: 30,
       payment_overdue_reminder_repeat_days: 7,
+      orientation_reminder_repeat_days: 14,
       planless_payment_window_days: 32,
       payment_currency_buffer_days: 2
     )
@@ -120,6 +122,12 @@ class MembershipSetting < ApplicationRecord
 
   def self.payment_overdue_reminder_repeat_days
     instance.payment_overdue_reminder_repeat_days
+  end
+
+  # How long after approval an un-oriented member is first reminded, and how long between
+  # reminders after that.
+  def self.orientation_reminder_repeat_days
+    instance.orientation_reminder_repeat_days
   end
 
   # How long a payment counts as current when the member has no membership plan assigned.

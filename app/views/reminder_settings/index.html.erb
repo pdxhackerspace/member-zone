@@ -16,121 +16,71 @@
   </div>
 <% end %>
 
+<% unless @building_access_topic %>
+  <div class="alert alert-warning text-13 py-2 mb-3">
+    No building access training topic is set, so orientation is judged on membership state alone.
+    <%= link_to "Set one in Membership settings", membership_settings_path, class: "alert-link" %>.
+  </div>
+<% end %>
+
 <% @reminder_settings.each do |reminder| %>
-  <% if reminder.key == 'slack_signup' %>
-    <div class="card shadow-sm border-0 mb-3">
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-          <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
-              <h2 class="h5 mb-0"><%= reminder.name %></h2>
-            </div>
-            <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
-            <div class="text-13">
-              <span class="fw-medium text-body"><%= @slack_due_count %></span>
-              <span class="text-secondary">would be emailed today ·</span>
-              <span class="text-secondary"><%= @slack_without_slack_count %> active without Slack</span>
-            </div>
-            <div class="text-12 text-secondary mt-1">
-              Timing:
-              <%= @membership_setting.slack_signup_reminder_initial_delay_days %> days after approval,
-              every <%= @membership_setting.slack_signup_reminder_repeat_delay_days %> days,
-              members who joined within <%= @membership_setting.slack_signup_reminder_max_account_age_months %> <%= 'month'.pluralize(@membership_setting.slack_signup_reminder_max_account_age_months) %>
-              · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex align-items-center gap-2 mb-0" do |f| %>
-              <div class="form-check form-switch mb-0">
-                <%= f.check_box :enabled, class: 'form-check-input', role: 'switch', id: "reminder_enabled_#{reminder.key}" %>
-                <%= f.label :enabled, reminder.enabled? ? 'Enabled' : 'Disabled', class: 'form-check-label text-13 text-nowrap', for: "reminder_enabled_#{reminder.key}" %>
-              </div>
-              <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm', data: { turbo: false } %>
-            <% end %>
-            <%= link_to "View due list", reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
-            <% if @slack_email_template %>
-              <%= link_to "Email template", email_template_path(@slack_email_template), class: "btn btn-outline-secondary btn-sm" %>
-            <% end %>
-          </div>
-        </div>
+  <% case reminder.key %>
+  <% when 'slack_signup' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @slack_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @slack_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @slack_without_slack_count %> active without Slack</span>
       </div>
-    </div>
-  <% elsif reminder.key == 'application_link' %>
-    <div class="card shadow-sm border-0 mb-3">
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-          <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
-              <h2 class="h5 mb-0"><%= reminder.name %></h2>
-            </div>
-            <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
-            <div class="text-13">
-              <span class="fw-medium text-body"><%= @application_link_due_count %></span>
-              <span class="text-secondary">would be emailed today ·</span>
-              <span class="text-secondary"><%= @application_link_awaiting_count %> awaiting application</span>
-            </div>
-            <div class="text-12 text-secondary mt-1">
-              Timing:
-              every <%= @membership_setting.application_link_reminder_delay_days %> days,
-              up to <%= @membership_setting.application_link_reminder_max_count %> reminders
-              · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex align-items-center gap-2 mb-0" do |f| %>
-              <div class="form-check form-switch mb-0">
-                <%= f.check_box :enabled, class: 'form-check-input', role: 'switch', id: "reminder_enabled_#{reminder.key}" %>
-                <%= f.label :enabled, reminder.enabled? ? 'Enabled' : 'Disabled', class: 'form-check-label text-13 text-nowrap', for: "reminder_enabled_#{reminder.key}" %>
-              </div>
-              <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm', data: { turbo: false } %>
-            <% end %>
-            <%= link_to "View due list", reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
-            <% if @application_link_email_template %>
-              <%= link_to "Email template", email_template_path(@application_link_email_template), class: "btn btn-outline-secondary btn-sm" %>
-            <% end %>
-          </div>
-        </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing:
+        <%= @membership_setting.slack_signup_reminder_initial_delay_days %> days after approval,
+        every <%= @membership_setting.slack_signup_reminder_repeat_delay_days %> days,
+        members who joined within <%= @membership_setting.slack_signup_reminder_max_account_age_months %> <%= 'month'.pluralize(@membership_setting.slack_signup_reminder_max_account_age_months) %>
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
       </div>
-    </div>
-  <% elsif reminder.key == 'payment_overdue' %>
-    <div class="card shadow-sm border-0 mb-3">
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-          <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
-              <h2 class="h5 mb-0"><%= reminder.name %></h2>
-            </div>
-            <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
-            <div class="text-13">
-              <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span>
-              <span class="text-secondary">would be emailed today ·</span>
-              <span class="text-secondary"><%= @payment_overdue_total_count %> overdue</span>
-            </div>
-            <div class="text-12 text-secondary mt-1">
-              Timing:
-              every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days while overdue,
-              stopping after <%= @membership_setting.overdue_grace_period_days %> days when they become inactive
-              · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex align-items-center gap-2 mb-0" do |f| %>
-              <div class="form-check form-switch mb-0">
-                <%= f.check_box :enabled, class: 'form-check-input', role: 'switch', id: "reminder_enabled_#{reminder.key}" %>
-                <%= f.label :enabled, reminder.enabled? ? 'Enabled' : 'Disabled', class: 'form-check-label text-13 text-nowrap', for: "reminder_enabled_#{reminder.key}" %>
-              </div>
-              <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm', data: { turbo: false } %>
-            <% end %>
-            <%= link_to "View due list", reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
-            <% if @payment_overdue_email_template %>
-              <%= link_to "Email template", email_template_path(@payment_overdue_email_template), class: "btn btn-outline-secondary btn-sm" %>
-            <% end %>
-          </div>
-        </div>
+    <% end %>
+  <% when 'application_link' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @application_link_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @application_link_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @application_link_awaiting_count %> awaiting application</span>
       </div>
-    </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing:
+        every <%= @membership_setting.application_link_reminder_delay_days %> days,
+        up to <%= @membership_setting.application_link_reminder_max_count %> reminders
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+    <% end %>
+  <% when 'payment_overdue' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @payment_overdue_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @payment_overdue_total_count %> overdue</span>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing:
+        every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days while overdue,
+        stopping after <%= @membership_setting.overdue_grace_period_days %> days when they become inactive
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+    <% end %>
+  <% when 'orientation' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @orientation_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @orientation_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @orientation_awaiting_count %> awaiting orientation</span>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing:
+        every <%= @membership_setting.orientation_reminder_repeat_days %> days after approval,
+        stopping after <%= @membership_setting.new_member_expiry_days %> days when they become inactive
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+    <% end %>
   <% end %>
 <% end %>

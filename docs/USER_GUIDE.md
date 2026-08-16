@@ -34,6 +34,24 @@ Members who have told us they are cancelling are never reminded, and neither are
 
 **Email copy** is editable under Settings → Email templates (`Payment Past Due`). Reminders wait in the outbound mail review queue for approval before they go out.
 
+Members who have not been through building access orientation are not reminded about dues, and are left off the **Dues lapsed** report for the same reason — see the orientation reminder below.
+
+### Orientation reminder
+
+Reminds members whose membership was **approved but who have not been through building access orientation**. Disabled by default. The daily job runs at 7:45 AM.
+
+Recording the member's building access training is what stops the reminders: it moves them out of the New member state and off the list. Members whose new-member window has already run out are not reminded — by then they have fallen inactive and the conversation is about rejoining.
+
+**Timing** (Settings → Membership settings):
+
+- **Orientation reminder — interval (days)** — how long after approval the first reminder goes out, and the gap between reminders after that. Defaults to 14 days.
+
+**Email copy** is editable under Settings → Email templates (`Orientation Reminder`). Reminders wait in the outbound mail review queue for approval before they go out.
+
+Which training counts as orientation comes from **Building access training topic** in Settings → Membership settings. If no topic is set, membership state alone decides who is waiting, and the reminders page says so.
+
+**Who is waiting** is listed on the **Approved members awaiting orientation** report (Reports → Building access), with the date each member's application was accepted and how long they have been waiting.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.

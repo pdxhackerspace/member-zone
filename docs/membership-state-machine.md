@@ -231,6 +231,7 @@ queue unless its template opts out of review.
 | `ban!` | `membership_banned` | Once per ban |
 | Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled** |
 | Being in `overdue_member` | `payment_past_due` | Weekly, while the reminder is enabled |
+| Being in `new_member` | `orientation_reminder` | Every `orientation_reminder_repeat_days`, while the reminder is enabled |
 | `mark_deceased!` | — | No email |
 
 The overdue reminder is a `ReminderSetting` keyed `payment_overdue`, **disabled by
@@ -242,6 +243,21 @@ account. Reading the resolved state rather than the column means a member whose 
 grace has run out does not get one last nag on their way to inactive. Cancelled members are
 excluded by design — they told us they were leaving — as are members with a cancellation on
 file that has not been reconciled yet (see below).
+
+The orientation reminder is a `ReminderSetting` keyed `orientation`, **disabled by default**.
+`OrientationReminderJob` runs daily at 7:45 AM and `Reminders::OrientationEligibility` decides
+who is due: members whose resolved state is still `new_member`, with no training recorded
+against the building access topic, approved more than `orientation_reminder_repeat_days`
+(default 14) ago and not reminded within that same window. `new_member` already means
+"approved, nothing has granted building access yet", so recording the training ends the
+reminders by moving the member to `provisional_member`; the training check is a backstop for
+members who reached `new_member` already trained, where the transition never fired. Reading
+the resolved state keeps the reminder off members whose `new_member_expiry_days` window has
+run out — they are on their way to inactive, and booking an orientation is no longer the
+point.
+
+Members still waiting on their orientation are also left out of the dues-lapsed report:
+somebody who was never let into the building is not a billing problem yet.
 
 The cancellation email promises reactivation without reapplying within
 `reactivation_grace_period_months` (default 12) and points anyone past that at the support
@@ -263,11 +279,20 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
 - `cancellation_recorded?` asks whether the stamp is set — the question for code deciding
   whether there is bookkeeping left to do.
 - `cancellation_on_file?` is the broader question, and the one anything about to mail a
-  member asks. It is true for the stamp **or** for an unprocessed `subscription_cancelled`
-  payment event newer than the member's last payment. `notify_membership_lapsed` and
-  `PaymentOverdueEligibility` both use it, because `Membership::TickJob` walks members from
-  `overdue_member` to `inactive_member` without passing through `cancelled_member` — a
-  filed notice nobody has reconciled yet has to be enough on its own.
+  member asks. It takes the most recent word that they cancelled — the stamp **or** an
+  unprocessed `subscription_cancelled` payment event — and is true unless something says they
+  came back since. `notify_membership_lapsed` and `PaymentOverdueEligibility` both use it,
+  because `Membership::TickJob` walks members from `overdue_member` to `inactive_member`
+  without passing through `cancelled_member`, so a filed notice nobody has reconciled yet has
+  to be enough on its own.
+- `returned_after?(moment)` is what "came back" means, in one place. A payment on the row is
+  the obvious evidence; `RETURN_EVENT_TYPES` (`payment`, `subscription_started`,
+  `subscription_resumed`) covers the returns the columns never hear about, since Recharge
+  opens a fresh subscription rather than reviving the cancelled one.
+  `Membership::CancellationReconciler` asks the same method before leaving a member's standing
+  alone. The two have to agree: a return the reconciler honours but the mail guards ignore
+  leaves the member in a deadlock, with nothing to move their standing and nothing willing to
+  chase them again.
 - Entering any of `REJOINED_STATES` — `new_member`, `provisional_member`, `current_member` —
   clears it, along with `membership_cancelled_email_sent_at`. A member who came back is not a
   member who left, so a later lapse reads as a lapse and a second cancellation mails them
@@ -279,6 +304,14 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
 - `overdue_member` does not clear it — that is the same membership falling behind, not a new
   one — and neither do `sponsored_member` or `guest_member`, which may end and leave the
   member exactly where the cancellation left them.
+
+The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
+the card's "Next payment" line with "Cancelled / Active until *date*", because there is no
+next payment coming and presenting the paid-through date as one — as a renewal, or once it
+passes, as an overdue bill — asks the member for money they told us they were done paying.
+The date is `dues_paid_through_at`, the day their last payment stops covering them. A
+sponsorship or guest pass granted after the cancellation supersedes it and the ordinary line
+returns.
 
 The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
 the card's "Next payment" line with "Cancelled / Active until *date*", because there is no
@@ -368,6 +401,7 @@ Settings → Membership settings, stored on the `MembershipSetting` singleton:
 | `new_member_expiry_days` | 90 | How long an approved member who never trains stays active |
 | `overdue_grace_period_days` | 30 | How long an overdue member keeps access |
 | `payment_overdue_reminder_repeat_days` | 7 | Minimum gap between overdue reminders |
+| `orientation_reminder_repeat_days` | 14 | Delay after approval before the first orientation reminder, and the gap between them |
 | `reactivation_grace_period_months` | 12 | How long a lapsed member can resubscribe without reapplying |
 | `building_access_training_topic_id` | — | Which training topic triggers `grant_building_access!` |
 
