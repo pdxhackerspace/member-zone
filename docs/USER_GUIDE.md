@@ -34,7 +34,7 @@ Members who have told us they are cancelling are never reminded, and neither are
 
 **Email copy** is editable under Settings → Email templates (`Payment Past Due`). Reminders wait in the outbound mail review queue for approval before they go out.
 
-Members who have not been through building access orientation are not reminded about dues, and are left off the **Dues lapsed** report for the same reason — see the orientation reminder below.
+Members who have not been through building access orientation are left off the **Dues lapsed** report — chasing an invoice is the wrong first conversation with someone who has never been let in. They still get the reminder email if their dues lapse, and they are listed on the **Approved members awaiting orientation** report, so nobody drops out of sight.
 
 ### Orientation reminder
 
@@ -51,6 +51,8 @@ Recording the member's building access training is what stops the reminders: it 
 Which training counts as orientation comes from **Building access training topic** in Settings → Membership settings. If no topic is set, membership state alone decides who is waiting, and the reminders page says so.
 
 **Who is waiting** is listed on the **Approved members awaiting orientation** report (Reports → Building access), with the date each member's application was accepted and how long they have been waiting.
+
+The report is broader than the reminder. A member who paid before booking their orientation is no longer a New member, so the reminder leaves them alone, but they still cannot get in and they still appear here — with their standing shown beside their name so a paying or overdue member stands out from the newly approved ones. They are the reason the report exists: because the Dues lapsed report leaves untrained members off, this is the only list they are on.
 
 ## Membership states
 

@@ -1,7 +1,11 @@
-<%# Approved members with no building access orientation on record. The wait is measured from
-    when they became a new member, which is the clock that eventually drops them to inactive;
-    the accepted date is shown separately because members onboarded without an application
-    have no accepted date at all. %>
+<%# Approved members with no building access orientation on record. The wait runs from when
+    they were approved rather than from their current state: a member who paid before booking
+    an orientation has moved states since, and measuring from the last move would report a
+    year-long wait as a few days. Members onboarded without an application have no accepted
+    date, so the wait falls back to when the record was created.
+
+    Most rows are new members. Anyone further along has been paying, or lapsing, without ever
+    being let into the building, which is the row worth reading first. %>
 <% approved_at = local_assigns.fetch(:approved_at, {}) %>
 <div class="table-responsive">
   <table class="table table-compact mb-0 align-middle">
@@ -10,6 +14,7 @@
         <th scope="col" style="width: 48px;"></th>
         <th scope="col">Name</th>
         <th scope="col">Email</th>
+        <th scope="col">Standing</th>
         <th scope="col">Accepted</th>
         <th scope="col" class="num">Waiting</th>
         <th scope="col">Actions</th>
@@ -29,8 +34,17 @@
               <span class="text-secondary">—</span>
             <% end %>
           </td>
+          <td>
+            <% if user.membership_state == 'new_member' %>
+              <span class="text-12 text-secondary"><%= membership_state_label(user.membership_state) %></span>
+            <% else %>
+              <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+                <%= membership_state_label(user.membership_state) %>
+              </span>
+            <% end %>
+          </td>
           <td><%= admin_profile_time(approved_at[user.id], empty: 'No application') %></td>
-          <td class="num"><%= orientation_wait_cell(user.membership_state_entered_at || user.created_at) %></td>
+          <td class="num"><%= orientation_wait_cell(approved_at[user.id] || user.created_at) %></td>
           <td><%= render 'user_actions', user: user, anchor: report.key %></td>
         </tr>
       <% end %>

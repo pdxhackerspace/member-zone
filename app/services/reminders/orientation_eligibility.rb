@@ -32,16 +32,45 @@ module Reminders
 
     DELIVERABLE_EMAIL_SQL = "users.email IS NOT NULL AND users.email ~ '\\S'".freeze
 
-    # Everyone approved but not yet oriented, whether or not a reminder is due for them.
-    # This is the list the report shows.
+    # States where never having been oriented is still a live problem: they are paying, or
+    # they are behind on dues and about to be chased for it. inactive_member and the states
+    # someone chose deliberately are left out — nobody books an orientation for a membership
+    # that has already ended.
+    AWAITING_ORIENTATION_STATES = %w[new_member provisional_member current_member overdue_member].freeze
+
+    # Approved and not oriented, whatever their dues are doing. This is the list the report
+    # shows, and it is deliberately wider than the population the reminder writes to: paying
+    # before booking an orientation moves a member straight to current_member, from where they
+    # can lapse to overdue_member without ever having been let into the building. DuesLapsedQuery
+    # leaves untrained members out on the understanding that they appear here instead, so
+    # anyone this list drops is a member no report is watching at all.
     def self.awaiting_orientation_scope
-      User.where(membership_state: 'new_member')
-          .non_service_accounts.non_legacy
-          .awaiting_building_access_training
+      untrained.where(membership_state: report_states)
+    end
+
+    # The wider states only say anything alongside a missing training record. With no building
+    # access topic configured there is nothing to be missing — awaiting_building_access_training
+    # matches everybody — and the state is the whole test, where only new_member means a member
+    # has yet to come in. Reading the states literally in that case would put the entire paying
+    # roster on the report and list every overdue member on the dues-lapsed report as well,
+    # which the two reports are meant never to do.
+    def self.report_states
+      TrainingTopic.building_access ? AWAITING_ORIENTATION_STATES : %w[new_member]
+    end
+
+    # Who the reminder is for. Its email is addressed to someone whose membership was just
+    # approved and whose window is still open — which is what due? enforces, on the resolved
+    # state — so it stays narrower than the report.
+    def self.reminder_scope
+      untrained.where(membership_state: 'new_member')
+    end
+
+    def self.untrained
+      User.non_service_accounts.non_legacy.awaiting_building_access_training
     end
 
     def self.total_awaiting
-      awaiting_orientation_scope.count
+      reminder_scope.count
     end
 
     def self.due(now: Time.current)
@@ -57,7 +86,7 @@ module Reminders
     def self.candidates(now: Time.current)
       cutoff = repeat_cutoff(now: now)
 
-      awaiting_orientation_scope
+      reminder_scope
         .where(DELIVERABLE_EMAIL_SQL)
         .where("#{APPROVAL_ANCHOR_SQL} <= ?", cutoff)
         .where('orientation_reminder_sent_at IS NULL OR orientation_reminder_sent_at <= ?', cutoff)
@@ -100,6 +129,6 @@ module Reminders
       !user.building_access_trained?
     end
 
-    private_class_method :base_user?
+    private_class_method :base_user?, :report_states
   end
 end
