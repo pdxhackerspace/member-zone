@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MemberZone (directory is still named `MemberManager`) is a Rails 8.1 app that runs a makerspace/membership organization: member roster, membership applications, payments (PayPal, Recharge, Ko-fi, cash), training records, RFID building access, parking notices, incident reports, and messaging. Authentik (OIDC) is the identity provider; the local database is kept in sync with it in both directions.
 
-Ruby 3.3.11, PostgreSQL 16, Redis 7, Sidekiq, Bootstrap 5.3 via cssbundling-rails, Stimulus/Turbo, importmap.
+Ruby 4.0.6, PostgreSQL 16, Redis 8, Sidekiq, Bootstrap 5.3 via cssbundling-rails, Stimulus/Turbo, importmap.
 
 ## Commands
 

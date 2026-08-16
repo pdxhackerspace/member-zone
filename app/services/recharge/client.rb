@@ -54,7 +54,7 @@ module Recharge
 
     # Generic paginated fetch for any Recharge API list endpoint.
     # Yields each raw item to the block for normalization.
-    def paginate(endpoint, key, params, &block)
+    def paginate(endpoint, key, params, &)
       results = []
       page = 1
 
@@ -66,7 +66,7 @@ module Recharge
         Rails.logger.debug { "[Recharge::Client] #{endpoint} page #{page}: #{items.size} items" }
         break if items.empty?
 
-        results.concat(items.map(&block))
+        results.concat(items.map(&))
 
         break unless more_pages?(payload, items.size)
 

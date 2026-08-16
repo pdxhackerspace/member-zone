@@ -31,7 +31,7 @@ jobs:
           --health-retries 5
 
       redis:
-        image: redis:7-alpine
+        image: redis:8-alpine
         ports:
           - 6379:6379
         options: >-
@@ -86,7 +86,7 @@ jobs:
         if: steps.version_only_main.outputs.skip != 'true'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3.11'
+          ruby-version: '4.0.6'
           bundler-cache: true
 
       - name: Set up Node.js

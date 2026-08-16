@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby '3.3.11'
+ruby '4.0.6'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem 'rails', '~> 8.1.2'
@@ -14,8 +14,7 @@ gem 'pg', '~> 1.1'
 # Use the Puma web server [https://github.com/puma/puma]
 gem 'puma', '>= 6.0'
 
-# Sidekiq constrains rack to < 3.3; stay on latest 3.2.x for security patches
-gem 'rack', '~> 3.2.6', '< 3.3'
+gem 'rack', '>= 3.2.6'
 
 # Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
 gem 'importmap-rails'
@@ -42,14 +41,12 @@ gem 'omniauth-rails_csrf_protection'
 gem 'jbuilder'
 
 # Use Redis adapter to run Action Cable in production
-# Stay below 6.0 — it switches to RESP3 by default, changing reply types
-gem 'redis', '>= 4.0.1', '< 7.0'
+gem 'redis', '>= 4.0.1'
 
 # Use Kredis to get higher-level data types in Redis [https://github.com/rails/kredis]
 # gem "kredis"
 
 # Background job processing
-gem 'connection_pool', '< 4.0' # Pin below 3.0 — sidekiq 7.x incompatible with connection_pool 3.0+
 gem 'sidekiq', '~> 8.1'
 gem 'sidekiq-cron', '~> 2.4'
 
