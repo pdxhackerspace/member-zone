@@ -8,7 +8,7 @@ x-web-common: &web-common
     context: .
     pull: true
     args:
-      RUBY_VERSION: "3.3.11"
+      RUBY_VERSION: "4.0.6"
   image: member_zone_web:latest
   env_file:
     - .env
@@ -47,7 +47,7 @@ services:
       retries: 15
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: memberzone-dev-redis
     restart: unless-stopped
     command: redis-server --appendonly yes

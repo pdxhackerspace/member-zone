@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## Docker
 
-- **Base image:** `ruby:3.3.11-slim` with multi-stage build
+- **Base image:** `ruby:4.0.6-slim` with multi-stage build
 - **Node:** Installed via nodenv (Node 24.x) for asset compilation
 - **Yarn:** Use `yarn install --frozen-lockfile` — never modify `yarn.lock` in Docker builds
 - **Assets:** Precompiled with `SECRET_KEY_BASE_DUMMY=1`
@@ -38,7 +38,7 @@ Dev/test bind-mount the repo at `/rails`; test images should not copy applicatio
 
 ## GitHub Actions
 
-- **ci.yml:** Runs on push/PR to `main`; sets up PostgreSQL 16 and Redis 7 as service containers; runs `bin/rails test`
+- **ci.yml:** Runs on push/PR to `main`; sets up PostgreSQL 16 and Redis 8 as service containers; runs `bin/rails test`
 - **release.yml:** Triggered by `v*` tags; runs tests then builds and pushes Docker image to `ghcr.io`
 - Uses `ruby/setup-ruby` with bundler-cache and `actions/setup-node` with yarn cache
 - Concurrency: cancels in-progress runs for the same ref

@@ -41,8 +41,11 @@ class UsersController < AuthenticatedController
   SORTABLE_COLUMNS = %w[username full_name membership_state membership_status payment_type last_synced_at].freeze
 
   def index
-    # Start with all users for the "all" count
-    all_users = User.all
+    # members.view_list opens the directory; it does not by itself confer the right to read
+    # a profile, so a holder without members.view_profile browses and searches only the
+    # members who opted into sharing. Scoping here rather than at the search keeps the
+    # counts and the filter tiles describing the same set of people as the table.
+    all_users = members_visible_to_viewer(User.all)
     @all_user_count = all_users.count
 
     # Legacy count (from all users)
@@ -173,9 +176,11 @@ class UsersController < AuthenticatedController
     # Store filter/sort params for passing to user profile links
     @list_params = @filter_params.dup
 
-    @recent_members = User.non_service_accounts.non_legacy
-                          .where(created_at: 1.week.ago..)
-                          .ordered_by_display_name
+    # Built from its own query rather than from @users, so it needs the visibility scope of
+    # its own too.
+    @recent_members = members_visible_to_viewer(User.non_service_accounts.non_legacy)
+                      .where(created_at: 1.week.ago..)
+                      .ordered_by_display_name
 
     @pagy, @users = pagy(@users, limit: 100)
   end

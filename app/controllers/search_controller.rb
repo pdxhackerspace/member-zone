@@ -21,11 +21,15 @@ class SearchController < AuthenticatedController
   def search_admin
     pattern = "%#{@q.downcase}%"
 
-    @users = User.where(
-      "LOWER(COALESCE(full_name, '')) LIKE :p " \
-      'OR LOWER(authentik_id) LIKE :p',
-      p: pattern
-    ).or(User.by_any_email(@q)).order(:full_name).limit(25)
+    # search.admin widens the search to the source records; it does not confer the right to
+    # read a profile, so the member list stays scoped the way it is everywhere else.
+    @users = members_visible_to_viewer(
+      User.where(
+        "LOWER(COALESCE(full_name, '')) LIKE :p " \
+        'OR LOWER(authentik_id) LIKE :p',
+        p: pattern
+      ).or(User.by_any_email(@q))
+    ).order(:full_name).limit(25)
     @authentik_users = AuthentikUser.where(
       "LOWER(COALESCE(full_name, '')) LIKE :p " \
       "OR LOWER(COALESCE(username, '')) LIKE :p " \
@@ -60,40 +64,39 @@ class SearchController < AuthenticatedController
   end
 
   def search_member
-    pattern     = "%#{@q.downcase}%"
-    visible     = %w[public members]
+    pattern = "%#{@q.downcase}%"
 
-    # Matching member profiles
-    @matching_members = User.where(profile_visibility: visible)
-                            .where(
-                              "LOWER(COALESCE(full_name, '')) LIKE :p OR LOWER(COALESCE(username, '')) LIKE :p",
-                              p: pattern
-                            )
-                            .order(:full_name)
-                            .limit(25)
+    @matching_members = matching_member_profiles(pattern)
+    @interest_matches = matching_interest_groups(pattern)
+    @training_matches = matching_training_groups(pattern)
+  end
 
-    # Matching interests → members who have that interest and a visible profile
-    matching_interests = Interest.where('LOWER(name) LIKE ?', pattern).alphabetical
-    @interest_matches = matching_interests.filter_map do |interest|
-      members = interest.users
-                        .where(profile_visibility: visible)
-                        .order(:full_name)
+  def matching_member_profiles(pattern)
+    members_visible_to_viewer(
+      User.where(
+        "LOWER(COALESCE(full_name, '')) LIKE :p OR LOWER(COALESCE(username, '')) LIKE :p",
+        p: pattern
+      )
+    ).order(:full_name).limit(25)
+  end
+
+  # Matching interests → the members who hold that interest and may be shown.
+  def matching_interest_groups(pattern)
+    Interest.where('LOWER(name) LIKE ?', pattern).alphabetical.filter_map do |interest|
+      members = members_visible_to_viewer(interest.users).order(:full_name)
       next if members.empty?
 
       { interest: interest, members: members }
     end
+  end
 
-    # Matching training topics → trained members + trainers with visible profiles
-    matching_topics = TrainingTopic.where('LOWER(name) LIKE ?', pattern).order(:name)
-    @training_matches = matching_topics.filter_map do |topic|
-      trained = User.joins(:trainings_as_trainee)
-                    .where(trainings: { training_topic_id: topic.id })
-                    .where(profile_visibility: visible)
-                    .distinct
-                    .order(:full_name)
-      trainers = topic.trainers
-                      .where(profile_visibility: visible)
-                      .order(:full_name)
+  # Matching training topics → the trained members and trainers who may be shown.
+  def matching_training_groups(pattern)
+    TrainingTopic.where('LOWER(name) LIKE ?', pattern).order(:name).filter_map do |topic|
+      trained = members_visible_to_viewer(
+        User.joins(:trainings_as_trainee).where(trainings: { training_topic_id: topic.id })
+      ).distinct.order(:full_name)
+      trainers = members_visible_to_viewer(topic.trainers).order(:full_name)
       next if trained.empty? && trainers.empty?
 
       { topic: topic, trained: trained, trainers: trainers }

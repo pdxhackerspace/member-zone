@@ -10,7 +10,7 @@ x-web-common: &web-common
     context: .
     dockerfile: Dockerfile.test
     args:
-      RUBY_VERSION: "3.3.11"
+      RUBY_VERSION: "4.0.6"
   image: member_zone_test:latest
   env_file:
     - .env
@@ -39,7 +39,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: memberzone-test-redis
     command: redis-server --save "" --appendonly no
 #    ports:
