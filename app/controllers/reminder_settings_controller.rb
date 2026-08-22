@@ -75,11 +75,15 @@ class ReminderSettingsController < AdminController
       @orientation_email_template = EmailTemplate.find_by(key: 'orientation_reminder')
       @building_access_topic = TrainingTopic.building_access
     when 'parking_notices'
-      @pagy, @due_notices = pagy(Reminders::ParkingNoticeEligibility.due, limit: PER_PAGE)
-      @parking_due_count = @pagy.count
-      @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
-      @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
+      load_parking_notices_show_data
     end
+  end
+
+  def load_parking_notices_show_data
+    @pagy, @due_notices = pagy(Reminders::ParkingNoticeEligibility.due, limit: PER_PAGE)
+    @parking_due_count = @pagy.count
+    @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
+    @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
   end
 
   def load_application_link_show_data

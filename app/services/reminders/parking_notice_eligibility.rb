@@ -25,7 +25,7 @@ module Reminders
 
     def self.due(now: Time.current)
       ids = []
-      remindable_scope(now: now).find_each { |notice| ids << notice.id if due?(notice, now: now) }
+      remindable_scope.find_each { |notice| ids << notice.id if due?(notice, now: now) }
       ParkingNotice.where(id: ids).includes(:user).order(:expires_at)
     end
 
@@ -67,7 +67,7 @@ module Reminders
       return false unless notice.expired?
       return false if notice.final_reminder_sent_at.present?
       return false if final_window_reached?(notice, now: now)
-      return false unless notice.expiration_notice_sent_at.present?
+      return false if notice.expiration_notice_sent_at.blank?
 
       last_sent = notice.overdue_reminder_sent_at || notice.expiration_notice_sent_at
       last_sent <= repeat_cutoff(now: now)
@@ -82,8 +82,7 @@ module Reminders
 
     def self.pending_reminder_mail?(notice)
       QueuedMail.where(recipient: notice.user, status: %w[pending approved], sent_at: nil)
-                .where("mailer_args ->> 'parking_notice_id' = ?", notice.id.to_s)
-                .exists?
+                .exists?(["mailer_args ->> 'parking_notice_id' = ?", notice.id.to_s])
     end
 
     def self.pre_expiration_cutoff(now: Time.current)
@@ -94,15 +93,15 @@ module Reminders
       now - MembershipSetting.parking_notice_expired_reminder_repeat_days.days
     end
 
-    def self.final_cutoff(notice, now: Time.current)
+    def self.final_cutoff(notice)
       notice.expires_at + MembershipSetting.parking_notice_final_reminder_days_after_expiration.days
     end
 
     def self.final_window_reached?(notice, now: Time.current)
-      final_cutoff(notice, now: now) <= now
+      final_cutoff(notice) <= now
     end
 
-    def self.remindable_scope(now: Time.current)
+    def self.remindable_scope
       ParkingNotice.not_cleared
                    .where(status: %w[active expired])
                    .where(DELIVERABLE_USER_SQL)

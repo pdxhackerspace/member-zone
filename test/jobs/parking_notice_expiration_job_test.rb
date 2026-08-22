@@ -43,7 +43,10 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
   test 'enqueues expiration email for notice with user' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
-    ReminderSetting.find_or_create_by!(key: 'parking_notices') { |s| s.name = 'Parking'; s.enabled = true }
+    ReminderSetting.find_or_create_by!(key: 'parking_notices') do |s|
+      s.name = 'Parking'
+      s.enabled = true
+    end
 
     assert_difference 'QueuedMail.count', 1 do
       ParkingNoticeExpirationJob.perform_now
@@ -53,7 +56,10 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
   test 'does not enqueue email when reminders disabled' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
-    ReminderSetting.find_or_create_by!(key: 'parking_notices') { |s| s.name = 'Parking'; s.enabled = false }
+    ReminderSetting.find_or_create_by!(key: 'parking_notices') do |s|
+      s.name = 'Parking'
+      s.enabled = false
+    end
 
     assert_no_difference 'QueuedMail.count' do
       ParkingNoticeExpirationJob.perform_now

@@ -17,7 +17,8 @@ class MembershipSetting < ApplicationRecord
   validates :overdue_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :payment_overdue_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :orientation_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
-  validates :parking_notice_reminder_days_before_expiration, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :parking_notice_reminder_days_before_expiration,
+            presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :parking_notice_expired_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :parking_notice_final_reminder_days_after_expiration, presence: true, numericality: { greater_than: 0 }
   validates :planless_payment_window_days, presence: true, numericality: { greater_than: 0 }

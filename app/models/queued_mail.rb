@@ -1,6 +1,7 @@
 class QueuedMail < ApplicationRecord
   include QueuedMailReminderDeliveries
   include QueuedMailApplicationLinkReminders
+  include QueuedMailMailerArgs
 
   STATUSES = %w[pending approved rejected].freeze
 
@@ -263,46 +264,5 @@ class QueuedMail < ApplicationRecord
     variables = MemberMailer.build_template_variables(user, extra_args)
     ensure_admin_new_application_application_url!(variables, action, extra_args) if template
     variables
-  end
-
-  # Some mailer actions accept a trailing options hash positionally (opts = {}) while others use
-  # keyword arguments (e.g. training_completed(user, training_topic:)). build_mailer_args returns the
-  # options as a trailing Hash; splat it as keywords so keyword-based mailers receive it correctly.
-  # Ruby forwards **hash as a positional Hash to mailers that don't declare keyword params, so this
-  # is safe for both styles.
-  def self.dispatch_mailer(action, mailer_args)
-    if mailer_args.last.is_a?(Hash)
-      *positional, keyword_args = mailer_args
-      MemberMailer.public_send(action, *positional, **keyword_args)
-    else
-      MemberMailer.public_send(action, *mailer_args)
-    end
-  end
-
-  def self.build_mailer_args(action, user, to_addr, extra_args)
-    case action.to_s
-    when 'admin_new_application'
-      [user, to_addr || extra_args[:admin_email], extra_args.slice(:application_url)]
-    when 'payment_past_due'
-      [user, { days_overdue: extra_args[:days_overdue] }.compact]
-    when 'membership_cancelled', 'membership_banned', 'application_rejected'
-      [user, { reason: extra_args[:reason] }.compact]
-    when 'training_completed', 'trainer_capability_granted'
-      [user, { training_topic: extra_args[:training_topic] }.compact]
-    when 'training_requested'
-      [user, extra_args.slice(:training_topic, :requester_name, :requester_email, :requester_slack,
-                              :share_contact_info, :recipient_role, :trainer_names, :to)]
-    when 'parking_permit_issued', 'parking_ticket_issued',
-         'parking_permit_expired', 'parking_ticket_expired',
-         'parking_permit_expiring_soon', 'parking_ticket_expiring_soon',
-         'parking_permit_overdue_reminder', 'parking_ticket_overdue_reminder',
-         'parking_permit_final_reminder', 'parking_ticket_final_reminder'
-      [user, extra_args.slice(:location, :location_detail, :description, :expires_at, :notice_type,
-                              :parking_notice_id)]
-    when 'login_link_sent'
-      [user, extra_args.slice(:login_url)]
-    else
-      [user]
-    end
   end
 end
