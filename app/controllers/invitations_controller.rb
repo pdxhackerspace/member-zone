@@ -104,6 +104,7 @@ class InvitationsController < AuthenticatedController
     end
 
     MailLogEntry.log!(mail, 'created', details: "Queued #{invitation.type_label} invitation to #{invitation.email}")
+    MailRecipientGuard.block_delivery_to!(mail)
   end
 
   def humanize_expiry(time)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -621,6 +621,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_120000) do
     t.integer "new_member_grace_period_days", default: 14, null: false
     t.integer "orientation_reminder_repeat_days", default: 14, null: false
     t.integer "overdue_grace_period_days", default: 30, null: false
+    t.integer "parking_notice_expired_reminder_repeat_days", default: 7, null: false
+    t.integer "parking_notice_final_reminder_days_after_expiration", default: 14, null: false
+    t.integer "parking_notice_reminder_days_before_expiration", default: 3, null: false
     t.integer "payment_currency_buffer_days", default: 2, null: false
     t.integer "payment_grace_period_days", default: 14, null: false
     t.integer "payment_overdue_reminder_repeat_days", default: 7, null: false
@@ -672,12 +675,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_120000) do
     t.bigint "cleared_by_id"
     t.datetime "created_at", null: false
     t.text "description"
+    t.datetime "expiration_notice_sent_at"
     t.datetime "expires_at", null: false
+    t.datetime "final_reminder_sent_at"
     t.bigint "issued_by_id", null: false
     t.string "location"
     t.string "location_detail"
     t.text "notes"
     t.string "notice_type", null: false
+    t.datetime "overdue_reminder_sent_at"
+    t.datetime "pre_expiration_reminder_sent_at"
     t.boolean "requires_admin_clearance", default: false, null: false
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
@@ -685,9 +692,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_120000) do
     t.index ["clearance_requested_at"], name: "index_parking_notices_on_clearance_requested_at"
     t.index ["clearance_requested_by_id"], name: "index_parking_notices_on_clearance_requested_by_id"
     t.index ["cleared_by_id"], name: "index_parking_notices_on_cleared_by_id"
+    t.index ["expiration_notice_sent_at"], name: "index_parking_notices_on_expiration_notice_sent_at"
     t.index ["expires_at"], name: "index_parking_notices_on_expires_at"
     t.index ["issued_by_id"], name: "index_parking_notices_on_issued_by_id"
     t.index ["notice_type", "status"], name: "index_parking_notices_on_notice_type_and_status"
+    t.index ["pre_expiration_reminder_sent_at"], name: "index_parking_notices_on_pre_expiration_reminder_sent_at"
     t.index ["requires_admin_clearance"], name: "index_parking_notices_on_requires_admin_clearance"
     t.index ["status"], name: "index_parking_notices_on_status"
     t.index ["user_id"], name: "index_parking_notices_on_user_id"

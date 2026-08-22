@@ -22,6 +22,7 @@ module QueuedMailApplicationLinkReminders
                  )
                end
       MailLogEntry.log!(record, 'created', details: "Queued application link reminder to #{dest}")
+      MailRecipientGuard.block_delivery_to!(record)
       record
     end
 

@@ -34,6 +34,13 @@
           · <span class="text-secondary"><%= @orientation_awaiting_count %> awaiting orientation total</span>
         <% end %>
       </div>
+    <% elsif @reminder_setting.key == 'parking_notices' %>
+      <div class="text-13 text-secondary mt-1">
+        <span class="fw-medium text-body"><%= @parking_due_count %></span> would be emailed on the next run
+        <% if @parking_awaiting_count > @parking_due_count %>
+          · <span class="text-secondary"><%= @parking_awaiting_count %> active or expired, not cleared</span>
+        <% end %>
+      </div>
     <% end %>
   </div>
   <div class="d-flex gap-2">
@@ -202,6 +209,67 @@
         <% end %>
       <% else %>
         <p class="text-secondary text-13 mb-0 p-3">No members are due for this reminder right now.</p>
+      <% end %>
+    </div>
+  </div>
+<% elsif @reminder_setting.key == 'parking_notices' %>
+  <div class="alert alert-secondary text-13 py-2 mb-3">
+    Cleared notices are not reminded. Issued emails on creation are always sent separately from this reminder.
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <% if @due_notices.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Expires</th>
+                <th>Due</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @due_notices.each do |notice| %>
+                <% phase = Reminders::ParkingNoticeEligibility.due_phase(notice) %>
+                <tr>
+                  <td>
+                    <% if notice.user %>
+                      <%= link_to notice.user.display_name, user_path(notice.user), class: "text-decoration-none fw-medium" %>
+                    <% else %>
+                      <span class="text-secondary">—</span>
+                    <% end %>
+                  </td>
+                  <td><%= notice.notice_type_display %></td>
+                  <td class="text-secondary"><%= notice.location_display.presence || '—' %></td>
+                  <td><%= admin_profile_time(notice.expires_at) %></td>
+                  <td><%= parking_reminder_phase_label(phase) %></td>
+                  <td class="text-end">
+                    <div class="d-inline-flex gap-2">
+                      <%= link_to "View", parking_notice_path(notice), class: "btn btn-outline-secondary btn-sm" %>
+                      <% if notice.clearable_by?(current_user) %>
+                        <%= button_to "Clear", clear_parking_notice_path(notice, return_to: reminder_setting_path(@reminder_setting.key)),
+                            method: :post,
+                            class: "btn btn-outline-secondary btn-sm",
+                            data: { turbo_confirm: "Clear this parking #{notice.notice_type}?" } %>
+                      <% end %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <% if @pagy.pages > 1 %>
+          <div class="p-3 border-top">
+            <%== pagy_bootstrap_nav(@pagy) %>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-secondary text-13 mb-0 p-3">No parking notices are due for a reminder right now.</p>
       <% end %>
     </div>
   </div>

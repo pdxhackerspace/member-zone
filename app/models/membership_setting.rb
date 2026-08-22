@@ -17,6 +17,9 @@ class MembershipSetting < ApplicationRecord
   validates :overdue_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :payment_overdue_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :orientation_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
+  validates :parking_notice_reminder_days_before_expiration, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :parking_notice_expired_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
+  validates :parking_notice_final_reminder_days_after_expiration, presence: true, numericality: { greater_than: 0 }
   validates :planless_payment_window_days, presence: true, numericality: { greater_than: 0 }
   validates :payment_currency_buffer_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
@@ -43,6 +46,9 @@ class MembershipSetting < ApplicationRecord
       overdue_grace_period_days: 30,
       payment_overdue_reminder_repeat_days: 7,
       orientation_reminder_repeat_days: 14,
+      parking_notice_reminder_days_before_expiration: 3,
+      parking_notice_expired_reminder_repeat_days: 7,
+      parking_notice_final_reminder_days_after_expiration: 14,
       planless_payment_window_days: 32,
       payment_currency_buffer_days: 2
     )
@@ -128,6 +134,18 @@ class MembershipSetting < ApplicationRecord
   # reminders after that.
   def self.orientation_reminder_repeat_days
     instance.orientation_reminder_repeat_days
+  end
+
+  def self.parking_notice_reminder_days_before_expiration
+    instance.parking_notice_reminder_days_before_expiration
+  end
+
+  def self.parking_notice_expired_reminder_repeat_days
+    instance.parking_notice_expired_reminder_repeat_days
+  end
+
+  def self.parking_notice_final_reminder_days_after_expiration
+    instance.parking_notice_final_reminder_days_after_expiration
   end
 
   # How long a payment counts as current when the member has no membership plan assigned.

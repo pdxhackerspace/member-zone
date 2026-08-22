@@ -61,6 +61,13 @@ class QueuedMailsController < AuthenticatedController
     end
 
     @queued_mail.approve!(current_user)
+    if @queued_mail.rejected?
+      status = @queued_mail.recipient.banned? ? 'banned' : 'deceased'
+      redirect_to queued_mail_path(@queued_mail),
+                  alert: "Message not sent: #{@queued_mail.recipient.display_name} is #{status}."
+      return
+    end
+
     redirect_to queued_mails_path, notice: "Message to #{@queued_mail.to} has been approved and sent."
   end
 
@@ -97,8 +104,14 @@ class QueuedMailsController < AuthenticatedController
 
     pending = QueuedMail.pending
     count = pending.count
-    pending.find_each { |qm| qm.approve!(current_user) }
-    redirect_to queued_mails_path, notice: "Approved and sent #{count} message#{'s' if count != 1}."
+    blocked = 0
+    pending.find_each do |qm|
+      blocked += 1 unless qm.approve!(current_user)
+    end
+    approved = count - blocked
+    notice = "Approved and sent #{approved} message#{'s' if approved != 1}."
+    notice += " #{blocked} blocked for banned or deceased recipients." if blocked.positive?
+    redirect_to queued_mails_path, notice: notice
   end
 
   def reject_all

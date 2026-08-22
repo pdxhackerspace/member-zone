@@ -13,6 +13,18 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   def log_member_zone_mail_delivery
+    if mail_recipient_blocked?
+      log_direct_mail_delivery!(
+        'rejected',
+        details: MailRecipientGuard.rejection_details_for_direct(
+          to: message.to,
+          mailer_class: self.class.name,
+          mailer_action: action_name
+        )
+      )
+      return
+    end
+
     yield
     log_direct_mail_delivery!('sent')
   rescue StandardError => e
@@ -34,6 +46,15 @@ class ApplicationMailer < ActionMailer::Base
       details: details,
       body_html: mail_body_html,
       body_text: mail_body_text
+    )
+  end
+
+  def mail_recipient_blocked?
+    MailRecipientGuard.block_direct_delivery!(
+      to: message.to,
+      subject: message.subject,
+      mailer_class: self.class.name,
+      mailer_action: action_name
     )
   end
 

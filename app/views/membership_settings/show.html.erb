@@ -119,6 +119,21 @@
           value: safe_join([content_tag(:strong, @membership_setting.orientation_reminder_repeat_days), " ",
                             "day".pluralize(@membership_setting.orientation_reminder_repeat_days)]),
           help: "How long after approval the first orientation reminder goes out, and the gap between them after that." %>
+      <%= render "show_field",
+          label: "Parking notice — days before expiration",
+          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_reminder_days_before_expiration), " ",
+                            "day".pluralize(@membership_setting.parking_notice_reminder_days_before_expiration)]),
+          help: "Pre-expiration reminder timing. 0 disables pre-expiration reminders." %>
+      <%= render "show_field",
+          label: "Parking notice — repeat after expiration",
+          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_expired_reminder_repeat_days), " ",
+                            "day".pluralize(@membership_setting.parking_notice_expired_reminder_repeat_days)]),
+          help: "Minimum days between follow-up reminders after expiration." %>
+      <%= render "show_field",
+          label: "Parking notice — final reminder after expiration",
+          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_final_reminder_days_after_expiration), " ",
+                            "day".pluralize(@membership_setting.parking_notice_final_reminder_days_after_expiration)]),
+          help: "Final warning with disposal notice, sent once after expiration." %>
     <% end %>
   </div>
 

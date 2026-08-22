@@ -23,6 +23,10 @@ class QueuedMail < ApplicationRecord
   scope :failed, -> { approved.where(sent_at: nil).where.not(last_error: nil) }
   scope :newest_first, -> { order(created_at: :desc) }
 
+  def self.pending_ban_mail_for?(user)
+    exists?(recipient: user, mailer_action: 'membership_banned', status: %w[pending approved], sent_at: nil)
+  end
+
   def pending?  = status == 'pending'
   def approved? = status == 'approved'
   def rejected? = status == 'rejected'
@@ -46,7 +50,9 @@ class QueuedMail < ApplicationRecord
     template = EmailTemplate.find_enabled(action.to_s)
     variables = enqueue_render_variables(action, user, extra_args, template)
 
-    return deliver_immediately(template, dest, variables) if template&.send_immediately?
+    if !MailRecipientGuard.blocked?(user) && template&.send_immediately?
+      return deliver_immediately(template, dest, variables)
+    end
 
     record = if template
                create_queued_mail_from_template(
@@ -63,6 +69,7 @@ class QueuedMail < ApplicationRecord
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued #{action.to_s.humanize} to #{dest}")
+    MailRecipientGuard.block_delivery_to!(record)
     record
   end
 
@@ -96,6 +103,7 @@ class QueuedMail < ApplicationRecord
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued application rejected to #{dest}")
+    MailRecipientGuard.block_delivery_to!(record)
     record
   end
 
@@ -170,9 +178,12 @@ class QueuedMail < ApplicationRecord
   end
 
   def approve!(reviewer)
+    return false if MailRecipientGuard.block_delivery_to!(self)
+
     update!(status: 'approved', reviewed_by: reviewer, reviewed_at: Time.current)
     MailLogEntry.log!(self, 'approved', actor: reviewer, details: "Approved for delivery to #{to}")
     QueuedMailDeliveryJob.perform_later(id)
+    true
   end
 
   def reject!(reviewer)
@@ -198,6 +209,8 @@ class QueuedMail < ApplicationRecord
   end
 
   def deliver_now!
+    return if MailRecipientGuard.block_delivery_to!(self)
+
     increment!(:send_attempts)
     QueuedMailMailer.deliver_queued(self).deliver_now
     sent_time = Time.current
@@ -280,8 +293,12 @@ class QueuedMail < ApplicationRecord
       [user, extra_args.slice(:training_topic, :requester_name, :requester_email, :requester_slack,
                               :share_contact_info, :recipient_role, :trainer_names, :to)]
     when 'parking_permit_issued', 'parking_ticket_issued',
-         'parking_permit_expired', 'parking_ticket_expired'
-      [user, extra_args.slice(:location, :location_detail, :description, :expires_at, :notice_type)]
+         'parking_permit_expired', 'parking_ticket_expired',
+         'parking_permit_expiring_soon', 'parking_ticket_expiring_soon',
+         'parking_permit_overdue_reminder', 'parking_ticket_overdue_reminder',
+         'parking_permit_final_reminder', 'parking_ticket_final_reminder'
+      [user, extra_args.slice(:location, :location_detail, :description, :expires_at, :notice_type,
+                              :parking_notice_id)]
     when 'login_link_sent'
       [user, extra_args.slice(:login_url)]
     else

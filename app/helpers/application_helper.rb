@@ -123,10 +123,12 @@ module ApplicationHelper
   # The value is not rendered at all. An earlier version blurred it in CSS behind a "Show
   # contact details" button, which left the address in the page for anyone who could open
   # the application — the mask was decoration, not a control.
-  def membership_application_masked_contact_capture(&)
-    return capture(&) unless membership_application_mask_contact_pii?
-
-    content_tag(:span, 'Hidden', class: 'text-secondary fst-italic',
-                                 title: 'Requires the applicant contact details privilege')
+  def parking_reminder_phase_label(phase)
+    {
+      pre_expiration: 'Before expiration',
+      expiration: 'At expiration',
+      overdue: 'Overdue follow-up',
+      final: 'Final warning'
+    }.fetch(phase, phase.to_s.humanize)
   end
 end

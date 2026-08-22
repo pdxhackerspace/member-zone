@@ -190,10 +190,28 @@
           <div class="form-text">Minimum days between overdue payment reminders for the same member.</div>
         </div>
 
-        <div class="mb-0">
+        <div class="mb-3">
           <%= f.label :orientation_reminder_repeat_days, "Orientation reminder — interval (days)", class: "form-label" %>
           <%= f.number_field :orientation_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
           <div class="form-text">How long after approval the first orientation reminder goes out, and the gap between them after that.</div>
+        </div>
+
+        <div class="mb-3">
+          <%= f.label :parking_notice_reminder_days_before_expiration, "Parking notice — days before expiration", class: "form-label" %>
+          <%= f.number_field :parking_notice_reminder_days_before_expiration, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">Send the pre-expiration reminder this many days before a permit or ticket expires. Set to 0 to skip pre-expiration reminders.</div>
+        </div>
+
+        <div class="mb-3">
+          <%= f.label :parking_notice_expired_reminder_repeat_days, "Parking notice — repeat after expiration (days)", class: "form-label" %>
+          <%= f.number_field :parking_notice_expired_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">Minimum days between follow-up reminders after a notice expires, until the final reminder.</div>
+        </div>
+
+        <div class="mb-0">
+          <%= f.label :parking_notice_final_reminder_days_after_expiration, "Parking notice — final reminder after expiration (days)", class: "form-label" %>
+          <%= f.number_field :parking_notice_final_reminder_days_after_expiration, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">Send one final warning this many days after expiration. Timing is configured here; enable sending in Reminders.</div>
         </div>
       <% end %>
 

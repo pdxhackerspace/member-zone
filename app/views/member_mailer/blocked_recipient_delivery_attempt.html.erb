@@ -1,0 +1,42 @@
+<h1>Blocked email delivery</h1>
+<p>Member Zone refused to send an email because the recipient is marked as <strong><%= @membership_state_label %></strong>.</p>
+
+<h2>Recipient</h2>
+<table style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Name:</strong></td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><%= @recipient_name %></td>
+  </tr>
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Email:</strong></td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><%= @delivery_to %></td>
+  </tr>
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Status:</strong></td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><%= @membership_state_label %></td>
+  </tr>
+</table>
+
+<h2>Blocked message</h2>
+<table style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Subject:</strong></td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><%= @blocked_subject %></td>
+  </tr>
+  <tr>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Action:</strong></td>
+    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><code><%= @mailer_action %></code></td>
+  </tr>
+  <% if @mailer_class.present? %>
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Mailer:</strong></td>
+      <td style="padding: 8px; border-bottom: 1px solid #ddd;"><code><%= @mailer_class %></code></td>
+    </tr>
+  <% end %>
+</table>
+
+<% if @queued_mail_url.present? %>
+  <p style="margin-top: 20px;"><a href="<%= @queued_mail_url %>">View the rejected queued message</a></p>
+<% end %>
+
+<p>The message was not sent. Review the member's profile if this delivery was unexpected.</p>

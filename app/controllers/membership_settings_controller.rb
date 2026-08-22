@@ -37,6 +37,9 @@ class MembershipSettingsController < AuthenticatedController
                                          overdue_grace_period_days
                                          payment_overdue_reminder_repeat_days
                                          orientation_reminder_repeat_days
+                                         parking_notice_reminder_days_before_expiration
+                                         parking_notice_expired_reminder_repeat_days
+                                         parking_notice_final_reminder_days_after_expiration
                                          planless_payment_window_days
                                          payment_currency_buffer_days
                                          building_access_training_topic_id])
