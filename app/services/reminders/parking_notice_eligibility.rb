@@ -1,12 +1,22 @@
 module Reminders
   # Who should receive parking permit/ticket reminder emails today.
   class ParkingNoticeEligibility
+    REMINDER_MAILER_ACTIONS = %w[
+      parking_permit_expiring_soon parking_ticket_expiring_soon
+      parking_permit_expired parking_ticket_expired
+      parking_permit_overdue_reminder parking_ticket_overdue_reminder
+      parking_permit_final_reminder parking_ticket_final_reminder
+    ].freeze
+
+    REMINDER_MAILER_ACTIONS_SQL = REMINDER_MAILER_ACTIONS.map { |action| "'#{action}'" }.join(', ').freeze
+    TERMINAL_MEMBERSHIP_STATES_SQL = MembershipState::TERMINAL_STATES.map { |state| "'#{state}'" }.join(', ').freeze
+
     WITHOUT_PENDING_REMINDER_MAIL_SQL = <<~SQL.squish
       NOT EXISTS (
         SELECT 1
         FROM queued_mails
         WHERE queued_mails.recipient_id = parking_notices.user_id
-          AND queued_mails.mailer_action LIKE 'parking_%'
+          AND queued_mails.mailer_action IN (#{REMINDER_MAILER_ACTIONS_SQL})
           AND queued_mails.status IN ('pending', 'approved')
           AND queued_mails.sent_at IS NULL
           AND queued_mails.mailer_args ->> 'parking_notice_id' = parking_notices.id::text
@@ -20,6 +30,7 @@ module Reminders
         WHERE users.id = parking_notices.user_id
           AND users.email IS NOT NULL
           AND users.email ~ '\\S'
+          AND users.membership_state NOT IN (#{TERMINAL_MEMBERSHIP_STATES_SQL})
       )
     SQL
 
@@ -47,7 +58,12 @@ module Reminders
     end
 
     def self.remindable?(notice)
-      !notice.cleared? && notice.user.present? && notice.user.email.present? && !pending_reminder_mail?(notice)
+      return false if notice.cleared?
+      return false if notice.user.blank? || notice.user.email.blank?
+      return false if MailRecipientGuard.blocked?(notice.user)
+      return false if pending_reminder_mail?(notice)
+
+      true
     end
 
     def self.pre_expiration_due?(notice, now: Time.current)
@@ -81,8 +97,12 @@ module Reminders
     end
 
     def self.pending_reminder_mail?(notice)
-      QueuedMail.where(recipient: notice.user, status: %w[pending approved], sent_at: nil)
-                .exists?(["mailer_args ->> 'parking_notice_id' = ?", notice.id.to_s])
+      QueuedMail.where(
+        recipient: notice.user,
+        status: %w[pending approved],
+        sent_at: nil,
+        mailer_action: REMINDER_MAILER_ACTIONS
+      ).exists?(["mailer_args ->> 'parking_notice_id' = ?", notice.id.to_s])
     end
 
     def self.pre_expiration_cutoff(now: Time.current)
