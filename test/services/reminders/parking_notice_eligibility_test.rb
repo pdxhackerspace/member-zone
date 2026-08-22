@@ -79,5 +79,51 @@ module Reminders
         assert ParkingNoticeEligibility.overdue_repeat_due?(@notice.reload, now: @now)
       end
     end
+
+    test 'banned members are not remindable' do
+      @user.update_columns(membership_state: 'banned_member')
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.remindable?(@notice.reload)
+        assert_not_includes ParkingNoticeEligibility.due(now: @now), @notice
+      end
+    end
+
+    test 'pending issued mail does not block reminder eligibility' do
+      QueuedMail.create!(
+        to: @user.email,
+        subject: 'Parking permit issued',
+        body_html: '<p>Issued</p>',
+        body_text: 'Issued',
+        reason: 'Parking permit issued',
+        mailer_action: 'parking_permit_issued',
+        recipient: @user,
+        status: 'pending',
+        mailer_args: { parking_notice_id: @notice.id }
+      )
+
+      travel_to @now do
+        assert ParkingNoticeEligibility.remindable?(@notice.reload)
+        assert ParkingNoticeEligibility.pre_expiration_due?(@notice, now: @now)
+      end
+    end
+
+    test 'pending reminder mail blocks duplicate reminders' do
+      QueuedMail.create!(
+        to: @user.email,
+        subject: 'Expiring soon',
+        body_html: '<p>Soon</p>',
+        body_text: 'Soon',
+        reason: 'Parking permit expiring soon',
+        mailer_action: 'parking_permit_expiring_soon',
+        recipient: @user,
+        status: 'pending',
+        mailer_args: { parking_notice_id: @notice.id }
+      )
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.remindable?(@notice.reload)
+      end
+    end
   end
 end

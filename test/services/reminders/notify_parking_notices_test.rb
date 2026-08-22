@@ -90,4 +90,18 @@ class NotifyParkingNoticesTest < ActiveSupport::TestCase
 
     assert_equal 'parking_permit_expired', QueuedMail.order(:created_at).last.mailer_action
   end
+
+  test 'does not enqueue repeat mail for banned members' do
+    @setting.update!(enabled: true)
+    @notice.update!(status: 'expired', expires_at: @now - 1.hour, expiration_notice_sent_at: nil)
+    @notice.user.update_columns(membership_state: 'banned_member')
+    clear_other_parking_notices!(@notice)
+
+    travel_to @now do
+      assert_no_difference 'QueuedMail.count' do
+        Reminders::NotifyParkingNotices.call(now: @now)
+        Reminders::NotifyParkingNotices.call(now: @now)
+      end
+    end
+  end
 end
