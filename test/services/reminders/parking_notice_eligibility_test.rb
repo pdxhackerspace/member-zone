@@ -30,11 +30,19 @@ module Reminders
       end
     end
 
-    test 'expiration due when active and past expires_at' do
-      @notice.update!(expires_at: @now - 1.hour)
+    test 'expiration due when expired and past expires_at without notice sent' do
+      @notice.update!(status: 'expired', expires_at: @now - 1.hour)
 
       travel_to @now do
         assert ParkingNoticeEligibility.expiration_due?(@notice.reload, now: @now)
+      end
+    end
+
+    test 'expiration not due for active notices before expire job runs' do
+      @notice.update!(status: 'active', expires_at: @now - 1.hour)
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.expiration_due?(@notice.reload, now: @now)
       end
     end
 

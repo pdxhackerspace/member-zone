@@ -1,9 +1,14 @@
 require 'test_helper'
 
 class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
+  def clear_other_parking_notices!(keep)
+    ParkingNotice.where.not(id: keep.id).update_all(status: 'cleared', cleared_at: Time.current)
+  end
+
   test 'expires active notices past their expiration date' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
+    clear_other_parking_notices!(notice)
 
     ParkingNoticeExpirationJob.perform_now
 
@@ -30,6 +35,7 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
   test 'creates journal entry for expired notice with user' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
+    clear_other_parking_notices!(notice)
 
     assert_difference 'Journal.count', 1 do
       ParkingNoticeExpirationJob.perform_now
@@ -43,6 +49,7 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
   test 'enqueues expiration email for notice with user' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
+    clear_other_parking_notices!(notice)
     ReminderSetting.find_or_create_by!(key: 'parking_notices') do |s|
       s.name = 'Parking'
       s.enabled = true
@@ -56,6 +63,7 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
   test 'does not enqueue email when reminders disabled' do
     notice = parking_notices(:active_permit)
     notice.update!(expires_at: 1.hour.ago)
+    clear_other_parking_notices!(notice)
     ReminderSetting.find_or_create_by!(key: 'parking_notices') do |s|
       s.name = 'Parking'
       s.enabled = false
@@ -70,7 +78,12 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
 
   test 'does not enqueue email for notice without user' do
     notice = parking_notices(:anonymous_ticket)
-    notice.update!(expires_at: 1.hour.ago)
+    notice.update!(status: 'active', expires_at: 1.hour.ago, cleared_at: nil, cleared_by_id: nil)
+    clear_other_parking_notices!(notice)
+    ReminderSetting.find_or_create_by!(key: 'parking_notices') do |s|
+      s.name = 'Parking'
+      s.enabled = true
+    end
 
     assert_no_difference 'QueuedMail.count' do
       ParkingNoticeExpirationJob.perform_now

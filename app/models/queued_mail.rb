@@ -86,8 +86,9 @@ class QueuedMail < ApplicationRecord
     extra_args = { reason: reason.presence }.compact
 
     variables = MemberMailer.build_template_variables(template_recipient, extra_args)
+    blocked = MailRecipientGuard.blocked?(recipient_user) || MailRecipientGuard.blocked_email?(dest)
 
-    return deliver_immediately(template, dest, variables) if template&.send_immediately?
+    return deliver_immediately(template, dest, variables) if !blocked && template&.send_immediately?
 
     record = if template
                create_queued_mail_from_template(

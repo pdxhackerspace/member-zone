@@ -29,7 +29,7 @@ module Reminders
     end
 
     def call
-      expire_without_reminders unless reminders_enabled?
+      expire_past_due_notices!
       return unless reminders_enabled?
 
       ParkingNoticeEligibility.due(now: @now).find_each { |notice| notify_notice(notice) }
@@ -41,7 +41,7 @@ module Reminders
       ReminderSetting.enabled?('parking_notices')
     end
 
-    def expire_without_reminders
+    def expire_past_due_notices!
       ParkingNotice.needing_expiration.find_each do |notice|
         notice.expire!
         notice.record_journal_entry!('parking_notice_expired') if notice.user.present?
@@ -63,8 +63,6 @@ module Reminders
     end
 
     def deliver_expiration!(notice)
-      notice.expire!
-      notice.record_journal_entry!('parking_notice_expired') if notice.user.present?
       deliver_reminder!(notice, :expiration)
     end
 

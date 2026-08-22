@@ -241,4 +241,23 @@ class MailRecipientGuardTest < ActiveSupport::TestCase
       mailer_action: 'admin_new_application'
     )
   end
+
+  test 'blocked_recipient_alert_message works without a linked recipient' do
+    @member.update_columns(membership_state: 'banned_member', email: 'banned@example.com')
+    mail = QueuedMail.create!(
+      to: 'banned@example.com',
+      subject: 'Invitation',
+      body_html: '<p>Hi</p>',
+      body_text: 'Hi',
+      reason: 'Invitation',
+      mailer_action: 'invitation',
+      recipient: nil,
+      status: 'pending'
+    )
+    MailRecipientGuard.block_delivery_to!(mail)
+
+    message = MailRecipientGuard.blocked_recipient_alert_message(mail.reload)
+    assert_includes message, 'banned@example.com'
+    assert_includes message.downcase, 'banned'
+  end
 end

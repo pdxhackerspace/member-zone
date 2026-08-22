@@ -60,7 +60,7 @@ module Reminders
     end
 
     def self.expiration_due?(notice, now: Time.current)
-      notice.active? && notice.expires_at <= now && notice.expiration_notice_sent_at.blank?
+      notice.expired? && notice.expires_at <= now && notice.expiration_notice_sent_at.blank?
     end
 
     def self.overdue_repeat_due?(notice, now: Time.current)

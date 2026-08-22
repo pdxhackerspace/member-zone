@@ -62,9 +62,8 @@ class QueuedMailsController < AuthenticatedController
 
     @queued_mail.approve!(current_user)
     if @queued_mail.rejected?
-      status = @queued_mail.recipient.banned? ? 'banned' : 'deceased'
       redirect_to queued_mail_path(@queued_mail),
-                  alert: "Message not sent: #{@queued_mail.recipient.display_name} is #{status}."
+                  alert: MailRecipientGuard.blocked_recipient_alert_message(@queued_mail)
       return
     end
 

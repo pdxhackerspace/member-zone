@@ -105,8 +105,18 @@ class OnboardingController < AuthenticatedController
 
   def approve_mail
     qm = QueuedMail.find(params[:mail_id])
-    qm.approve!(current_user) if qm.pending?
-    redirect_to onboard_mail_path(@user), status: :see_other
+    unless qm.pending?
+      redirect_to onboard_mail_path(@user), status: :see_other
+      return
+    end
+
+    if qm.approve!(current_user)
+      redirect_to onboard_mail_path(@user), notice: "Message to #{qm.to} approved.", status: :see_other
+    else
+      redirect_to onboard_mail_path(@user),
+                  alert: MailRecipientGuard.blocked_recipient_alert_message(qm),
+                  status: :see_other
+    end
   end
 
   def reject_mail
@@ -116,8 +126,19 @@ class OnboardingController < AuthenticatedController
   end
 
   def approve_all_mail
-    @user.queued_mails.pending.find_each { |qm| qm.approve!(current_user) }
-    redirect_to onboard_mail_path(@user), notice: 'All pending messages approved.', status: :see_other
+    blocked = 0
+    approved = 0
+    @user.queued_mails.pending.find_each do |qm|
+      if qm.approve!(current_user)
+        approved += 1
+      else
+        blocked += 1
+      end
+    end
+
+    notice = "Approved #{approved} message#{'s' if approved != 1}."
+    notice += " #{blocked} blocked for banned or deceased recipients." if blocked.positive?
+    redirect_to onboard_mail_path(@user), notice: notice, status: :see_other
   end
 
   def reject_all_mail

@@ -105,6 +105,13 @@ class MailRecipientGuard
       "Auto-rejected: recipient is #{label.downcase}"
     end
 
+    def blocked_recipient_alert_message(queued_mail)
+      recipient = queued_mail.recipient || User.lookup_by_email(queued_mail.to)
+      label = membership_state_label(recipient).downcase
+      name = recipient&.display_name || queued_mail.to
+      "Message not sent: #{name} is #{label}."
+    end
+
     def rejection_details_for_direct(to:, mailer_class:, mailer_action:)
       addresses = Array(to).compact.join(', ')
       "Auto-rejected direct delivery to #{addresses} (#{mailer_class}##{mailer_action})"

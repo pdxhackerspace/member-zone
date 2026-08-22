@@ -22,6 +22,10 @@ module QueuedMailMailerArgs
     def build_mailer_args(action, user, to_addr, extra_args)
       return parking_mailer_args(user, extra_args) if PARKING_MAILER_ACTIONS.include?(action.to_s)
 
+      build_standard_mailer_args(action, user, to_addr, extra_args)
+    end
+
+    def build_standard_mailer_args(action, user, to_addr, extra_args)
       case action.to_s
       when 'admin_new_application'
         [user, to_addr || extra_args[:admin_email], extra_args.slice(:application_url)]
