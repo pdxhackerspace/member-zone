@@ -9,23 +9,10 @@ module QueuedMailMailerArgs
     parking_permit_final_reminder parking_ticket_final_reminder
   ].freeze
 
-  class_methods do
-    def dispatch_mailer(action, mailer_args)
-      if mailer_args.last.is_a?(Hash)
-        *positional, keyword_args = mailer_args
-        MemberMailer.public_send(action, *positional, **keyword_args)
-      else
-        MemberMailer.public_send(action, *mailer_args)
-      end
-    end
+  module StandardArgs
+    module_function
 
-    def build_mailer_args(action, user, to_addr, extra_args)
-      return parking_mailer_args(user, extra_args) if PARKING_MAILER_ACTIONS.include?(action.to_s)
-
-      build_standard_mailer_args(action, user, to_addr, extra_args)
-    end
-
-    def build_standard_mailer_args(action, user, to_addr, extra_args)
+    def build(action, user, to_addr, extra_args)
       case action.to_s
       when 'admin_new_application'
         [user, to_addr || extra_args[:admin_email], extra_args.slice(:application_url)]
@@ -43,6 +30,23 @@ module QueuedMailMailerArgs
       else
         [user]
       end
+    end
+  end
+
+  class_methods do
+    def dispatch_mailer(action, mailer_args)
+      if mailer_args.last.is_a?(Hash)
+        *positional, keyword_args = mailer_args
+        MemberMailer.public_send(action, *positional, **keyword_args)
+      else
+        MemberMailer.public_send(action, *mailer_args)
+      end
+    end
+
+    def build_mailer_args(action, user, to_addr, extra_args)
+      return parking_mailer_args(user, extra_args) if PARKING_MAILER_ACTIONS.include?(action.to_s)
+
+      StandardArgs.build(action, user, to_addr, extra_args)
     end
 
     def parking_mailer_args(user, extra_args)
