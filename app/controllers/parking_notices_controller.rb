@@ -48,11 +48,10 @@ class ParkingNoticesController < AuthenticatedController
     @parking_notice.event_actor = current_user
 
     if @parking_notice.save
-      template_key = @parking_notice.permit? ? 'parking_permit_issued' : 'parking_ticket_issued'
       journal_action = @parking_notice.permit? ? 'parking_permit_issued' : 'parking_ticket_issued'
 
       @parking_notice.record_journal_entry!(journal_action, actor: current_user)
-      @parking_notice.enqueue_notification!(template_key)
+      @parking_notice.enqueue_notification!(@parking_notice.issued_template_key)
 
       if print_and_create_another_permit?
         redirect_after_print_and_create_another_permit

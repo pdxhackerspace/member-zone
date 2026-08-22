@@ -101,7 +101,7 @@ class QueuedMailTest < ActiveSupport::TestCase
     reviewer = users(:one)
 
     assert_enqueued_jobs 1, only: QueuedMailDeliveryJob do
-      @pending.approve!(reviewer)
+      assert @pending.approve!(reviewer)
     end
 
     assert @pending.approved?
@@ -109,6 +109,16 @@ class QueuedMailTest < ActiveSupport::TestCase
     assert_not_nil @pending.reviewed_at
     # sent_at is set when the delivery job runs, not when enqueued
     assert_nil @pending.sent_at
+  end
+
+  test 'approve! rejects mail to a banned recipient' do
+    @pending.recipient.update_columns(membership_state: 'banned_member')
+
+    assert_no_enqueued_jobs only: QueuedMailDeliveryJob do
+      assert_not @pending.approve!(users(:one))
+    end
+
+    assert @pending.rejected?
   end
 
   test 'enqueue sends immediate template without creating queued mail' do

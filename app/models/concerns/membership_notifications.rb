@@ -20,7 +20,11 @@ module MembershipNotifications
 
     case membership_state
     when 'cancelled_member' then notify_membership_cancelled
-    when 'banned_member' then notify_membership_banned
+    when 'banned_member'
+      MailRecipientGuard.withdraw_pending_mail!(self)
+      notify_membership_banned
+    when 'deceased_member'
+      MailRecipientGuard.withdraw_pending_mail!(self)
     when 'inactive_member' then notify_membership_lapsed
     end
   end
@@ -37,6 +41,8 @@ module MembershipNotifications
   end
 
   def notify_membership_banned
+    return if QueuedMail.pending_ban_mail_for?(self)
+
     QueuedMail.enqueue(:membership_banned, self, reason: "Member banned: #{display_name}")
   end
 

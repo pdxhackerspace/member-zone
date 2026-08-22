@@ -30,6 +30,7 @@ class MemberParkingPermitsController < AuthenticatedController
 
     if @parking_notice.errors.empty? && @parking_notice.save
       @parking_notice.record_journal_entry!('parking_permit_issued', actor: current_user)
+      @parking_notice.enqueue_notification!(@parking_notice.issued_template_key)
       redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit created successfully.'
     else
       render :new, status: :unprocessable_content

@@ -82,5 +82,24 @@
         · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
       </div>
     <% end %>
+  <% when 'parking_notices' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @parking_expiring_soon_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @parking_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @parking_awaiting_count %> active or expired, not cleared</span>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing:
+        <%= @membership_setting.parking_notice_reminder_days_before_expiration %> days before expiration,
+        at expiration,
+        every <%= @membership_setting.parking_notice_expired_reminder_repeat_days %> days after,
+        final at <%= @membership_setting.parking_notice_final_reminder_days_after_expiration %> days
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Issued emails on creation are always sent and are not controlled by this toggle.
+      </div>
+    <% end %>
   <% end %>
 <% end %>

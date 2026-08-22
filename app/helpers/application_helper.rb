@@ -129,4 +129,13 @@ module ApplicationHelper
     content_tag(:span, 'Hidden', class: 'text-secondary fst-italic',
                                  title: 'Requires the applicant contact details privilege')
   end
+
+  def parking_reminder_phase_label(phase)
+    {
+      pre_expiration: 'Before expiration',
+      expiration: 'At expiration',
+      overdue: 'Overdue follow-up',
+      final: 'Final warning'
+    }.fetch(phase, phase.to_s.humanize)
+  end
 end
