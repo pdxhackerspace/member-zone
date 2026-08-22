@@ -648,6 +648,44 @@ class EmailTemplate < ApplicationRecord
         See you soon,
         The {{organization_name}} Team
       TEXT
+    },
+    'blocked_recipient_delivery_attempt' => {
+      name: 'Admin: Blocked Recipient Delivery',
+      description: 'Warns admins when outbound mail to a banned or deceased member was blocked',
+      subject: '{{organization_name}}: Blocked email to {{membership_state_label}} member',
+      body_html: <<~HTML,
+        <h1>Blocked email delivery</h1>
+        <p>Member Zone refused to send an email because the recipient is marked as <strong>{{membership_state_label}}</strong>.</p>
+        <h2>Recipient</h2>
+        <p><strong>Name:</strong> {{recipient_name}}<br>
+        <strong>Email:</strong> {{delivery_to}}<br>
+        <strong>Status:</strong> {{membership_state_label}}</p>
+        <h2>Blocked message</h2>
+        <p><strong>Subject:</strong> {{blocked_subject}}<br>
+        <strong>Action:</strong> {{mailer_action}}</p>
+        <p><a href="{{queued_mail_url}}">View the rejected queued message</a></p>
+        <p>The message was not sent. Review the member's profile if this delivery was unexpected.</p>
+      HTML
+      body_text: <<~TEXT
+        Blocked email delivery
+
+        Member Zone refused to send an email because the recipient is marked as {{membership_state_label}}.
+
+        Recipient
+        ---------
+        Name: {{recipient_name}}
+        Email: {{delivery_to}}
+        Status: {{membership_state_label}}
+
+        Blocked message
+        ---------------
+        Subject: {{blocked_subject}}
+        Action: {{mailer_action}}
+
+        View the rejected queued message: {{queued_mail_url}}
+
+        The message was not sent. Review the member's profile if this delivery was unexpected.
+      TEXT
     }
   }.tap do |templates|
     templates['slack_signup_nag'] = templates['slack_signup_reminder']

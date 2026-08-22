@@ -1,6 +1,7 @@
 class QueuedMail < ApplicationRecord
   include QueuedMailReminderDeliveries
   include QueuedMailApplicationLinkReminders
+  include QueuedMailMailerArgs
 
   STATUSES = %w[pending approved rejected].freeze
 
@@ -22,6 +23,10 @@ class QueuedMail < ApplicationRecord
   scope :unsent, -> { approved.where(sent_at: nil) }
   scope :failed, -> { approved.where(sent_at: nil).where.not(last_error: nil) }
   scope :newest_first, -> { order(created_at: :desc) }
+
+  def self.pending_ban_mail_for?(user)
+    exists?(recipient: user, mailer_action: 'membership_banned', status: %w[pending approved], sent_at: nil)
+  end
 
   def pending?  = status == 'pending'
   def approved? = status == 'approved'
@@ -46,7 +51,9 @@ class QueuedMail < ApplicationRecord
     template = EmailTemplate.find_enabled(action.to_s)
     variables = enqueue_render_variables(action, user, extra_args, template)
 
-    return deliver_immediately(template, dest, variables) if template&.send_immediately?
+    if !MailRecipientGuard.blocked?(user) && template&.send_immediately?
+      return deliver_immediately(template, dest, variables)
+    end
 
     record = if template
                create_queued_mail_from_template(
@@ -63,6 +70,7 @@ class QueuedMail < ApplicationRecord
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued #{action.to_s.humanize} to #{dest}")
+    MailRecipientGuard.block_delivery_to!(record)
     record
   end
 
@@ -78,8 +86,9 @@ class QueuedMail < ApplicationRecord
     extra_args = { reason: reason.presence }.compact
 
     variables = MemberMailer.build_template_variables(template_recipient, extra_args)
+    blocked = MailRecipientGuard.blocked?(recipient_user) || MailRecipientGuard.blocked_email?(dest)
 
-    return deliver_immediately(template, dest, variables) if template&.send_immediately?
+    return deliver_immediately(template, dest, variables) if !blocked && template&.send_immediately?
 
     record = if template
                create_queued_mail_from_template(
@@ -96,6 +105,7 @@ class QueuedMail < ApplicationRecord
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued application rejected to #{dest}")
+    MailRecipientGuard.block_delivery_to!(record)
     record
   end
 
@@ -170,9 +180,12 @@ class QueuedMail < ApplicationRecord
   end
 
   def approve!(reviewer)
+    return false if MailRecipientGuard.block_delivery_to!(self)
+
     update!(status: 'approved', reviewed_by: reviewer, reviewed_at: Time.current)
     MailLogEntry.log!(self, 'approved', actor: reviewer, details: "Approved for delivery to #{to}")
     QueuedMailDeliveryJob.perform_later(id)
+    true
   end
 
   def reject!(reviewer)
@@ -198,6 +211,8 @@ class QueuedMail < ApplicationRecord
   end
 
   def deliver_now!
+    return if MailRecipientGuard.block_delivery_to!(self)
+
     increment!(:send_attempts)
     QueuedMailMailer.deliver_queued(self).deliver_now
     sent_time = Time.current
@@ -250,42 +265,5 @@ class QueuedMail < ApplicationRecord
     variables = MemberMailer.build_template_variables(user, extra_args)
     ensure_admin_new_application_application_url!(variables, action, extra_args) if template
     variables
-  end
-
-  # Some mailer actions accept a trailing options hash positionally (opts = {}) while others use
-  # keyword arguments (e.g. training_completed(user, training_topic:)). build_mailer_args returns the
-  # options as a trailing Hash; splat it as keywords so keyword-based mailers receive it correctly.
-  # Ruby forwards **hash as a positional Hash to mailers that don't declare keyword params, so this
-  # is safe for both styles.
-  def self.dispatch_mailer(action, mailer_args)
-    if mailer_args.last.is_a?(Hash)
-      *positional, keyword_args = mailer_args
-      MemberMailer.public_send(action, *positional, **keyword_args)
-    else
-      MemberMailer.public_send(action, *mailer_args)
-    end
-  end
-
-  def self.build_mailer_args(action, user, to_addr, extra_args)
-    case action.to_s
-    when 'admin_new_application'
-      [user, to_addr || extra_args[:admin_email], extra_args.slice(:application_url)]
-    when 'payment_past_due'
-      [user, { days_overdue: extra_args[:days_overdue] }.compact]
-    when 'membership_cancelled', 'membership_banned', 'application_rejected'
-      [user, { reason: extra_args[:reason] }.compact]
-    when 'training_completed', 'trainer_capability_granted'
-      [user, { training_topic: extra_args[:training_topic] }.compact]
-    when 'training_requested'
-      [user, extra_args.slice(:training_topic, :requester_name, :requester_email, :requester_slack,
-                              :share_contact_info, :recipient_role, :trainer_names, :to)]
-    when 'parking_permit_issued', 'parking_ticket_issued',
-         'parking_permit_expired', 'parking_ticket_expired'
-      [user, extra_args.slice(:location, :location_detail, :description, :expires_at, :notice_type)]
-    when 'login_link_sent'
-      [user, extra_args.slice(:login_url)]
-    else
-      [user]
-    end
   end
 end

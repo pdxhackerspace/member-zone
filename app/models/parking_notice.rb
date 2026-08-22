@@ -28,6 +28,7 @@ class ParkingNotice < ApplicationRecord
   scope :cleared_notices, -> { where(status: 'cleared') }
   scope :not_cleared, -> { where.not(status: 'cleared') }
   scope :needing_expiration, -> { active_notices.where(expires_at: ..Time.current) }
+  scope :remindable, -> { not_cleared.where(status: %w[active expired]) }
   scope :ordered, -> { order(expires_at: :asc) }
   scope :newest_first, -> { order(created_at: :desc) }
   scope :for_user, ->(user) { where(user: user) }
@@ -164,8 +165,38 @@ class ParkingNotice < ApplicationRecord
       location_detail: location_detail.to_s,
       description: description.to_s,
       expires_at: expires_at.strftime('%B %d, %Y'),
-      notice_type: notice_type_display
+      notice_type: notice_type_display,
+      parking_notice_id: id
     )
+  end
+
+  def template_key_for_reminder_phase(phase)
+    case phase
+    when :pre_expiration then expiring_soon_template_key
+    when :expiration then expired_template_key
+    when :overdue then overdue_reminder_template_key
+    when :final then final_reminder_template_key
+    end
+  end
+
+  def expiring_soon_template_key
+    permit? ? 'parking_permit_expiring_soon' : 'parking_ticket_expiring_soon'
+  end
+
+  def expired_template_key
+    permit? ? 'parking_permit_expired' : 'parking_ticket_expired'
+  end
+
+  def overdue_reminder_template_key
+    permit? ? 'parking_permit_overdue_reminder' : 'parking_ticket_overdue_reminder'
+  end
+
+  def final_reminder_template_key
+    permit? ? 'parking_permit_final_reminder' : 'parking_ticket_final_reminder'
+  end
+
+  def issued_template_key
+    permit? ? 'parking_permit_issued' : 'parking_ticket_issued'
   end
 
   private

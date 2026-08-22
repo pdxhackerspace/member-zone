@@ -1,0 +1,23 @@
+Blocked email delivery
+
+Member Zone refused to send an email because the recipient is marked as <%= @membership_state_label %>.
+
+Recipient
+---------
+Name: <%= @recipient_name %>
+Email: <%= @delivery_to %>
+Status: <%= @membership_state_label %>
+
+Blocked message
+---------------
+Subject: <%= @blocked_subject %>
+Action: <%= @mailer_action %>
+<% if @mailer_class.present? -%>
+Mailer: <%= @mailer_class %>
+<% end -%>
+<% if @queued_mail_url.present? -%>
+
+View the rejected queued message: <%= @queued_mail_url %>
+<% end -%>
+
+The message was not sent. Review the member's profile if this delivery was unexpected.

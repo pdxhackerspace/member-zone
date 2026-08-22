@@ -205,6 +205,30 @@ class MemberMailer < ApplicationMailer
     send_parking_notice_mail('parking_ticket_expired', user, opts)
   end
 
+  def parking_permit_expiring_soon(user, opts = {})
+    send_parking_notice_mail('parking_permit_expiring_soon', user, opts)
+  end
+
+  def parking_ticket_expiring_soon(user, opts = {})
+    send_parking_notice_mail('parking_ticket_expiring_soon', user, opts)
+  end
+
+  def parking_permit_overdue_reminder(user, opts = {})
+    send_parking_notice_mail('parking_permit_overdue_reminder', user, opts)
+  end
+
+  def parking_ticket_overdue_reminder(user, opts = {})
+    send_parking_notice_mail('parking_ticket_overdue_reminder', user, opts)
+  end
+
+  def parking_permit_final_reminder(user, opts = {})
+    send_parking_notice_mail('parking_permit_final_reminder', user, opts)
+  end
+
+  def parking_ticket_final_reminder(user, opts = {})
+    send_parking_notice_mail('parking_ticket_final_reminder', user, opts)
+  end
+
   def application_email_verification(email, opts = {})
     @email = email
     @organization = organization_name
@@ -356,6 +380,20 @@ class MemberMailer < ApplicationMailer
       mail(
         to: recipient.email,
         subject: "#{@organization}: Complete your membership application"
+      )
+    end
+  end
+
+  # Warns admins when outbound mail to a banned or deceased member was blocked.
+  def blocked_recipient_delivery_attempt(admin, details)
+    assign_blocked_recipient_delivery_vars(admin, details.symbolize_keys)
+
+    if send_from_template('blocked_recipient_delivery_attempt', admin, blocked_recipient_template_vars, to: admin.email)
+      # Email sent from database template
+    else
+      mail(
+        to: admin.email,
+        subject: "#{@organization}: Blocked email to #{@membership_state_label.downcase} member"
       )
     end
   end
@@ -632,6 +670,47 @@ class MemberMailer < ApplicationMailer
     )
   end
 
+  def assign_blocked_recipient_delivery_vars(admin, details)
+    recipient = details[:recipient]
+    queued_mail = details[:queued_mail]
+    @user = admin
+    @organization = organization_name
+    @recipient_name = recipient&.display_name || 'Unknown member'
+    @delivery_to = details[:delivery_to].presence || recipient&.email || 'Unknown'
+    @membership_state_label = membership_state_label_for(recipient)
+    @blocked_subject = details[:subject].presence || 'Unknown subject'
+    @mailer_action = details[:mailer_action].presence || 'unknown'
+    @mailer_class = details[:mailer_class]
+    @queued_mail_url = queued_mail_url_for(queued_mail)
+  end
+
+  def blocked_recipient_template_vars
+    {
+      recipient_name: @recipient_name,
+      delivery_to: @delivery_to,
+      membership_state_label: @membership_state_label,
+      blocked_subject: @blocked_subject,
+      mailer_action: @mailer_action,
+      mailer_class: @mailer_class.to_s,
+      queued_mail_url: @queued_mail_url.to_s
+    }
+  end
+
+  def membership_state_label_for(user)
+    return 'Banned or deceased' if user.blank?
+
+    MailRecipientGuard::MEMBERSHIP_STATE_LABELS.fetch(user.membership_state, user.membership_state.humanize)
+  end
+
+  def queued_mail_url_for(queued_mail)
+    return if queued_mail.blank?
+
+    queued_mail_url(queued_mail)
+  rescue ArgumentError, ActionController::UrlGenerationError
+    base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
+    "#{base}/queued_mails/#{queued_mail.id}"
+  end
+
   def send_parking_notice_mail(template_key, user, opts = {})
     @user = user
     @organization = organization_name
@@ -643,6 +722,11 @@ class MemberMailer < ApplicationMailer
       expires_at: opts[:expires_at].to_s,
       notice_type: opts[:notice_type].to_s
     }
+    @location = extra_vars[:location]
+    @location_detail = extra_vars[:location_detail]
+    @description = extra_vars[:description]
+    @expires_at = extra_vars[:expires_at]
+    @notice_type = extra_vars[:notice_type]
 
     subject_label = template_key.humanize.titleize
     if send_from_template(template_key, user, extra_vars)

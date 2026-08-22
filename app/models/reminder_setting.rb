@@ -19,6 +19,12 @@ class ReminderSetting < ApplicationRecord
       name: 'Orientation reminder',
       description: 'Reminder to approved members who have not had their building access orientation yet.',
       enabled: false
+    },
+    'parking_notices' => {
+      name: 'Parking notice reminders',
+      description: 'Pre-expiration, expiration, and follow-up reminders for parking permits and tickets. ' \
+                   'The initial issued email on creation is always sent.',
+      enabled: false
     }
   }.freeze
 
