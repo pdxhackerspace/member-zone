@@ -14,9 +14,7 @@ module Notifications
       @verification_token = verification_token
     end
 
-    def present?
-      @category.present?
-    end
+    delegate :present?, to: :@category, allow_nil: true
 
     def mandatory?
       present? && !NotificationCategory.opt_out_allowed?(@category.key)
@@ -27,7 +25,7 @@ module Notifications
     end
 
     def html
-      return '' unless present?
+      return '' if @category.blank?
 
       if opt_out_allowed?
         opt_out_html
@@ -39,7 +37,7 @@ module Notifications
     end
 
     def text
-      return '' unless present?
+      return '' if @category.blank?
 
       if opt_out_allowed?
         opt_out_text
