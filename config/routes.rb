@@ -326,7 +326,11 @@ Rails.application.routes.draw do
     post :provision_core_groups, on: :member
   end
   resource :membership_settings, only: [:show, :edit, :update], path: "settings/membership"
-  resources :reminder_settings, only: [:index, :show, :update], path: "settings/reminders", param: :key
+  resources :reminder_settings, only: [:index, :show, :update], path: "settings/reminders", param: :key do
+    member do
+      post :send_now
+    end
+  end
   resources :email_notification_opt_outs, only: %i[index destroy], path: "settings/email-opt-outs"
   resources :ai_providers, except: [:show], path: "settings/ai-providers"
   resources :ai_ollama_profiles, only: [:index, :edit, :update], path: "settings/ai-services" do

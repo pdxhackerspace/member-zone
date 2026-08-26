@@ -3,7 +3,15 @@ class ReminderSettingsController < AdminController
 
   PER_PAGE = 50
 
-  before_action :set_reminder_setting, only: %i[show update]
+  RUNNERS = {
+    'slack_signup' => Reminders::NotifySlackSignup,
+    'application_link' => Reminders::NotifyApplicationLink,
+    'payment_overdue' => Reminders::NotifyPaymentOverdue,
+    'orientation' => Reminders::NotifyOrientation,
+    'parking_notices' => Reminders::NotifyParkingNotices
+  }.freeze
+
+  before_action :set_reminder_setting, only: %i[show update send_now]
 
   def index
     ReminderSetting.seed_defaults!
@@ -42,6 +50,23 @@ class ReminderSettingsController < AdminController
     end
   end
 
+  def send_now
+    runner = RUNNERS[@reminder_setting.key]
+    unless runner
+      redirect_to reminder_settings_path, alert: 'Unknown reminder type.'
+      return
+    end
+
+    blocked = send_now_blocked_reason(@reminder_setting)
+    if blocked
+      redirect_to reminder_settings_path, alert: blocked
+      return
+    end
+
+    runner.call
+    redirect_to reminder_settings_path, notice: "#{@reminder_setting.name} run finished."
+  end
+
   private
 
   def set_reminder_setting
@@ -50,6 +75,19 @@ class ReminderSettingsController < AdminController
 
   def reminder_setting_params
     params.expect(reminder_setting: %i[enabled allow_opt_out])
+  end
+
+  def send_now_blocked_reason(reminder)
+    return "#{reminder.name} is disabled." unless reminder.enabled?
+
+    case reminder.key
+    when 'slack_signup'
+      'Slack member source is disabled.' unless MemberSource.enabled?('slack')
+    when 'application_link'
+      unless Reminders::ApplicationLinkEligibility.active?
+        'Application link reminders require the built-in membership application.'
+      end
+    end
   end
 
   def load_show_data
