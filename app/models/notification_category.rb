@@ -127,6 +127,12 @@ class NotificationCategory
       all.select(&:reminder_key)
     end
 
+    def each_entry
+      return enum_for(:each_entry) unless block_given?
+
+      CATALOG.each_key { |key| yield find(key) }
+    end
+
     def opt_out_allowed?(category_key)
       entry = find(category_key)
       return false unless entry&.reminder_key

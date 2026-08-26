@@ -74,7 +74,7 @@ class NotificationPreferencesController < ApplicationController
 
   def apply_bulk_updates
     permitted = params.fetch(:preferences, {}).permit!.to_h
-    NotificationCategory.all.each do |entry|
+    NotificationCategory.each_entry do |entry|
       next unless NotificationCategory.opt_out_allowed?(entry.key)
 
       channels = permitted[entry.key]
