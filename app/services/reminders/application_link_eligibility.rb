@@ -69,6 +69,7 @@ module Reminders
           cutoff, cutoff
         )
         .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+        .then { |scope| Notifications::EligibilityOptOuts.verification_scope_excluding_opt_outs(scope, 'application_link') }
     end
 
     def self.base_verification?(verification)

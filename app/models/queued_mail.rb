@@ -48,6 +48,11 @@ class QueuedMail < ApplicationRecord
     dest = to || user.email
     return nil if dest.blank?
 
+    if Notifications::DeliveryGate.blocked?(mailer_action: action, user: user, email: dest)
+      Rails.logger.info("[QueuedMail] Suppressed #{action} to #{dest}: notification opt-out")
+      return nil
+    end
+
     template = EmailTemplate.find_enabled(action.to_s)
     variables = enqueue_render_variables(action, user, extra_args, template)
 

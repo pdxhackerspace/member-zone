@@ -5,6 +5,7 @@ module QueuedMailApplicationLinkReminders
     def enqueue_application_link_reminder(verification, reason: nil, **extra_args)
       dest = verification.email
       return nil if dest.blank?
+      return nil if suppress_application_link_reminder?(dest)
 
       recipient = verification_recipient_for(verification)
       action = 'application_link_reminder'
@@ -34,6 +35,13 @@ module QueuedMailApplicationLinkReminders
         email: verification.email,
         username: 'Not set'
       )
+    end
+
+    def suppress_application_link_reminder?(dest)
+      return false unless Notifications::DeliveryGate.blocked?(mailer_action: 'application_link_reminder', email: dest)
+
+      Rails.logger.info("[QueuedMail] Suppressed application_link_reminder to #{dest}: notification opt-out")
+      true
     end
   end
 end

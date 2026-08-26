@@ -49,6 +49,14 @@ Rails.application.routes.draw do
   get  "/login_link/:token", to: "login_links#authenticate", as: :login_link_authenticate
   get  "/profile/login_link", to: "login_links#show", as: :login_link
   post "/profile/login_link/regenerate", to: "login_links#regenerate", as: :login_link_regenerate
+  get  "/profile/notifications", to: "notification_preferences#show", as: :notification_preferences
+  patch "/profile/notifications", to: "notification_preferences#update"
+  post "/profile/notifications/opt_out", to: "notification_preferences#opt_out", as: :notification_preferences_opt_out
+  get  "/notifications/:token", to: "notification_preferences#show", as: :token_notification_preferences
+  patch "/notifications/:token", to: "notification_preferences#update"
+  post "/notifications/:token/opt_out", to: "notification_preferences#opt_out", as: :token_notification_preferences_opt_out
+  get  "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#show", as: :applicant_notification_opt_out
+  post "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#create"
 
   post "/webhooks/:slug", to: "webhooks#receive", as: :webhook_receive
 
@@ -319,6 +327,7 @@ Rails.application.routes.draw do
   end
   resource :membership_settings, only: [:show, :edit, :update], path: "settings/membership"
   resources :reminder_settings, only: [:index, :show, :update], path: "settings/reminders", param: :key
+  resources :email_notification_opt_outs, only: %i[index destroy], path: "settings/email-opt-outs"
   resources :ai_providers, except: [:show], path: "settings/ai-providers"
   resources :ai_ollama_profiles, only: [:index, :edit, :update], path: "settings/ai-services" do
     collection do

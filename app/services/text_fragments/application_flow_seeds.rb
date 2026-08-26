@@ -8,6 +8,7 @@ module TextFragments
       seed_check_email!
       seed_gate_intro!
       seed_overdue_apology!
+      seed_email_opted_out!
     end
 
     def seed_check_email!
@@ -47,6 +48,17 @@ module TextFragments
             by volunteers, and sometimes review can take longer than we'd like. Thank you for your patience
             while our team catches up.
           </p>
+        HTML
+      )
+    end
+
+    def seed_email_opted_out!
+      TextFragment.ensure_exists!(
+        key: 'application_email_opted_out',
+        title: 'Application email opted out',
+        content: <<~HTML
+          <p>This email address has opted out of messages from us.</p>
+          <p>To opt back in and apply for membership, please email <a href="mailto:info@pdxhackerspace.org">info@pdxhackerspace.org</a> from this same address.</p>
         HTML
       )
     end

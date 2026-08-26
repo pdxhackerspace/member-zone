@@ -1,0 +1,25 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Turn off application reminders</h1>
+    <div class="text-13 text-secondary mt-1">
+      You will stop receiving application verification and reminder emails at this address.
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <p class="text-13 mb-3"><%= @entry.description %></p>
+    <%= button_to "Turn off email reminders",
+          applicant_notification_opt_out_path(token: @verification.token),
+          method: :post,
+          params: { category: @category, channel: 'email' },
+          class: "btn btn-outline-secondary btn-sm",
+          form: { class: "d-inline" } %>
+    <%= link_to "Keep receiving reminders", apply_new_path, class: "btn btn-outline-secondary btn-sm ms-2" %>
+  </div>
+</div>
+
+<p class="text-12 text-secondary">
+  To apply for membership later, you will need to contact us from this email address to opt back in.
+</p>

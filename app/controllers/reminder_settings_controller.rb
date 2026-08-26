@@ -7,6 +7,7 @@ class ReminderSettingsController < AdminController
 
   def index
     ReminderSetting.seed_defaults!
+    ReminderSetting.sync_catalog_attributes!
     @reminder_settings = ReminderSetting.ordered
     @slack_due_count = Reminders::SlackSignupEligibility.count_due
     @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
@@ -48,7 +49,7 @@ class ReminderSettingsController < AdminController
   end
 
   def reminder_setting_params
-    params.expect(reminder_setting: [:enabled])
+    params.expect(reminder_setting: %i[enabled allow_opt_out])
   end
 
   def load_show_data

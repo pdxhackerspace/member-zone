@@ -1,1 +1,4 @@
 <%= yield %>
+<% if @notification_footer&.present? %>
+<%= @notification_footer.text %>
+<% end %>

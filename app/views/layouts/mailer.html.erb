@@ -109,6 +109,9 @@
     <div class="email-wrapper">
       <div class="email-content">
         <%= yield %>
+        <% if @notification_footer&.present? %>
+          <%= @notification_footer.html.html_safe %>
+        <% end %>
       </div>
       <div class="email-footer">
         <p>&copy; <%= Date.current.year %> <%= ENV.fetch('ORGANIZATION_NAME', 'Member Zone') %></p>

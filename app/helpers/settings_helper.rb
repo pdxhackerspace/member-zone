@@ -91,6 +91,8 @@ module SettingsHelper
       { category: 'Communications', title: 'Reminders',
         desc: 'Automated member reminders with preview of who would be emailed.', path: reminder_settings_path,
         attention_count: settings_attention_counts[:reminders_due] },
+      { category: 'Communications', title: 'Email opt-outs',
+        desc: 'Email addresses that opted out of applicant reminders.', path: email_notification_opt_outs_path },
       { category: 'Communications', title: 'Documents', privilege: :'training.documents.view_all',
         desc: 'Member documents and training-topic attachments.', path: documents_path },
       { category: 'Communications', title: 'Login branding', privilege: :'settings.defaults',

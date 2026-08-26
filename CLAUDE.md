@@ -56,7 +56,7 @@ Roles are treated as portable configuration, not data: `rails roles:export` / `r
 
 ### External integrations
 
-Each integration follows the same shape: a service namespace under `app/services/`, jobs under `app/jobs/`, a rake task, and a "Sync now" button in the UI.
+Each integration follows the same shape: a service namespace under `app/services/`, jobs under `app/jobs/`, a rake task, and a "Sync now" button in the UI. Member notification opt-outs are enforced in `Notifications::DeliveryGate` — see `docs/notifications.md`.
 
 | Source | Services | Direction |
 | --- | --- | --- |

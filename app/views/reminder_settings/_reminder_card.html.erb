@@ -10,12 +10,22 @@
         </div>
         <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
         <%= yield %>
+        <% opted_out_count = NotificationOptOut.count_for_reminder(reminder.key) %>
+        <% if opted_out_count.positive? %>
+          <div class="text-12 text-secondary mt-1">
+            <span class="text-body"><%= opted_out_count %></span> members opted out
+          </div>
+        <% end %>
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2">
-        <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex align-items-center gap-2 mb-0" do |f| %>
+        <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex flex-wrap align-items-center gap-3 mb-0" do |f| %>
           <div class="form-check form-switch mb-0">
             <%= f.check_box :enabled, class: 'form-check-input', role: 'switch', id: "reminder_enabled_#{reminder.key}" %>
             <%= f.label :enabled, reminder.enabled? ? 'Enabled' : 'Disabled', class: 'form-check-label text-13 text-nowrap', for: "reminder_enabled_#{reminder.key}" %>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <%= f.check_box :allow_opt_out, class: 'form-check-input', role: 'switch', id: "reminder_allow_opt_out_#{reminder.key}" %>
+            <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
           </div>
           <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm', data: { turbo: false } %>
         <% end %>
