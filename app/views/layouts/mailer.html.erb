@@ -81,6 +81,19 @@
         text-decoration: underline;
       }
       
+      .email-banner {
+        margin-bottom: 24px;
+        padding: 16px 18px;
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+        border-radius: 4px;
+        font-size: 15px;
+      }
+
+      .email-banner p:last-child {
+        margin-bottom: 0;
+      }
+      
       .email-footer {
         margin-top: 32px;
         padding-top: 16px;
@@ -108,6 +121,11 @@
   <body>
     <div class="email-wrapper">
       <div class="email-content">
+        <% if @email_banner&.present? %>
+          <div class="email-banner">
+            <%= @email_banner.html.html_safe %>
+          </div>
+        <% end %>
         <%= yield %>
         <% if @notification_footer&.present? %>
           <%= @notification_footer.html.html_safe %>

@@ -98,7 +98,7 @@ module SettingsHelper
       { category: 'Communications', title: 'Login branding', privilege: :'settings.defaults',
         desc: 'Login screen text, branding image, and background uploads.', path: branding_default_settings_path },
       { category: 'Communications', title: 'Text fragments', privilege: :'text_fragments.manage',
-        desc: 'Reusable HTML snippets for help text and system messages.', path: text_fragments_path }
+        desc: 'Reusable HTML snippets for help text, system messages, and the optional email banner.', path: text_fragments_path }
     ]
   end
 

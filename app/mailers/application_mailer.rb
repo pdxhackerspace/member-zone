@@ -6,6 +6,7 @@ class ApplicationMailer < ActionMailer::Base
   around_deliver :log_member_zone_mail_delivery
 
   def mail(headers = {}, &)
+    assign_email_banner
     assign_notification_footer_context
     super
   end
@@ -91,6 +92,10 @@ class ApplicationMailer < ActionMailer::Base
 
   def notification_recipient_email
     Array(message.to).compact.first || @notification_recipient_user&.email || @email
+  end
+
+  def assign_email_banner
+    @email_banner = Emails::BannerPresenter.for_email
   end
 
   def assign_notification_footer_context
