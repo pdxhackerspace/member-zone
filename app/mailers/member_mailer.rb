@@ -609,11 +609,8 @@ class MemberMailer < ApplicationMailer
     return false if to_address.blank?
 
     mail(to: to_address, subject: rendered[:subject]) do |format|
-      body_text = rendered[:body_text]
-      footer_text = @notification_footer&.text.to_s
-      body_text = "#{body_text}\n\n#{footer_text}".strip if footer_text.present? && body_text.present?
       format.html { render html: rendered[:body_html].html_safe, layout: 'mailer' }
-      format.text { render plain: body_text.presence || footer_text }
+      format.text { render plain: plain_text_email_body(rendered[:body_text]) }
     end
 
     true

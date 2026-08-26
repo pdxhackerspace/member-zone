@@ -9,7 +9,8 @@ class QueuedMailMailer < ApplicationMailer
 
     mail(to: queued_mail.to, subject: queued_mail.subject) do |format|
       format.html { render html: @body_html.html_safe, layout: 'mailer' }
-      format.text { render plain: @body_text } if @body_text.present?
+      plain = plain_text_email_body(@body_text)
+      format.text { render plain: plain } if plain.present?
     end
   end
 
@@ -27,8 +28,6 @@ class QueuedMailMailer < ApplicationMailer
       email: queued_mail.to,
       verification_token: verification_token
     )
-    footer_text = @notification_footer.text
-    @body_text = "#{@body_text}\n\n#{footer_text}".strip if footer_text.present? && @body_text.present?
   end
 
   def verification_token_for(queued_mail)

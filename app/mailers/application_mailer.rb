@@ -119,6 +119,15 @@ class ApplicationMailer < ActionMailer::Base
     "#{text}\n\n#{footer}".strip
   end
 
+  def plain_text_email_body(body = nil)
+    parts = []
+    parts << @email_banner.text if @email_banner&.present?
+    parts << body if body.present?
+    footer = @notification_footer&.text
+    parts << footer if footer.present?
+    parts.join("\n\n").presence
+  end
+
   def mail_body_html
     return message.html_part&.body&.decoded if message.multipart?
     return message.body.decoded if message.mime_type == 'text/html'

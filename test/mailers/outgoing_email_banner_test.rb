@@ -46,8 +46,32 @@ class OutgoingEmailBannerTest < ActionMailer::TestCase
 
     mail = QueuedMailMailer.deliver_queued(qm)
     html = mail.html_part.body.decoded
+    text = mail.text_part.body.decoded
 
     assert_includes html, 'Queued mail banner notice.'
     assert_includes html, 'email-banner'
+    assert_includes text, 'Queued mail banner notice.'
+    assert_operator text.index('Queued mail banner notice.'), :<, text.index(qm.body_text.strip.lines.first.strip)
+  end
+
+  test 'templated member mail puts banner before body in text part' do
+    TextFragment.ensure_exists!(
+      key: 'outgoing_email_banner',
+      title: 'Outgoing email banner',
+      content: '<p>Top announcement.</p>'
+    )
+    EmailTemplate.create!(
+      key: 'payment_past_due',
+      name: 'Payment past due',
+      enabled: true,
+      subject: 'Payment due',
+      body_html: '<p>Template body for {{member_name}}.</p>',
+      body_text: 'Template body for {{member_name}}.'
+    )
+
+    mail = MemberMailer.payment_past_due(@user, days_overdue: 7)
+    text = mail.text_part.body.decoded
+
+    assert_operator text.index('Top announcement.'), :<, text.index('Template body for Regular Member.')
   end
 end
