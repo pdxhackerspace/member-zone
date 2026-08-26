@@ -53,6 +53,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Quick actions/i, response.body)
     assert_match(/Membership/i, response.body)
     assert_match(/Request training/i, response.body)
+    assert_select 'a.action-card[href=?]', notification_preferences_path, text: /Notifications/
+    assert_select 'a.nav-link[href=?]', notification_preferences_path, text: /Notifications/
   end
 
   test 'admin home includes normal user tabs' do
