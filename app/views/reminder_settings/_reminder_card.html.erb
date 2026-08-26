@@ -1,11 +1,11 @@
 <%# Card chrome shared by every reminder. The block supplies the counts and timing lines,
     which are the only part that differs between them. %>
-<div class="card shadow-sm border-0 mb-3">
-  <div class="card-body">
-    <div class="d-flex align-items-center gap-2 mb-1">
-      <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
-      <h2 class="h5 mb-0"><%= reminder.name %></h2>
-    </div>
+<div class="card reminder-setting-card mb-4">
+  <div class="card-header reminder-setting-card-header d-flex align-items-center gap-2 py-2">
+    <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
+    <h2 class="h5 mb-0"><%= reminder.name %></h2>
+  </div>
+  <div class="card-body reminder-setting-card-body py-3">
     <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
     <%= yield %>
     <% opted_out_count = NotificationOptOut.count_for_reminder(reminder.key) %>
@@ -14,8 +14,9 @@
         <span class="text-body"><%= opted_out_count %></span> members opted out
       </div>
     <% end %>
-
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 pt-3 border-top">
+  </div>
+  <div class="card-footer reminder-setting-card-footer">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
       <%= form_with model: reminder,
                     url: reminder_setting_path(reminder.key),
                     method: :patch,
