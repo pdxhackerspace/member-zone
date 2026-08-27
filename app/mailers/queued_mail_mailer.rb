@@ -3,6 +3,9 @@ class QueuedMailMailer < ApplicationMailer
   after_action :mark_skip_duplicate_mail_log
 
   def deliver_queued(queued_mail)
+    @queued_mail = queued_mail
+    @notification_mailer_action = queued_mail.mailer_action
+    @notification_recipient_user = queued_mail.recipient
     @body_html = queued_mail.body_html
     @body_text = queued_mail.body_text
     assign_queued_notification_footer(queued_mail)

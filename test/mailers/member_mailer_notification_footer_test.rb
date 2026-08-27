@@ -39,10 +39,15 @@ class MemberMailerNotificationFooterTest < ActionMailer::TestCase
       username: 'Not set'
     )
 
-    mail = MemberMailer.application_link_reminder(recipient, application_url: 'https://example.com/apply')
+    mail = MemberMailer.application_link_reminder(
+      recipient,
+      application_url: 'https://example.com/apply',
+      verification_token: 'applicant-verification-token'
+    )
 
     assert_equal [recipient.email], mail.to
     assert_includes mail.subject, 'Complete your membership application'
+    assert_includes mail.text_part.body.decoded, '/apply/notifications/applicant-verification-token'
   end
 
   test 'application_rejected fallback renders for applicant recipient' do

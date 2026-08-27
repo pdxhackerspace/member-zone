@@ -372,6 +372,7 @@ class MemberMailer < ApplicationMailer
     @user = recipient
     @organization = organization_name
     @application_url = opts[:application_url] || opts['application_url']
+    @notification_verification_token = opts[:verification_token] || opts['verification_token']
 
     extra_vars = { application_url: @application_url.to_s }
 

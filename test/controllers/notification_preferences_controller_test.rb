@@ -48,6 +48,22 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to token_notification_preferences_path(token: token)
   end
 
+  test 'token link applies to token owner when another user is signed in' do
+    token = @member.generate_token_for(:notification_preferences)
+
+    with_local_auth do
+      sign_in_as_admin
+      assert_difference -> { NotificationOptOut.where(user: @member).count }, 1 do
+        post token_notification_preferences_opt_out_path(token: token),
+             params: { category: 'payment_overdue', channel: 'email' }
+      end
+    end
+
+    assert NotificationOptOut.opted_out?(@member, category: 'payment_overdue', channel: 'email')
+    admin = User.by_email(local_accounts(:active_admin).email)
+    assert_not NotificationOptOut.opted_out?(admin, category: 'payment_overdue', channel: 'email')
+  end
+
   test 'invalid token redirects to login' do
     get token_notification_preferences_path(token: 'invalid-token')
     assert_redirected_to login_path

@@ -1,5 +1,5 @@
 class MailLogEntry < ApplicationRecord
-  EVENTS = %w[created edited regenerated approved rejected sent send_failed].freeze
+  EVENTS = %w[created edited regenerated approved rejected sent send_failed suppressed].freeze
 
   belongs_to :queued_mail, optional: true
   belongs_to :actor, class_name: 'User', optional: true

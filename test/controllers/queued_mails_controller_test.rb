@@ -167,6 +167,28 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to queued_mail_path(@approved)
   end
 
+  test 'approve shows opt-out alert when recipient unsubscribed after queueing' do
+    ReminderSetting.seed_defaults!
+    user = users(:member_with_local_account)
+    mail = QueuedMail.create!(
+      to: user.email,
+      subject: 'Payment reminder',
+      body_html: '<p>Hi</p>',
+      body_text: 'Hi',
+      reason: 'Test',
+      mailer_action: 'payment_past_due',
+      recipient: user,
+      status: 'pending'
+    )
+    NotificationOptOut.opt_out!(user, category: 'payment_overdue', channel: 'email')
+
+    post approve_queued_mail_path(mail)
+
+    assert_redirected_to queued_mail_path(mail)
+    assert_match 'opted out of overdue payment reminders', flash[:alert]
+    assert_no_match 'banned', flash[:alert]
+  end
+
   # ─── Reject ──────────────────────────────────────────────────────
 
   test 'rejects pending mail' do
