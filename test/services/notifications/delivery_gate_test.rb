@@ -78,7 +78,7 @@ module Notifications
       )
 
       assert_includes footer.text, '/apply/notifications/applicant-verification-token'
-      refute_includes footer.text, 'http://www.example.com/notifications/'
+      assert_not_includes footer.text, 'http://www.example.com/notifications/'
     end
 
     test 'footer for application rejected applicant recipient does not raise' do
