@@ -25,11 +25,14 @@ module Notifications
         category = NotificationCategory.for_mailer_action(mailer_action)
         return FooterPresenter.none unless category
 
+        preferences_token = user&.generate_token_for(:notification_preferences) if user.present?
+
         FooterPresenter.new(
           category: category,
           user: user,
           email: email,
-          verification_token: verification_token
+          verification_token: verification_token,
+          notification_preferences_token: preferences_token
         )
       end
 

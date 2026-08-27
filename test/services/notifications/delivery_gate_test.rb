@@ -47,6 +47,16 @@ module Notifications
       assert_includes footer.text, 'http'
     end
 
+    test 'footer for member uses signed token url' do
+      footer = DeliveryGate.footer_for(mailer_action: 'payment_past_due', user: @user)
+
+      assert_match %r{/notifications/[^?\s]+}, footer.text
+      assert_not_includes footer.text, '/profile/notifications'
+
+      token = footer.text[%r{/notifications/([^?\s]+)}, 1]
+      assert_equal @user, User.find_by_token_for(:notification_preferences, token)
+    end
+
     test 'footer for mandatory category explains requirement' do
       footer = DeliveryGate.footer_for(mailer_action: 'parking_permit_issued', user: @user)
       assert footer.mandatory?

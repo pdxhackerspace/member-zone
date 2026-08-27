@@ -24,9 +24,15 @@ class EmailNotificationOptOut < ApplicationRecord
   end
 
   def self.opt_out!(email, category:, channel: 'email', source: 'email_link')
-    find_or_create_by!(email: SensitiveData.normalize_email(email), category: category, channel: channel) do |record|
-      record.source = source
-    end
+    normalized = SensitiveData.normalize_email(email)
+    digest = SensitiveData.email_digest(normalized)
+    raise ActiveRecord::RecordInvalid if digest.blank?
+
+    record = find_or_initialize_by(email_lookup_digest: digest, category: category, channel: channel)
+    record.email = normalized
+    record.source = source
+    record.save!
+    record
   end
 
   def self.opt_in!(email, category:, channel: 'email')

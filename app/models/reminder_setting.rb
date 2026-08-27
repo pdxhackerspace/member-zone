@@ -53,7 +53,7 @@ class ReminderSetting < ApplicationRecord
   def self.sync_catalog_attributes!
     CATALOG.each do |key, attrs|
       setting = find_or_initialize_by(key: key)
-      setting.assign_attributes(attrs.slice(:name, :description, :allow_opt_out))
+      setting.assign_attributes(attrs.slice(:name, :description))
       setting.save! if setting.changed?
     end
   end

@@ -156,6 +156,16 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert reminder.reload.enabled?
   end
 
+  test 'index preserves admin allow_opt_out changes' do
+    reminder = ReminderSetting.find_by!(key: 'payment_overdue')
+    reminder.update!(allow_opt_out: false)
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_not reminder.reload.allow_opt_out?
+  end
+
   test 'send now runs slack signup reminder when enabled' do
     reminder = ReminderSetting.find_by!(key: 'slack_signup')
     reminder.update!(enabled: true)

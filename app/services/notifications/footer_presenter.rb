@@ -7,11 +7,12 @@ module Notifications
       new(category: nil)
     end
 
-    def initialize(category:, user: nil, email: nil, verification_token: nil)
+    def initialize(category:, user: nil, email: nil, verification_token: nil, notification_preferences_token: nil)
       @category = category
       @user = user
       @email = email
       @verification_token = verification_token
+      @notification_preferences_token = notification_preferences_token
     end
 
     delegate :present?, to: :@category, allow_nil: true
@@ -91,25 +92,31 @@ module Notifications
     end
 
     def preferences_url
-      if @user.present?
-        notification_preferences_url(highlight: @category.key, **default_url_options)
+      if @user.present? && @notification_preferences_token.present?
+        token_notification_preferences_url(
+          token: @notification_preferences_token,
+          highlight: @category.key,
+          **default_url_options
+        )
       elsif @verification_token.present?
         applicant_notification_opt_out_url(@verification_token, category: @category.key, **default_url_options)
       end
     rescue ArgumentError, ActionController::UrlGenerationError
       base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
-      if @user.present?
-        "#{base}/profile/notifications?highlight=#{@category.key}"
+      if @user.present? && @notification_preferences_token.present?
+        "#{base}/notifications/#{@notification_preferences_token}?highlight=#{@category.key}"
       elsif @verification_token.present?
         "#{base}/apply/notifications/#{@verification_token}/opt-out?category=#{@category.key}"
       end
     end
 
     def manage_notifications_url
-      notification_preferences_url(**default_url_options) if @user.present?
+      return unless @user.present? && @notification_preferences_token.present?
+
+      token_notification_preferences_url(token: @notification_preferences_token, **default_url_options)
     rescue ArgumentError, ActionController::UrlGenerationError
       base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
-      @user.present? ? "#{base}/profile/notifications" : nil
+      "#{base}/notifications/#{@notification_preferences_token}"
     end
 
     def default_url_options

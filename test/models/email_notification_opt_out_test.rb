@@ -20,4 +20,13 @@ class EmailNotificationOptOutTest < ActiveSupport::TestCase
     assert record
     assert_equal email, record.email
   end
+
+  test 'opt_out! is idempotent for the same email' do
+    email = 'duplicate-opt-out@example.com'
+
+    assert_difference -> { EmailNotificationOptOut.count }, 1 do
+      EmailNotificationOptOut.opt_out!(email, category: 'application_link')
+      EmailNotificationOptOut.opt_out!(email, category: 'application_link')
+    end
+  end
 end
