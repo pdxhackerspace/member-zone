@@ -10,12 +10,13 @@ class NotificationCategoryTest < ActiveSupport::TestCase
     assert_empty missing, "Uncatalogued MemberMailer actions: #{missing.join(', ')}"
   end
 
-  test 'parking notices is the only reminder with opt-out disabled by default' do
+  test 'parking notices and application review are the only reminders with opt-out disabled by default' do
     ReminderSetting.seed_defaults!
-    parking = ReminderSetting.find_by!(key: 'parking_notices')
-    assert_not parking.allow_opt_out?
+    %w[parking_notices application_review].each do |key|
+      assert_not ReminderSetting.find_by!(key: key).allow_opt_out?, "expected #{key} to disallow opt-out"
+    end
 
-    (ReminderSetting::CATALOG.keys - ['parking_notices']).each do |key|
+    (ReminderSetting::CATALOG.keys - %w[parking_notices application_review]).each do |key|
       setting = ReminderSetting.find_by!(key: key)
       assert setting.allow_opt_out?, "expected #{key} to allow opt-out"
     end

@@ -30,7 +30,42 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Orientation reminder', response.body
     assert_select 'input[type=submit][value=Save]', count: 0
     assert_select 'form[data-controller=?]', 'reminder-setting-form'
-    assert_select 'button', text: 'Send now', minimum: 5
+    assert_select 'button', text: 'Send now', minimum: 6
+  end
+
+  test 'index lists application review reminder with preview counts' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Application review reminder', response.body
+    assert_match 'Remind for under review', response.body
+  end
+
+  test 'show lists due applications for application review' do
+    now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+    application = MembershipApplication.create!(
+      email: 'due-application-review@example.com',
+      status: 'submitted',
+      submitted_at: now - 8.days,
+      created_at: now - 8.days
+    )
+
+    travel_to now do
+      get reminder_setting_url('application_review')
+    end
+
+    assert_response :success
+    assert_match application.email, response.body
+  end
+
+  test 'update toggles remind_under_review for application review' do
+    reminder = ReminderSetting.find_by!(key: 'application_review')
+    reminder.update!(remind_under_review: false)
+
+    patch reminder_setting_url('application_review'), params: { reminder_setting: { remind_under_review: '1' } }
+
+    assert_redirected_to reminder_settings_url
+    assert reminder.reload.remind_under_review?
   end
 
   test 'show lists members waiting on their orientation' do

@@ -2,6 +2,6 @@ class MembershipApplicationReminderJob < ApplicationJob
   queue_as :default
 
   def perform
-    MembershipApplications::NotifyDirectorsOfStaleApplications.call
+    Reminders::NotifyApplicationReview.call
   end
 end

@@ -8,7 +8,8 @@ class ReminderSettingsController < AdminController
     'application_link' => Reminders::NotifyApplicationLink,
     'payment_overdue' => Reminders::NotifyPaymentOverdue,
     'orientation' => Reminders::NotifyOrientation,
-    'parking_notices' => Reminders::NotifyParkingNotices
+    'parking_notices' => Reminders::NotifyParkingNotices,
+    'application_review' => Reminders::NotifyApplicationReview
   }.freeze
 
   before_action :set_reminder_setting, only: %i[show update send_now]
@@ -33,6 +34,9 @@ class ReminderSettingsController < AdminController
     @parking_due_count = Reminders::ParkingNoticeEligibility.count_due
     @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
     @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
+    @application_review_due_count = Reminders::ApplicationReviewEligibility.count_due
+    @application_review_awaiting_count = Reminders::ApplicationReviewEligibility.total_awaiting
+    @application_review_email_template = EmailTemplate.find_by(key: 'staff_application_reminder')
     @building_access_topic = TrainingTopic.building_access
     @membership_setting = MembershipSetting.instance
   end
@@ -74,7 +78,9 @@ class ReminderSettingsController < AdminController
   end
 
   def reminder_setting_params
-    params.expect(reminder_setting: %i[enabled allow_opt_out])
+    permitted = %i[enabled allow_opt_out]
+    permitted << :remind_under_review if @reminder_setting.key == 'application_review'
+    params.expect(reminder_setting: permitted)
   end
 
   def send_now_blocked_reason(reminder)
@@ -95,11 +101,7 @@ class ReminderSettingsController < AdminController
 
     case @reminder_setting.key
     when 'slack_signup'
-      @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
-      @slack_due_count = @pagy.count
-      @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
-      @slack_source_enabled = MemberSource.enabled?('slack')
-      @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+      load_slack_signup_show_data
     when 'application_link'
       load_application_link_show_data
     when 'payment_overdue'
@@ -115,7 +117,24 @@ class ReminderSettingsController < AdminController
       @building_access_topic = TrainingTopic.building_access
     when 'parking_notices'
       load_parking_notices_show_data
+    when 'application_review'
+      load_application_review_show_data
     end
+  end
+
+  def load_slack_signup_show_data
+    @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
+    @slack_due_count = @pagy.count
+    @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
+    @slack_source_enabled = MemberSource.enabled?('slack')
+    @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+  end
+
+  def load_application_review_show_data
+    @pagy, @due_applications = pagy(Reminders::ApplicationReviewEligibility.due, limit: PER_PAGE)
+    @application_review_due_count = @pagy.count
+    @application_review_awaiting_count = Reminders::ApplicationReviewEligibility.total_awaiting
+    @application_review_email_template = EmailTemplate.find_by(key: 'staff_application_reminder')
   end
 
   def load_parking_notices_show_data

@@ -101,5 +101,19 @@
         Issued emails on creation are always sent and are not controlled by this toggle.
       </div>
     <% end %>
+  <% when 'application_review' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @application_review_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @application_review_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @application_review_awaiting_count %> stale awaiting review</span>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing: 1 week after submission, every 3 days
+        <% unless reminder.remind_under_review? %>
+          · Under review applications are excluded
+        <% end %>
+      </div>
+    <% end %>
   <% end %>
 <% end %>

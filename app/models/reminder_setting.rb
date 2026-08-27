@@ -30,6 +30,13 @@ class ReminderSetting < ApplicationRecord
                    'The initial issued email on creation is always sent.',
       enabled: false,
       allow_opt_out: false
+    },
+    'application_review' => {
+      name: 'Application review reminder',
+      description: 'Reminds executive reviewers when membership applications are waiting for a decision.',
+      enabled: false,
+      allow_opt_out: false,
+      remind_under_review: false
     }
   }.freeze
 

@@ -1,14 +1,15 @@
-# frozen_string_literal: true
-
 require 'test_helper'
 
-module MembershipApplications
-  class NotifyDirectorsOfStaleApplicationsTest < ActiveSupport::TestCase
+module Reminders
+  class NotifyApplicationReviewTest < ActiveSupport::TestCase
     include ActiveJob::TestHelper
 
     setup do
       ActionMailer::Base.deliveries.clear
       clear_enqueued_jobs
+      ReminderSetting.seed_defaults!
+      @setting = ReminderSetting.find_by!(key: 'application_review')
+      @setting.update!(enabled: true)
       EmailTemplate.where(key: 'staff_application_reminder').delete_all
       EmailTemplate.create!(
         key: 'staff_application_reminder',
@@ -24,6 +25,21 @@ module MembershipApplications
       clear_enqueued_jobs
     end
 
+    test 'does nothing when reminder is disabled' do
+      @setting.update!(enabled: false)
+      now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      stale_application(now: now, email: 'disabled-reminder@example.com')
+      train_staff(users(:one))
+
+      travel_to now do
+        assert_no_difference 'ActionMailer::Base.deliveries.size' do
+          perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
+            NotifyApplicationReview.call(now: now)
+          end
+        end
+      end
+    end
+
     test 'emails executive application reviewers for applications pending after a week' do
       now = Time.zone.local(2026, 5, 1, 9, 0, 0)
       application = stale_application(now: now, email: 'stale-review@example.com')
@@ -33,7 +49,7 @@ module MembershipApplications
       travel_to now do
         assert_difference 'ActionMailer::Base.deliveries.size', 2 do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -55,7 +71,7 @@ module MembershipApplications
 
       travel_to now do
         assert_enqueued_jobs 1, only: ActionMailer::MailDeliveryJob do
-          NotifyDirectorsOfStaleApplications.call(now: now)
+          NotifyApplicationReview.call(now: now)
         end
       end
     ensure
@@ -78,10 +94,44 @@ module MembershipApplications
       travel_to now do
         assert_no_difference 'ActionMailer::Base.deliveries.size' do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
+    end
+
+    test 'does not email under review applications when remind_under_review is off' do
+      now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      @setting.update!(remind_under_review: false)
+      train_staff(users(:one))
+      application = stale_application(now: now, email: 'under-review-off@example.com', status: 'under_review')
+
+      travel_to now do
+        assert_no_difference 'ActionMailer::Base.deliveries.size' do
+          perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
+            NotifyApplicationReview.call(now: now)
+          end
+        end
+      end
+
+      assert_nil application.reload.application_reminder_sent_at
+    end
+
+    test 'emails under review applications when remind_under_review is on' do
+      now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      @setting.update!(remind_under_review: true)
+      train_staff(users(:one))
+      application = stale_application(now: now, email: 'under-review-on@example.com', status: 'under_review')
+
+      travel_to now do
+        assert_difference 'ActionMailer::Base.deliveries.size', 1 do
+          perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
+            NotifyApplicationReview.call(now: now)
+          end
+        end
+      end
+
+      assert_equal now, application.reload.application_reminder_sent_at
     end
 
     test 'emails applications again when the previous reminder is at least three days old' do
@@ -96,7 +146,7 @@ module MembershipApplications
       travel_to now do
         assert_difference 'ActionMailer::Base.deliveries.size', 1 do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -116,7 +166,7 @@ module MembershipApplications
       travel_to now do
         assert_no_difference 'ActionMailer::Base.deliveries.size' do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -135,7 +185,7 @@ module MembershipApplications
       travel_to now do
         assert_difference 'ActionMailer::Base.deliveries.size', 1 do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -151,7 +201,7 @@ module MembershipApplications
       travel_to now do
         assert_no_difference 'ActionMailer::Base.deliveries.size' do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -161,6 +211,7 @@ module MembershipApplications
 
     test 'does not email applications parked as needs review' do
       now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      @setting.update!(remind_under_review: true)
       train_staff(users(:one))
       application = stale_application(
         now: now,
@@ -171,7 +222,7 @@ module MembershipApplications
       travel_to now do
         assert_no_difference 'ActionMailer::Base.deliveries.size' do
           perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
-            NotifyDirectorsOfStaleApplications.call(now: now)
+            NotifyApplicationReview.call(now: now)
           end
         end
       end
@@ -191,7 +242,6 @@ module MembershipApplications
       )
     end
 
-    # Reviewers are whoever holds applications.review through a role on a topic they hold.
     def train_staff(user)
       grant_privileges(user, 'applications.review')
     end

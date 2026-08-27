@@ -40,11 +40,22 @@
                   data: { reminder_setting_form_target: 'enabledLabel' } %>
           </div>
           <div class="form-check form-switch mb-0">
-            <%= f.check_box :allow_opt_out,
-                  class: 'form-check-input',
-                  role: 'switch',
-                  id: "reminder_allow_opt_out_#{reminder.key}" %>
-            <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
+            <% if reminder.key == 'application_review' %>
+              <%= f.check_box :remind_under_review,
+                    class: 'form-check-input',
+                    role: 'switch',
+                    id: "reminder_remind_under_review_#{reminder.key}" %>
+              <%= f.label :remind_under_review,
+                    'Remind for under review',
+                    class: 'form-check-label text-13 text-nowrap',
+                    for: "reminder_remind_under_review_#{reminder.key}" %>
+            <% else %>
+              <%= f.check_box :allow_opt_out,
+                    class: 'form-check-input',
+                    role: 'switch',
+                    id: "reminder_allow_opt_out_#{reminder.key}" %>
+              <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
+            <% end %>
           </div>
         </div>
       <% end %>
