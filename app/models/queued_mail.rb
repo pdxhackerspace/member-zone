@@ -192,6 +192,7 @@ class QueuedMail < ApplicationRecord
 
   def approve!(reviewer)
     return false if MailRecipientGuard.block_delivery_to!(self)
+    return false if Notifications::DeliveryGate.block_queued_delivery!(self)
 
     update!(status: 'approved', reviewed_by: reviewer, reviewed_at: Time.current)
     MailLogEntry.log!(self, 'approved', actor: reviewer, details: "Approved for delivery to #{to}")
@@ -223,6 +224,7 @@ class QueuedMail < ApplicationRecord
 
   def deliver_now!
     return if MailRecipientGuard.block_delivery_to!(self)
+    return if Notifications::DeliveryGate.block_queued_delivery!(self)
 
     increment!(:send_attempts)
     QueuedMailMailer.deliver_queued(self).deliver_now

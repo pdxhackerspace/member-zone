@@ -36,6 +36,23 @@ module Notifications
       assert DeliveryGate.blocked?(mailer_action: 'application_email_verification', email: email)
     end
 
+    test 'block_queued_delivery rejects opted-out queued mail' do
+      mail = QueuedMail.create!(
+        to: @user.email,
+        subject: 'Reminder',
+        body_html: '<p>Hi</p>',
+        body_text: 'Hi',
+        reason: 'Test',
+        mailer_action: 'payment_past_due',
+        recipient: @user,
+        status: 'approved'
+      )
+      NotificationOptOut.opt_out!(@user, category: 'payment_overdue', channel: 'email')
+
+      assert DeliveryGate.block_queued_delivery!(mail)
+      assert_predicate mail.reload, :rejected?
+    end
+
     test 'fails open for unknown mailer actions' do
       assert_not DeliveryGate.blocked?(mailer_action: 'totally_unknown_action', user: @user)
     end

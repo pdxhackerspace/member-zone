@@ -21,6 +21,19 @@ module Notifications
         end
       end
 
+      def block_queued_delivery!(queued_mail)
+        return false unless blocked?(
+          mailer_action: queued_mail.mailer_action,
+          user: queued_mail.recipient,
+          email: queued_mail.to
+        )
+        return true if queued_mail.rejected?
+
+        queued_mail.update!(status: 'rejected', reviewed_by: nil, reviewed_at: Time.current)
+        MailLogEntry.log!(queued_mail, 'rejected', details: 'Auto-rejected: recipient opted out')
+        true
+      end
+
       def footer_for(mailer_action:, user: nil, email: nil, verification_token: nil)
         category = NotificationCategory.for_mailer_action(mailer_action)
         return FooterPresenter.none unless category
