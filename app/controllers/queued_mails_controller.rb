@@ -63,7 +63,7 @@ class QueuedMailsController < AuthenticatedController
     @queued_mail.approve!(current_user)
     if @queued_mail.rejected?
       redirect_to queued_mail_path(@queued_mail),
-                  alert: MailRecipientGuard.blocked_recipient_alert_message(@queued_mail)
+                  alert: @queued_mail.approval_blocked_alert
       return
     end
 
@@ -102,14 +102,10 @@ class QueuedMailsController < AuthenticatedController
     end
 
     pending = QueuedMail.pending
-    count = pending.count
-    blocked = 0
-    pending.find_each do |qm|
-      blocked += 1 unless qm.approve!(current_user)
-    end
-    approved = count - blocked
-    notice = "Approved and sent #{approved} message#{'s' if approved != 1}."
-    notice += " #{blocked} blocked for banned or deceased recipients." if blocked.positive?
+    counts = QueuedMail.approve_all!(pending, current_user)
+    notice = "Approved and sent #{counts[:approved]} message#{'s' if counts[:approved] != 1}."
+    extras = QueuedMail.approve_all_notice_extras(counts)
+    notice += " #{extras}" if extras.present?
     redirect_to queued_mails_path, notice: notice
   end
 

@@ -37,12 +37,13 @@ class NotificationPreferencesController < ApplicationController
   end
 
   def set_subject_user
-    @subject_user = current_user
-    return if @subject_user.present?
-    return if params[:token].blank?
+    if params[:token].present?
+      @subject_user = User.find_by_token_for(:notification_preferences, params[:token])
+      @token_access = @subject_user.present?
+      return
+    end
 
-    @subject_user = User.find_by_token_for(:notification_preferences, params[:token])
-    @token_access = @subject_user.present?
+    @subject_user = current_user
   end
 
   def require_subject_user!

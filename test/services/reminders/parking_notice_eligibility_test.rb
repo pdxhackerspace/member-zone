@@ -22,6 +22,15 @@ module Reminders
       end
     end
 
+    test 'due excludes members who opted out of parking notices email' do
+      ReminderSetting.find_by!(key: 'parking_notices').update!(allow_opt_out: true)
+      NotificationOptOut.opt_out!(@user, category: 'parking_notices', channel: 'email')
+
+      travel_to @now do
+        assert_not_includes ParkingNoticeEligibility.due(now: @now), @notice.reload
+      end
+    end
+
     test 'pre_expiration not due when days before is zero' do
       MembershipSetting.instance.update!(parking_notice_reminder_days_before_expiration: 0)
 

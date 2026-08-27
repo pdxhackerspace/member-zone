@@ -70,13 +70,21 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   def notification_opt_out_blocked?
-    return false if MailRecipientGuard.admin_facing_delivery?(mailer_class: self.class.name, mailer_action: action_name)
+    return false if admin_facing_mailer_action?
 
     Notifications::DeliveryGate.blocked?(
-      mailer_action: action_name,
+      mailer_action: effective_mailer_action,
       user: notification_recipient_user,
       email: notification_recipient_email
     )
+  end
+
+  def admin_facing_mailer_action?
+    MailRecipientGuard::ADMIN_MAILER_ACTIONS.include?(effective_mailer_action)
+  end
+
+  def effective_mailer_action
+    @notification_mailer_action.presence || action_name
   end
 
   def notification_recipient_user
@@ -87,7 +95,7 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   def notification_opt_out_rejection_details
-    "Suppressed: recipient opted out of #{action_name}"
+    "Suppressed: recipient opted out of #{effective_mailer_action}"
   end
 
   def notification_recipient_email
@@ -105,7 +113,7 @@ class ApplicationMailer < ActionMailer::Base
     email ||= user&.email if user.respond_to?(:email)
 
     @notification_footer = Notifications::DeliveryGate.footer_for(
-      mailer_action: action_name,
+      mailer_action: effective_mailer_action,
       user: user,
       email: email,
       verification_token: @notification_verification_token

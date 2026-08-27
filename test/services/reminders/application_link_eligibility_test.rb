@@ -126,6 +126,17 @@ module Reminders
       end
     end
 
+    test 'due excludes verifications for members who opted out of application reminders' do
+      now = Time.zone.local(2026, 8, 6, 7, 15, 0)
+      user = users(:member_with_local_account)
+      verification = awaiting_verification(now: now, email: user.email)
+      NotificationOptOut.opt_out!(user, category: 'application_link', channel: 'email')
+
+      travel_to now do
+        assert_not_includes ApplicationLinkEligibility.due(now: now), verification
+      end
+    end
+
     private
 
     def awaiting_verification(now:, email:, **attrs)
