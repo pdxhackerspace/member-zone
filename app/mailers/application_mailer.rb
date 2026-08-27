@@ -121,7 +121,7 @@ class ApplicationMailer < ActionMailer::Base
 
   def plain_text_email_body(body = nil)
     parts = []
-    parts << @email_banner.text if @email_banner&.present?
+    parts << @email_banner.text if @email_banner.present?
     parts << body if body.present?
     footer = @notification_footer&.text
     parts << footer if footer.present?

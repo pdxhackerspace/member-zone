@@ -36,24 +36,6 @@ class OutgoingEmailBannerTest < ActionMailer::TestCase
     assert_no_match(/<div class="email-banner">/, html)
   end
 
-  test 'queued mail includes banner when fragment is set' do
-    TextFragment.ensure_exists!(
-      key: 'outgoing_email_banner',
-      title: 'Outgoing email banner',
-      content: '<p>Queued mail banner notice.</p>'
-    )
-    qm = queued_mails(:pending_mail)
-
-    mail = QueuedMailMailer.deliver_queued(qm)
-    html = mail.html_part.body.decoded
-    text = mail.text_part.body.decoded
-
-    assert_includes html, 'Queued mail banner notice.'
-    assert_includes html, 'email-banner'
-    assert_includes text, 'Queued mail banner notice.'
-    assert_operator text.index('Queued mail banner notice.'), :<, text.index(qm.body_text.strip.lines.first.strip)
-  end
-
   test 'templated member mail puts banner before body in text part' do
     TextFragment.ensure_exists!(
       key: 'outgoing_email_banner',
@@ -73,5 +55,69 @@ class OutgoingEmailBannerTest < ActionMailer::TestCase
     text = mail.text_part.body.decoded
 
     assert_operator text.index('Top announcement.'), :<, text.index('Template body for Regular Member.')
+  end
+
+  test 'queued mail adds banner for template fragment bodies' do
+    TextFragment.ensure_exists!(
+      key: 'outgoing_email_banner',
+      title: 'Outgoing email banner',
+      content: '<p>Queued mail banner notice.</p>'
+    )
+    qm = queued_mails(:pending_mail)
+    assert_not qm.pre_rendered_mail_body?
+
+    mail = QueuedMailMailer.deliver_queued(qm)
+    html = mail.html_part.body.decoded
+    text = mail.text_part.body.decoded
+
+    assert_includes html, 'Queued mail banner notice.'
+    assert_includes html, 'email-banner'
+    assert_includes text, 'Queued mail banner notice.'
+    assert_operator text.index('Queued mail banner notice.'), :<, text.index(qm.body_text.strip.lines.first.strip)
+  end
+
+  test 'deliver_queued does not duplicate banner or footer for pre-rendered mailer bodies' do
+    TextFragment.ensure_exists!(
+      key: 'outgoing_email_banner',
+      title: 'Outgoing email banner',
+      content: '<p>Unique banner once.</p>'
+    )
+    EmailTemplate.where(key: 'payment_past_due').delete_all
+
+    qm = QueuedMail.enqueue(:payment_past_due, @user, reason: 'Test')
+    assert_predicate qm, :pre_rendered_mail_body?
+
+    mail = QueuedMailMailer.deliver_queued(qm)
+    html = mail.html_part.body.decoded
+    text = mail.text_part.body.decoded
+
+    assert_equal 1, html.scan('Unique banner once.').size
+    assert_equal 1, text.scan('Unique banner once.').size
+    assert_equal 1, text.scan('Manage overdue payment reminders').size
+  end
+
+  test 'deliver_queued adds banner once for template-backed queued mail' do
+    TextFragment.ensure_exists!(
+      key: 'outgoing_email_banner',
+      title: 'Outgoing email banner',
+      content: '<p>Template queue banner.</p>'
+    )
+    EmailTemplate.create!(
+      key: 'payment_past_due',
+      name: 'Payment past due',
+      enabled: true,
+      subject: 'Payment due',
+      body_html: '<p>Queued template body.</p>',
+      body_text: 'Queued template body.'
+    )
+
+    qm = QueuedMail.enqueue(:payment_past_due, @user, reason: 'Test')
+    assert_not qm.pre_rendered_mail_body?
+
+    mail = QueuedMailMailer.deliver_queued(qm)
+    text = mail.text_part.body.decoded
+
+    assert_equal 1, text.scan('Template queue banner.').size
+    assert_includes text, 'Queued template body.'
   end
 end

@@ -1,6 +1,6 @@
 module Emails
   class BannerPresenter
-    FRAGMENT_KEY = 'outgoing_email_banner'
+    FRAGMENT_KEY = 'outgoing_email_banner'.freeze
 
     ALLOWED_TAGS = %w[p br strong b em i u a ul ol li h1 h2 h3 h4 h5 h6 span div].freeze
     ALLOWED_ATTRIBUTES = %w[href target style].freeze
@@ -16,9 +16,9 @@ module Emails
       @html_content = html_content
     end
 
-    def present?
-      @html_content.present?
-    end
+    attr_reader :html_content
+
+    delegate :present?, to: :html_content
 
     def html
       sanitize(@html_content)

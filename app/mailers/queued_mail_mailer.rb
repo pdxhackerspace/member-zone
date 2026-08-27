@@ -8,8 +8,13 @@ class QueuedMailMailer < ApplicationMailer
     assign_queued_notification_footer(queued_mail)
 
     mail(to: queued_mail.to, subject: queued_mail.subject) do |format|
-      format.html { render html: @body_html.html_safe, layout: 'mailer' }
-      plain = plain_text_email_body(@body_text)
+      if queued_mail.pre_rendered_mail_body?
+        format.html { render html: @body_html.html_safe, layout: false }
+        plain = @body_text.presence || plain_text_email_body(nil)
+      else
+        format.html { render html: @body_html.html_safe, layout: 'mailer' }
+        plain = plain_text_email_body(@body_text)
+      end
       format.text { render plain: plain } if plain.present?
     end
   end

@@ -44,6 +44,12 @@ class QueuedMail < ApplicationRecord
     approved? && sent_at.nil? && last_error.present?
   end
 
+  # Queued from a rendered MemberMailer message (no email template): HTML/text already
+  # include the shared mailer layout, banner, and notification footer.
+  def pre_rendered_mail_body?
+    email_template_id.blank? && body_html.to_s.include?('email-wrapper')
+  end
+
   def self.enqueue(action, user, to: nil, reason: nil, **extra_args)
     dest = to || user.email
     return nil if dest.blank?
