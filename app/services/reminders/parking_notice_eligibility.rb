@@ -126,6 +126,7 @@ module Reminders
                    .where(status: %w[active expired])
                    .where(DELIVERABLE_USER_SQL)
                    .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+                   .then { |scope| Notifications::EligibilityOptOuts.parking_notice_scope_excluding_opt_outs(scope, 'parking_notices') }
     end
 
     def self.due_phase(notice, now: Time.current)

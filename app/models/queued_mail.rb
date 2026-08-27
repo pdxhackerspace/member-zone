@@ -63,7 +63,7 @@ class QueuedMail < ApplicationRecord
     variables = enqueue_render_variables(action, user, extra_args, template)
 
     if !MailRecipientGuard.blocked?(user) && template&.send_immediately?
-      return deliver_immediately(template, dest, variables)
+      return deliver_immediately(template, dest, variables, mailer_action: action.to_s, user: user)
     end
 
     record = if template
@@ -99,7 +99,9 @@ class QueuedMail < ApplicationRecord
     variables = MemberMailer.build_template_variables(template_recipient, extra_args)
     blocked = MailRecipientGuard.blocked?(recipient_user) || MailRecipientGuard.blocked_email?(dest)
 
-    return deliver_immediately(template, dest, variables) if !blocked && template&.send_immediately?
+    if !blocked && template&.send_immediately?
+      return deliver_immediately(template, dest, variables, mailer_action: action, user: recipient_user)
+    end
 
     record = if template
                create_queued_mail_from_template(
@@ -138,14 +140,18 @@ class QueuedMail < ApplicationRecord
     )
   end
 
-  def self.deliver_immediately(template, dest, variables)
+  def self.deliver_immediately(template, dest, variables, **options)
     rendered = template.render(variables)
-    EmailTemplateMailer.send_rendered(
+    mail = EmailTemplateMailer::RenderedMail.new(
       to: dest,
       subject: rendered[:subject],
       body_html: rendered[:body_html],
-      body_text: rendered[:body_text] || ''
-    ).deliver_now
+      body_text: rendered[:body_text] || '',
+      mailer_action: options.fetch(:mailer_action, template.key),
+      user: options[:user],
+      verification_token: options[:verification_token]
+    )
+    EmailTemplateMailer.send_rendered(mail).deliver_now
 
     ImmediateDelivery.new(
       to: dest,

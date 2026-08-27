@@ -36,6 +36,13 @@ module Notifications
       assert DeliveryGate.blocked?(mailer_action: 'application_email_verification', email: email)
     end
 
+    test 'blocks application link email for member notification opt-out' do
+      NotificationOptOut.opt_out!(@user, category: 'application_link', channel: 'email')
+
+      assert DeliveryGate.blocked?(mailer_action: 'application_link_reminder', email: @user.email)
+      assert DeliveryGate.blocked?(mailer_action: 'application_link_reminder', user: @user)
+    end
+
     test 'block_queued_delivery rejects opted-out queued mail' do
       mail = QueuedMail.create!(
         to: @user.email,

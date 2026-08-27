@@ -34,6 +34,10 @@ module Reminders
     def self.due?(verification, now: Time.current)
       return false unless base_verification?(verification)
       return false if pending_reminder_mail?(verification)
+      return false if Notifications::DeliveryGate.blocked?(
+        mailer_action: 'application_link_reminder',
+        email: verification.email
+      )
 
       delay = MembershipSetting.application_link_reminder_delay_days.days
       max_count = MembershipSetting.application_link_reminder_max_count

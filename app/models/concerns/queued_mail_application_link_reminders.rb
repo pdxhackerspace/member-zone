@@ -14,7 +14,7 @@ module QueuedMailApplicationLinkReminders
       return nil if dest.blank?
       return nil if QueuedMailApplicationLinkReminders.suppress_application_link_reminder?(dest)
 
-      enqueue_application_link_reminder_mail(verification, dest, reason, extra_args)
+      QueuedMail::ApplicationLinkReminderEnqueue.call(verification, reason:, extra_args:)
     end
 
     def verification_recipient_for(verification)
@@ -23,33 +23,6 @@ module QueuedMailApplicationLinkReminders
         email: verification.email,
         username: 'Not set'
       )
-    end
-  end
-
-  class_methods do
-    private
-
-    def enqueue_application_link_reminder_mail(verification, dest, reason, extra_args)
-      recipient = verification_recipient_for(verification)
-      action = 'application_link_reminder'
-      merged_args = extra_args.merge(application_verification_id: verification.id)
-      template = EmailTemplate.find_enabled(action)
-      variables = MemberMailer.build_template_variables(recipient, merged_args)
-      if !MailRecipientGuard.blocked_email?(dest) && template&.send_immediately?
-        return deliver_immediately(template, dest, variables)
-      end
-
-      attrs = queued_mail_attrs(dest, reason || 'Application link reminder', nil, action, merged_args)
-      record = if template
-                 create_queued_mail_from_template(template, variables, attrs)
-               else
-                 create_queued_mail_from_message(
-                   MemberMailer.application_link_reminder(recipient, **merged_args), attrs
-                 )
-               end
-      MailLogEntry.log!(record, 'created', details: "Queued application link reminder to #{dest}")
-      MailRecipientGuard.block_delivery_to!(record)
-      record
     end
   end
 end

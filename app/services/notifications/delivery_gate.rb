@@ -13,7 +13,10 @@ module Notifications
           address = email.presence || user&.email
           return false if address.blank?
 
-          EmailNotificationOptOut.opted_out?(address, category: category.key, channel: channel)
+          return true if EmailNotificationOptOut.opted_out?(address, category: category.key, channel: channel)
+
+          resolved_user = user.is_a?(User) ? user : User.lookup_by_email(address)
+          NotificationOptOut.opted_out?(resolved_user, category: category.key, channel: channel)
         else
           return false if user.blank?
 
