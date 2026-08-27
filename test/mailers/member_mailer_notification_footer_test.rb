@@ -30,4 +30,32 @@ class MemberMailerNotificationFooterTest < ActionMailer::TestCase
     text = mail.text_part&.body&.decoded
     assert_includes text, 'required notice' if text.present?
   end
+
+  test 'application_link_reminder fallback renders for applicant recipient' do
+    EmailTemplate.where(key: 'application_link_reminder').delete_all
+    recipient = QueuedMail::ApplicantMailRecipient.new(
+      display_name: 'Applicant',
+      email: 'applicant-mailer@example.com',
+      username: 'Not set'
+    )
+
+    mail = MemberMailer.application_link_reminder(recipient, application_url: 'https://example.com/apply')
+
+    assert_equal [recipient.email], mail.to
+    assert_includes mail.subject, 'Complete your membership application'
+  end
+
+  test 'application_rejected fallback renders for applicant recipient' do
+    EmailTemplate.where(key: 'application_rejected').delete_all
+    recipient = QueuedMail::ApplicantMailRecipient.new(
+      display_name: 'Applicant',
+      email: 'rejected-mailer@example.com',
+      username: 'Not set'
+    )
+
+    mail = MemberMailer.application_rejected(recipient, reason: 'Not a fit at this time')
+
+    assert_equal [recipient.email], mail.to
+    assert_includes mail.subject, 'Update on Your Membership Application'
+  end
 end

@@ -62,5 +62,40 @@ module Notifications
       assert footer.mandatory?
       assert_includes footer.html, 'required notice'
     end
+
+    test 'footer for applicant recipient uses verification token not member token' do
+      recipient = QueuedMail::ApplicantMailRecipient.new(
+        display_name: 'Applicant',
+        email: 'applicant-footer@example.com',
+        username: 'Not set'
+      )
+
+      footer = DeliveryGate.footer_for(
+        mailer_action: 'application_link_reminder',
+        user: recipient,
+        email: recipient.email,
+        verification_token: 'applicant-verification-token'
+      )
+
+      assert_includes footer.text, '/apply/notifications/applicant-verification-token'
+      refute_includes footer.text, 'http://www.example.com/notifications/'
+    end
+
+    test 'footer for application rejected applicant recipient does not raise' do
+      recipient = QueuedMail::ApplicantMailRecipient.new(
+        display_name: 'Applicant',
+        email: 'rejected-applicant@example.com',
+        username: 'Not set'
+      )
+
+      footer = DeliveryGate.footer_for(
+        mailer_action: 'application_rejected',
+        user: recipient,
+        email: recipient.email
+      )
+
+      assert footer.mandatory?
+      assert_includes footer.text, 'required notice'
+    end
   end
 end
