@@ -9,7 +9,8 @@ class TestMailer < ApplicationMailer
       subject: subject
     ) do |format|
       format.html { render html: @body_html.html_safe, layout: 'mailer' }
-      format.text { render plain: @body_text }
+      plain = plain_text_email_body(@body_text)
+      format.text { render plain: plain } if plain.present?
     end
   end
 end

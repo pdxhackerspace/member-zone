@@ -117,6 +117,15 @@
           <span></span>
         </div>
 
+        <div class="profile-field-row">
+          <span class="profile-field-label">Notifications</span>
+          <span class="profile-field-value">
+            <%= notification_summary_label(user) %>
+            <%= link_to "Manage", notification_preferences_path, class: "ms-2 text-13" %>
+          </span>
+          <span></span>
+        </div>
+
       </div>
     </div>
   </div>

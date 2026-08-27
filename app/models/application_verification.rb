@@ -55,6 +55,8 @@ class ApplicationVerification < ApplicationRecord
   end
 
   def deliver_verification_email!
+    return if Notifications::DeliveryGate.blocked?(mailer_action: 'application_email_verification', email: email)
+
     url_options = Rails.application.config.action_mailer.default_url_options
     verification_url = Rails.application.routes.url_helpers.apply_verify_email_url(
       token: token,
@@ -65,7 +67,8 @@ class ApplicationVerification < ApplicationRecord
     MemberMailer.application_email_verification(
       email,
       verification_url: verification_url,
-      expires_in: "#{expiry_hours} #{'hour'.pluralize(expiry_hours)}"
+      expires_in: "#{expiry_hours} #{'hour'.pluralize(expiry_hours)}",
+      verification_token: token
     ).deliver_later
   end
 

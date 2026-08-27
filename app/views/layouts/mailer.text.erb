@@ -1,1 +1,7 @@
-<%= yield %>
+<% if @email_banner&.present? %>
+<%= @email_banner.text %>
+
+<% end %><%= yield %>
+<% if @notification_footer&.present? %>
+<%= @notification_footer.text %>
+<% end %>

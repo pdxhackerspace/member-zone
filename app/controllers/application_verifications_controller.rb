@@ -31,6 +31,12 @@ class ApplicationVerificationsController < ApplicationController
     email = normalized_verification_email
     return if email.nil?
 
+    if EmailNotificationOptOut.opted_out?(email, category: 'application_link')
+      @opted_out_message = TextFragment.content_for('application_email_opted_out')
+      render :gate, status: :unprocessable_content
+      return
+    end
+
     verification = create_verification!(email)
     deliver_verification_mailer(email, verification)
 

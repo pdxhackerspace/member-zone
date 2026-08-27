@@ -23,7 +23,7 @@ class InviteControllerTest < ActionDispatch::IntegrationTest
     get invite_path(invitations(:expired).token)
     assert_response :success
     assert_match(/Invitation Expired/i, response.body)
-    assert_no_match(/form/i, response.body.gsub('<form', '')) # no acceptance form
+    assert_select 'form', count: 0
   end
 
   test 'shows cancelled/invalid error for a cancelled invitation' do

@@ -3,28 +3,33 @@ class ReminderSetting < ApplicationRecord
     'slack_signup' => {
       name: 'Slack signup reminder',
       description: 'Gentle reminder to active members without a linked Slack account.',
-      enabled: false
+      enabled: false,
+      allow_opt_out: true
     },
     'application_link' => {
       name: 'Application link reminder',
       description: 'Reminder when someone requested a membership application link but has not submitted yet.',
-      enabled: false
+      enabled: false,
+      allow_opt_out: true
     },
     'payment_overdue' => {
       name: 'Overdue payment reminder',
       description: 'Weekly reminder to members whose dues are past due. Members who have cancelled are not reminded.',
-      enabled: false
+      enabled: false,
+      allow_opt_out: true
     },
     'orientation' => {
       name: 'Orientation reminder',
       description: 'Reminder to approved members who have not had their building access orientation yet.',
-      enabled: false
+      enabled: false,
+      allow_opt_out: true
     },
     'parking_notices' => {
       name: 'Parking notice reminders',
       description: 'Pre-expiration, expiration, and follow-up reminders for parking permits and tickets. ' \
                    'The initial issued email on creation is always sent.',
-      enabled: false
+      enabled: false,
+      allow_opt_out: false
     }
   }.freeze
 
@@ -42,6 +47,14 @@ class ReminderSetting < ApplicationRecord
       find_or_create_by!(key: key) do |setting|
         setting.assign_attributes(attrs)
       end
+    end
+  end
+
+  def self.sync_catalog_attributes!
+    CATALOG.each do |key, attrs|
+      setting = find_or_initialize_by(key: key)
+      setting.assign_attributes(attrs.slice(:name, :description))
+      setting.save! if setting.changed?
     end
   end
 end

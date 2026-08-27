@@ -31,6 +31,7 @@ module Reminders
         .where("#{APPROVAL_ANCHOR_SQL} <= ?", initial_cutoff)
         .where('slack_signup_reminder_sent_at IS NULL OR slack_signup_reminder_sent_at <= ?', repeat_cutoff)
         .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+        .then { |scope| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(scope, 'slack_signup') }
         .order(:full_name)
     end
 

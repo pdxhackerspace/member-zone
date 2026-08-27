@@ -1,0 +1,60 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Email opt-outs</h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="text-body"><%= @pagy.count %></span> addresses opted out of applicant reminders
+    </div>
+  </div>
+  <div>
+    <%= link_to "Back to Settings", settings_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<%= form_with url: email_notification_opt_outs_path, method: :get, local: true, class: "mb-3" do %>
+  <div class="input-group input-group-sm" style="max-width: 420px;">
+    <%= text_field_tag :email, @email_filter, class: "form-control", placeholder: "Full email address" %>
+    <%= submit_tag "Search", class: "btn btn-outline-secondary" %>
+  </div>
+<% end %>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-compact mb-0">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Category</th>
+          <th>Channel</th>
+          <th>Source</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @opt_outs.each do |opt_out| %>
+          <tr>
+            <td><%= opt_out.email %></td>
+            <td><%= NotificationCategory.find(opt_out.category)&.name || opt_out.category %></td>
+            <td class="text-secondary"><%= opt_out.channel %></td>
+            <td class="text-secondary"><%= opt_out.source %></td>
+            <td class="text-secondary text-12"><%= time_ago_in_words(opt_out.updated_at) %> ago</td>
+            <td class="text-end">
+              <%= button_to "Remove",
+                    email_notification_opt_out_path(opt_out),
+                    method: :delete,
+                    class: "btn btn-outline-danger btn-sm",
+                    form: { class: "d-inline", data: { turbo_confirm: "Remove this opt-out?" } } %>
+            </td>
+          </tr>
+        <% end %>
+        <% if @opt_outs.empty? %>
+          <tr>
+            <td colspan="6" class="text-secondary text-13 py-3">No email opt-outs found.</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>

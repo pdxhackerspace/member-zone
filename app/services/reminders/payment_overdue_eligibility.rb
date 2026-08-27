@@ -64,6 +64,7 @@ module Reminders
           .where('payment_overdue_reminder_sent_at IS NULL OR payment_overdue_reminder_sent_at <= ?',
                  repeat_cutoff(now: now))
           .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+          .then { |scope| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(scope, 'payment_overdue') }
           .order(:full_name)
     end
 

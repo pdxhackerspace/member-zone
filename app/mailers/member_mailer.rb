@@ -234,6 +234,7 @@ class MemberMailer < ApplicationMailer
     @organization = organization_name
     @verification_url = opts[:verification_url] || opts['verification_url']
     @expires_in = opts[:expires_in] || opts['expires_in'] || '24 hours'
+    @notification_verification_token = opts[:verification_token] || opts['verification_token']
 
     mail(
       to: email,
@@ -609,7 +610,7 @@ class MemberMailer < ApplicationMailer
 
     mail(to: to_address, subject: rendered[:subject]) do |format|
       format.html { render html: rendered[:body_html].html_safe, layout: 'mailer' }
-      format.text { render plain: rendered[:body_text] }
+      format.text { render plain: plain_text_email_body(rendered[:body_text]) }
     end
 
     true

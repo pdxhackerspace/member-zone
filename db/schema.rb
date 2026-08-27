@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -312,6 +312,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
     t.boolean "show_on_all_profiles", default: false, null: false
     t.string "title"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "email_notification_opt_outs", force: :cascade do |t|
+    t.string "category", null: false
+    t.string "channel", null: false
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.string "email_lookup_digest"
+    t.string "source", default: "email_link", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category", "channel"], name: "index_email_notification_opt_outs_on_category_and_channel"
+    t.index ["email_lookup_digest", "category", "channel"], name: "index_email_opt_outs_on_digest_category_channel", unique: true
   end
 
   create_table "email_templates", force: :cascade do |t|
@@ -655,6 +667,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
     t.index ["sender_id"], name: "index_messages_on_sender_id"
   end
 
+  create_table "notification_opt_outs", force: :cascade do |t|
+    t.string "category", null: false
+    t.string "channel", null: false
+    t.datetime "created_at", null: false
+    t.string "source", default: "self_service", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["category", "channel"], name: "index_notification_opt_outs_on_category_and_channel"
+    t.index ["user_id", "category", "channel"], name: "index_notification_opt_outs_on_user_category_channel", unique: true
+    t.index ["user_id"], name: "index_notification_opt_outs_on_user_id"
+  end
+
   create_table "parking_notice_events", force: :cascade do |t|
     t.bigint "actor_id"
     t.datetime "created_at", null: false
@@ -865,6 +889,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
   end
 
   create_table "reminder_settings", force: :cascade do |t|
+    t.boolean "allow_opt_out", default: true, null: false
     t.datetime "created_at", null: false
     t.text "description"
     t.boolean "enabled", default: false, null: false
@@ -1236,6 +1261,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_21_120000) do
   add_foreign_key "membership_settings", "training_topics", column: "building_access_training_topic_id"
   add_foreign_key "messages", "users", column: "recipient_id"
   add_foreign_key "messages", "users", column: "sender_id"
+  add_foreign_key "notification_opt_outs", "users"
   add_foreign_key "parking_notice_events", "parking_notices"
   add_foreign_key "parking_notice_events", "users", column: "actor_id"
   add_foreign_key "parking_notices", "users"
