@@ -28,6 +28,9 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'would be emailed today', response.body
     assert_match 'Application link reminder', response.body
     assert_match 'Orientation reminder', response.body
+    assert_select 'input[type=submit][value=Save]', count: 0
+    assert_select 'form[data-controller=?]', 'reminder-setting-form'
+    assert_select 'button', text: 'Send now', minimum: 5
   end
 
   test 'show lists members waiting on their orientation' do
@@ -151,6 +154,37 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to reminder_settings_url
     assert reminder.reload.enabled?
+  end
+
+  test 'index preserves admin allow_opt_out changes' do
+    reminder = ReminderSetting.find_by!(key: 'payment_overdue')
+    reminder.update!(allow_opt_out: false)
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_not reminder.reload.allow_opt_out?
+  end
+
+  test 'send now runs slack signup reminder when enabled' do
+    reminder = ReminderSetting.find_by!(key: 'slack_signup')
+    reminder.update!(enabled: true)
+    MemberSource.find_or_create_by!(key: 'slack') { |source| source.enabled = true }
+    MemberSource.find_by!(key: 'slack').update!(enabled: true)
+
+    post send_now_reminder_setting_url('slack_signup')
+
+    assert_redirected_to reminder_settings_url
+    assert_match(/run finished/i, flash[:notice])
+  end
+
+  test 'send now blocked when reminder disabled' do
+    ReminderSetting.find_by!(key: 'slack_signup').update!(enabled: false)
+
+    post send_now_reminder_setting_url('slack_signup')
+
+    assert_redirected_to reminder_settings_url
+    assert_match(/disabled/i, flash[:alert])
   end
 
   private

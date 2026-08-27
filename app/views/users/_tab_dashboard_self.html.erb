@@ -85,6 +85,12 @@
             <div class="action-card-desc">Add links, interests, and contact details</div>
           <% end %>
         </div>
+        <div class="col-md-6">
+          <%= link_to notification_preferences_path, class: "action-card" do %>
+            <div class="action-card-title"><i class="bi bi-bell me-1"></i>Notifications</div>
+            <div class="action-card-desc"><%= notification_summary_label(user) %></div>
+          <% end %>
+        </div>
       </div>
     </div>
 
@@ -143,5 +149,6 @@
     <%= render 'users/member_membership_card', user: user %>
     <%= render 'users/member_training_card', user: user, show_request_link: false %>
     <%= render 'users/member_resources_card', user: user %>
+    <%= render 'users/member_notifications_card', user: user %>
   </div>
 </div>

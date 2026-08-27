@@ -463,6 +463,13 @@
         <% end %>
       <% end %>
     </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to notification_preferences_path,
+          class: "nav-link #{'active' if controller_name == 'notification_preferences'}",
+          role: "tab" do %>
+        Notifications
+      <% end %>
+    </li>
   </ul>
 
   <div class="tab-content">

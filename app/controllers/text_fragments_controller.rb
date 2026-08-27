@@ -291,5 +291,11 @@ class TextFragmentsController < AuthenticatedController
       title: 'Code of Conduct URL',
       content: ''
     )
+
+    TextFragment.ensure_exists!(
+      key: 'outgoing_email_banner',
+      title: 'Outgoing email banner',
+      content: ''
+    )
   end
 end

@@ -44,9 +44,20 @@ class QueuedMail < ApplicationRecord
     approved? && sent_at.nil? && last_error.present?
   end
 
+  # Queued from a rendered MemberMailer message (no email template): HTML/text already
+  # include the shared mailer layout, banner, and notification footer.
+  def pre_rendered_mail_body?
+    email_template_id.blank? && body_html.to_s.include?('email-wrapper')
+  end
+
   def self.enqueue(action, user, to: nil, reason: nil, **extra_args)
     dest = to || user.email
     return nil if dest.blank?
+
+    if Notifications::DeliveryGate.blocked?(mailer_action: action, user: user, email: dest)
+      Rails.logger.info("[QueuedMail] Suppressed #{action} to #{dest}: notification opt-out")
+      return nil
+    end
 
     template = EmailTemplate.find_enabled(action.to_s)
     variables = enqueue_render_variables(action, user, extra_args, template)

@@ -12,6 +12,11 @@
             confirm the following and provide your email address.
           </p>
         <% end %>
+        <% if @opted_out_message.present? %>
+          <div class="alert alert-warning text-13 mt-3 mb-0">
+            <%= sanitize(@opted_out_message) %>
+          </div>
+        <% end %>
       </div>
     </div>
 

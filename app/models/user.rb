@@ -33,6 +33,7 @@ class User < ApplicationRecord
   has_many :trainings_as_trainer, class_name: 'Training', foreign_key: 'trainer_id', dependent: :destroy
   has_and_belongs_to_many :application_groups
   has_many :queued_mails, foreign_key: 'recipient_id', dependent: :nullify
+  has_many :notification_opt_outs, dependent: :destroy
   has_many :reported_incidents, class_name: 'IncidentReport', foreign_key: 'reporter_id', dependent: :nullify
   has_and_belongs_to_many :incident_reports, join_table: 'incident_report_members'
   has_many :parking_notices, dependent: :nullify
@@ -51,6 +52,10 @@ class User < ApplicationRecord
             }
   validates :email_lookup_digest, uniqueness: true, allow_blank: true
   validates :payment_type, inclusion: { in: %w[unknown sponsored paypal recharge kofi cash inactive] }
+
+  generates_token_for :notification_preferences, expires_in: 1.year do
+    email
+  end
 
   PROFILE_VISIBILITY_OPTIONS = %w[public members private].freeze
 

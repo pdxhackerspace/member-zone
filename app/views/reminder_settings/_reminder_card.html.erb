@@ -1,24 +1,63 @@
 <%# Card chrome shared by every reminder. The block supplies the counts and timing lines,
     which are the only part that differs between them. %>
-<div class="card shadow-sm border-0 mb-3">
-  <div class="card-body">
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-      <div>
-        <div class="d-flex align-items-center gap-2 mb-1">
-          <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
-          <h2 class="h5 mb-0"><%= reminder.name %></h2>
-        </div>
-        <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
-        <%= yield %>
+<div class="card reminder-setting-card mb-4">
+  <div class="card-header reminder-setting-card-header d-flex align-items-center gap-2 py-2">
+    <span class="status-dot <%= reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
+    <h2 class="h5 mb-0"><%= reminder.name %></h2>
+  </div>
+  <div class="card-body reminder-setting-card-body py-3">
+    <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
+    <%= yield %>
+    <% opted_out_count = NotificationOptOut.count_for_reminder(reminder.key) %>
+    <% if opted_out_count.positive? %>
+      <div class="text-12 text-secondary mt-1">
+        <span class="text-body"><%= opted_out_count %></span> members opted out
       </div>
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <%= form_with model: reminder, url: reminder_setting_path(reminder.key), method: :patch, local: true, class: "d-flex align-items-center gap-2 mb-0" do |f| %>
+    <% end %>
+  </div>
+  <div class="card-footer reminder-setting-card-footer">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <%= form_with model: reminder,
+                    url: reminder_setting_path(reminder.key),
+                    method: :patch,
+                    local: true,
+                    class: "mb-0",
+                    data: {
+                      controller: "reminder-setting-form",
+                      action: "change->reminder-setting-form#submit"
+                    } do |f| %>
+        <div class="d-flex flex-wrap align-items-center gap-3">
           <div class="form-check form-switch mb-0">
-            <%= f.check_box :enabled, class: 'form-check-input', role: 'switch', id: "reminder_enabled_#{reminder.key}" %>
-            <%= f.label :enabled, reminder.enabled? ? 'Enabled' : 'Disabled', class: 'form-check-label text-13 text-nowrap', for: "reminder_enabled_#{reminder.key}" %>
+            <%= f.check_box :enabled,
+                  class: 'form-check-input',
+                  role: 'switch',
+                  id: "reminder_enabled_#{reminder.key}",
+                  data: { reminder_setting_form_target: 'enabledInput' } %>
+            <%= f.label :enabled,
+                  reminder.enabled? ? 'Enabled' : 'Disabled',
+                  class: 'form-check-label text-13 text-nowrap',
+                  for: "reminder_enabled_#{reminder.key}",
+                  data: { reminder_setting_form_target: 'enabledLabel' } %>
           </div>
-          <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm', data: { turbo: false } %>
-        <% end %>
+          <div class="form-check form-switch mb-0">
+            <%= f.check_box :allow_opt_out,
+                  class: 'form-check-input',
+                  role: 'switch',
+                  id: "reminder_allow_opt_out_#{reminder.key}" %>
+            <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
+          </div>
+        </div>
+      <% end %>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <%= button_to "Send now",
+              send_now_reminder_setting_path(reminder.key),
+              method: :post,
+              class: "btn btn-outline-secondary btn-sm",
+              form: {
+                data: {
+                  turbo_confirm: "Send #{reminder.name.downcase} to everyone due right now?"
+                }
+              } %>
         <%= link_to "View due list", reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
         <% if email_template %>
           <%= link_to "Email template", email_template_path(email_template), class: "btn btn-outline-secondary btn-sm" %>

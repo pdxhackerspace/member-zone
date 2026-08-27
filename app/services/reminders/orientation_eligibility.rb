@@ -91,6 +91,7 @@ module Reminders
         .where("#{APPROVAL_ANCHOR_SQL} <= ?", cutoff)
         .where('orientation_reminder_sent_at IS NULL OR orientation_reminder_sent_at <= ?', cutoff)
         .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+        .then { |scope| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(scope, 'orientation') }
         .order(:full_name)
     end
 

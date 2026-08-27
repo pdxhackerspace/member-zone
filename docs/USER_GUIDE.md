@@ -54,6 +54,14 @@ Which training counts as orientation comes from **Building access training topic
 
 The report is broader than the reminder. A member who paid before booking their orientation is no longer a New member, so the reminder leaves them alone, but they still cannot get in and they still appear here — with their standing shown beside their name so a paying or overdue member stands out from the newly approved ones. They are the reason the report exists: because the Dues lapsed report leaves untrained members off, this is the only list they are on.
 
+## Member notification preferences
+
+Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off.
+
+Optional reminder categories can also be disabled per category on Settings → **Reminders** via **Members can opt out**. Parking permit and ticket reminders default to mandatory.
+
+Applicants without an account can opt out from links in application reminder emails. Opted-out addresses are blocked at the apply gate until an admin removes the opt-out under Settings → **Email opt-outs**.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.

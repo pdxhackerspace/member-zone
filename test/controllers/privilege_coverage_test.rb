@@ -19,6 +19,7 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     'invite' => %w[show accept accepted],
     'application_verifications' => %w[gate send_verification verify_email status check_email
                                       code_of_conduct_pdf],
+    'applicant_notification_opt_outs' => %w[show create],
     # The public application wizard. Its admin surface lives behind
     # MembershipApplicationPrivileges and is covered below.
     'membership_applications' => %w[start page save_page submit_application confirmation],
@@ -47,7 +48,7 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
   MEMBER_FACING_CONTROLLERS = %w[
     users messages profile_setup member_parking_permits user_links search
     training_catalog training_requests documents rag membership_plans trainings
-    training_topics training_topic_links settings login_links
+    training_topics training_topic_links settings login_links notification_preferences
   ].freeze
 
   test 'every routed action is authenticated, admin gated, or privilege gated' do

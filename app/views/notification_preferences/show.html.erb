@@ -1,0 +1,100 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Notifications</h1>
+    <div class="text-13 text-secondary mt-1">
+      Choose which emails and Slack reminders you receive.
+    </div>
+  </div>
+  <% if @token_access %>
+    <div class="text-12 text-secondary">
+      Signed in via email link
+    </div>
+  <% else %>
+    <%= link_to "Back to your profile", user_path(@subject_user, tab: :dashboard), class: "btn btn-outline-secondary btn-sm" %>
+  <% end %>
+</div>
+
+<% if @highlight_entry && NotificationCategory.opt_out_allowed?(@highlight_entry.key) %>
+  <div class="status-panel status-attention mb-3">
+    <span class="status-icon">●</span>
+    <div class="flex-grow-1">
+      <div class="status-headline">Turn off <%= @highlight_entry.name.downcase %>?</div>
+      <div class="status-detail text-13 mb-2"><%= @highlight_entry.description %></div>
+      <% opt_out_path = @token_access ? token_notification_preferences_opt_out_path(token: params[:token]) : notification_preferences_opt_out_path %>
+      <%= button_to "Turn off email for this notice",
+            opt_out_path,
+            method: :post,
+            params: { category: @highlight_entry.key, channel: 'email' },
+            class: "btn btn-outline-secondary btn-sm",
+            form: { class: "d-inline" } %>
+    </div>
+  </div>
+<% end %>
+
+<%= form_with url: (@token_access ? token_notification_preferences_path(token: params[:token]) : notification_preferences_path),
+              method: :patch, local: true do %>
+  <% @grouped_categories.each do |group, entries| %>
+    <div class="mb-3">
+      <div class="h-section-label mb-2"><%= group %></div>
+      <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+          <table class="table table-compact mb-0">
+            <thead>
+              <tr>
+                <th>Notice</th>
+                <th class="text-center" style="width: 90px;">Email</th>
+                <th class="text-center" style="width: 90px;">Slack</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% entries.each do |entry| %>
+                <% disabled = notification_channel_disabled?(entry) %>
+                <% row_class = notification_row_class(entry) %>
+                <tr class="<%= row_class %>">
+                  <td>
+                    <div class="<%= disabled ? 'text-secondary' : 'text-body' %>"><%= entry.name %></div>
+                    <div class="text-12 text-secondary"><%= entry.description %></div>
+                    <% if disabled %>
+                      <div class="text-11 text-secondary mt-1">Required</div>
+                    <% end %>
+                  </td>
+                  <% NotificationCategory::CHANNELS.each do |channel| %>
+                    <td class="text-center align-middle">
+                      <% if disabled %>
+                        <div class="form-check form-switch d-inline-flex justify-content-center mb-0 opacity-50">
+                          <input type="checkbox" class="form-check-input" checked disabled aria-label="<%= entry.name %> email required">
+                        </div>
+                      <% else %>
+                        <% subscribed = !opted_out?(@opt_out_lookup, entry.key, channel) %>
+                        <div class="form-check form-switch d-inline-flex justify-content-center mb-0">
+                          <%= hidden_field_tag "preferences[#{entry.key}][#{channel}]", '0' %>
+                          <%= check_box_tag "preferences[#{entry.key}][#{channel}]",
+                                '1',
+                                subscribed,
+                                class: 'form-check-input',
+                                id: "pref_#{entry.key}_#{channel}",
+                                aria: { label: "#{entry.name} #{channel}" } %>
+                        </div>
+                      <% end %>
+                    </td>
+                  <% end %>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="text-12 text-secondary mb-3">
+    Slack preferences are saved for when Slack reminders are enabled. We are not sending reminder DMs on Slack yet.
+  </div>
+
+  <div class="d-flex gap-2">
+    <%= submit_tag "Save preferences", class: "btn btn-primary btn-sm" %>
+    <% unless @token_access %>
+      <%= link_to "Cancel", user_path(@subject_user, tab: :dashboard), class: "btn btn-outline-secondary btn-sm" %>
+    <% end %>
+  </div>
+<% end %>

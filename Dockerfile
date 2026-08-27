@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install --no-install-recommends -y build-essential curl git libpq-dev libvips node-gyp pkg-config python-is-python3 libyaml-dev
 
 # Install JavaScript dependencies
-ARG NODE_VERSION=24.9.0
+ARG NODE_VERSION=24.15.0
 ARG YARN_VERSION=latest
 ENV PATH=/usr/local/node/bin:$PATH
 RUN curl -sL https://github.com/nodenv/node-build/archive/master.tar.gz | tar xz -C /tmp/ && \

@@ -285,6 +285,33 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_select 'a[href=?]', profile_setup_path, text: /Update your profile/
   end
 
+  test 'member dashboard links to notification preferences' do
+    member = users(:member_with_local_account)
+
+    delete logout_path
+    sign_in_as_regular_member
+
+    get user_path(member, tab: :dashboard)
+
+    assert_response :success
+    assert_select 'a.action-card[href=?]', notification_preferences_path, text: /Notifications/
+    assert_select 'a[href=?]', notification_preferences_path, text: /Manage notifications/
+    assert_select 'a.nav-link.active[href=?]', notification_preferences_path, count: 0
+    assert_select 'a.nav-link[href=?]', notification_preferences_path, text: /Notifications/
+  end
+
+  test 'member profile tab links to notification preferences' do
+    member = users(:member_with_local_account)
+
+    delete logout_path
+    sign_in_as_regular_member
+
+    get user_path(member, tab: :profile)
+
+    assert_response :success
+    assert_select 'a[href=?]', notification_preferences_path, text: /Manage/
+  end
+
   test 'member dashboard shows train a member action for trainers' do
     delete logout_path
     trainer = sign_in_as_trainer
