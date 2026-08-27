@@ -2,6 +2,7 @@ class QueuedMail < ApplicationRecord
   include QueuedMailReminderDeliveries
   include QueuedMailApplicationLinkReminders
   include QueuedMailMailerArgs
+  include QueuedMailApproval
 
   STATUSES = %w[pending approved rejected].freeze
 
@@ -194,16 +195,6 @@ class QueuedMail < ApplicationRecord
       body_html: html_body || '',
       body_text: text_body || ''
     )
-  end
-
-  def approve!(reviewer)
-    return false if MailRecipientGuard.block_delivery_to!(self)
-    return false if Notifications::DeliveryGate.block_queued_delivery!(self)
-
-    update!(status: 'approved', reviewed_by: reviewer, reviewed_at: Time.current)
-    MailLogEntry.log!(self, 'approved', actor: reviewer, details: "Approved for delivery to #{to}")
-    QueuedMailDeliveryJob.perform_later(id)
-    true
   end
 
   def reject!(reviewer)

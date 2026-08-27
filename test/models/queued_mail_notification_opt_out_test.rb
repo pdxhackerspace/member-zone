@@ -60,4 +60,22 @@ class QueuedMailNotificationOptOutTest < ActiveSupport::TestCase
 
     assert_predicate mail.reload, :rejected?
   end
+
+  test 'approval_blocked_reason distinguishes opt-out from terminal recipient' do
+    mail = QueuedMail.create!(
+      to: @user.email,
+      subject: 'Reminder',
+      body_html: '<p>Hi</p>',
+      body_text: 'Hi',
+      reason: 'Test',
+      mailer_action: 'payment_past_due',
+      recipient: @user,
+      status: 'pending'
+    )
+    NotificationOptOut.opt_out!(@user, category: 'payment_overdue', channel: 'email')
+
+    assert_not mail.approve!(users(:one))
+    assert_equal :opt_out, mail.approval_blocked_reason
+    assert_includes mail.approval_blocked_alert, 'opted out of overdue payment reminders'
+  end
 end

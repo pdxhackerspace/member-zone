@@ -58,6 +58,7 @@ module Notifications
 
       assert DeliveryGate.block_queued_delivery!(mail)
       assert_predicate mail.reload, :rejected?
+      assert DeliveryGate.opt_out_rejection?(mail)
     end
 
     test 'fails open for unknown mailer actions' do

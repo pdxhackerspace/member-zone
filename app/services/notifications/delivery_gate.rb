@@ -2,6 +2,8 @@ module Notifications
   # Single choke point for member notification opt-outs. Returns true when delivery should
   # be suppressed for the given mailer action and recipient.
   class DeliveryGate
+    OPT_OUT_REJECTION_DETAILS = 'Auto-rejected: recipient opted out'.freeze
+
     class << self
       def blocked?(mailer_action:, user: nil, email: nil, channel: 'email')
         category = NotificationCategory.for_mailer_action(mailer_action)
@@ -33,8 +35,22 @@ module Notifications
         return true if queued_mail.rejected?
 
         queued_mail.update!(status: 'rejected', reviewed_by: nil, reviewed_at: Time.current)
-        MailLogEntry.log!(queued_mail, 'rejected', details: 'Auto-rejected: recipient opted out')
+        MailLogEntry.log!(queued_mail, 'rejected', details: OPT_OUT_REJECTION_DETAILS)
         true
+      end
+
+      def opt_out_alert_message(queued_mail)
+        category = NotificationCategory.for_mailer_action(queued_mail.mailer_action)
+        notification_name = category&.name&.downcase || 'this notification'
+        recipient_name = queued_mail.recipient&.display_name || queued_mail.to
+        "Message not sent: #{recipient_name} opted out of #{notification_name}."
+      end
+
+      def opt_out_rejection?(queued_mail)
+        return false unless queued_mail.rejected?
+
+        queued_mail.mail_log_entries.where(event: 'rejected').order(created_at: :desc).pick(:details) ==
+          OPT_OUT_REJECTION_DETAILS
       end
 
       def footer_for(mailer_action:, user: nil, email: nil, verification_token: nil)
