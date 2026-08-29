@@ -421,7 +421,7 @@ class EmailTemplate < ApplicationRecord
     },
     'admin_dashboard_urgent_digest' => {
       name: 'Admin Dashboard: Urgent Items',
-      description: 'Daily 7am digest of urgent admin dashboard items for executive directors',
+      description: 'Daily 9:15am digest of urgent admin dashboard items for executive directors',
       subject: '{{organization_name}}: {{urgent_item_count}} urgent admin dashboard items',
       body_html: <<~HTML,
         <h1>Urgent admin dashboard items</h1>
