@@ -143,6 +143,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Lapsed Member Access Reminder - Daily at 8:05am
+  Sidekiq::Cron::Job.create(
+    name: 'Lapsed Member Access Reminder - Daily at 8:05am',
+    cron: '5 8 * * *',
+    class: 'LapsedAccessReminderJob',
+    active_job: true
+  )
+
   # Membership Application AI Feedback Retry - Every 30 minutes
   Sidekiq::Cron::Job.create(
     name: 'Membership Application AI Feedback Retry - Every 30 minutes',

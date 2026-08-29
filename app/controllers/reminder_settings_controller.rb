@@ -8,7 +8,8 @@ class ReminderSettingsController < AdminController
     'application_link' => Reminders::NotifyApplicationLink,
     'payment_overdue' => Reminders::NotifyPaymentOverdue,
     'orientation' => Reminders::NotifyOrientation,
-    'parking_notices' => Reminders::NotifyParkingNotices
+    'parking_notices' => Reminders::NotifyParkingNotices,
+    'lapsed_access' => Reminders::NotifyLapsedAccess
   }.freeze
 
   before_action :set_reminder_setting, only: %i[show update send_now]
@@ -33,6 +34,9 @@ class ReminderSettingsController < AdminController
     @parking_due_count = Reminders::ParkingNoticeEligibility.count_due
     @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
     @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
+    @lapsed_access_due_count = Reminders::LapsedAccessEligibility.count_due
+    @lapsed_access_yesterday_count = Reminders::LapsedAccessEligibility.total_accessed_yesterday
+    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
     @building_access_topic = TrainingTopic.building_access
     @membership_setting = MembershipSetting.instance
   end
@@ -95,11 +99,7 @@ class ReminderSettingsController < AdminController
 
     case @reminder_setting.key
     when 'slack_signup'
-      @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
-      @slack_due_count = @pagy.count
-      @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
-      @slack_source_enabled = MemberSource.enabled?('slack')
-      @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+      load_slack_signup_show_data
     when 'application_link'
       load_application_link_show_data
     when 'payment_overdue'
@@ -115,7 +115,24 @@ class ReminderSettingsController < AdminController
       @building_access_topic = TrainingTopic.building_access
     when 'parking_notices'
       load_parking_notices_show_data
+    when 'lapsed_access'
+      load_lapsed_access_show_data
     end
+  end
+
+  def load_slack_signup_show_data
+    @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
+    @slack_due_count = @pagy.count
+    @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
+    @slack_source_enabled = MemberSource.enabled?('slack')
+    @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+  end
+
+  def load_lapsed_access_show_data
+    @pagy, @due_users = pagy(Reminders::LapsedAccessEligibility.due, limit: PER_PAGE)
+    @lapsed_access_due_count = @pagy.count
+    @lapsed_access_yesterday_count = Reminders::LapsedAccessEligibility.total_accessed_yesterday
+    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
   end
 
   def load_parking_notices_show_data

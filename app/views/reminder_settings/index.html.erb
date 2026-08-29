@@ -101,5 +101,18 @@
         Issued emails on creation are always sent and are not controlled by this toggle.
       </div>
     <% end %>
+  <% when 'lapsed_access' %>
+    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @lapsed_access_email_template } do %>
+      <div class="text-13">
+        <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span>
+        <span class="text-secondary">would be emailed today ·</span>
+        <span class="text-secondary"><%= @lapsed_access_yesterday_count %> inactive, accessed yesterday</span>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Timing: daily scan of yesterday's access logs for inactive members
+        · Reactivation window: <%= @membership_setting.reactivation_grace_period_months %> <%= 'month'.pluralize(@membership_setting.reactivation_grace_period_months) %>
+        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+    <% end %>
   <% end %>
 <% end %>
