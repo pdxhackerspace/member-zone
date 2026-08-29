@@ -376,6 +376,11 @@ class MemberMailer < ApplicationMailer
     if send_from_template('lapsed_access_reminder', user, extras)
       # Email sent from database template
     else
+      @lapsed_at = extras[:lapsed_at]
+      @reactivation_guidance_html = extras[:reactivation_guidance_html]
+      @reactivation_guidance_text = extras[:reactivation_guidance_text]
+      @profile_url = extras[:profile_url]
+      @support_email = extras[:support_email]
       mail(
         to: @user.email,
         subject: "#{@organization}: Your membership has lapsed"

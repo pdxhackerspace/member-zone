@@ -174,4 +174,22 @@ class MemberMailerTest < ActionMailer::TestCase
     Rails.application.config.x.slack_oidc = original_oidc
     template&.destroy
   end
+
+  test 'lapsed_access_reminder renders fallback views when template is disabled' do
+    EmailTemplate.where(key: 'lapsed_access_reminder').update_all(enabled: false)
+
+    user = users(:one)
+    user.update_columns(
+      membership_state: 'inactive_member',
+      membership_state_entered_at: 45.days.ago,
+      last_payment_date: 30.days.ago.to_date
+    )
+
+    email = MemberMailer.lapsed_access_reminder(user).deliver_now
+
+    assert_equal [user.email], email.to
+    assert_includes email.subject, 'Your membership has lapsed'
+    assert_includes email.html_part.body.to_s, 'facilities yesterday'
+    assert_includes email.text_part.body.to_s, 'facilities yesterday'
+  end
 end
