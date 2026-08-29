@@ -79,6 +79,15 @@ module Emails
       assert_includes preview.html, 'Office closed'
     end
 
+    # A SafeBuffer here would slip through ERB::Util.html_escape untouched and break out of the
+    # iframe srcdoc attribute at the layout's first double quote.
+    test 'html is escapable so it survives an iframe srcdoc attribute' do
+      composed = BodyComposer.html(body_html: '<p>Body.</p>')
+
+      assert_not composed.html_safe?
+      assert_includes ERB::Util.html_escape(composed), '&lt;!DOCTYPE html&gt;'
+    end
+
     test 'text returns nil when there is nothing to compose' do
       assert_nil BodyComposer.text
     end

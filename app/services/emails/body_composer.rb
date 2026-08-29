@@ -21,13 +21,18 @@ module Emails
 
       # Renders +body_html+ inside the shared mailer layout so previews pick up the banner,
       # footer, and email CSS from the same template the mailer uses.
+      #
+      # Returns a plain String rather than the renderer's SafeBuffer: this is a whole document
+      # destined for an iframe srcdoc, never markup to inline into a page, and +html_escape+
+      # silently does nothing to an already-safe string.
       def html(body_html:, banner: nil, footer: nil)
-        ApplicationController.render(
+        rendered = ApplicationController.render(
           # Email bodies are admin-authored HTML, the same trust boundary the mailers apply.
           html: body_html.to_s.html_safe, # rubocop:disable Rails/OutputSafety
           layout: 'mailer',
           assigns: { email_banner: banner, notification_footer: footer }
         )
+        String.new(rendered)
       end
 
       def text(body: nil, banner: nil, footer: nil)

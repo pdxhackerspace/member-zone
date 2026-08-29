@@ -60,6 +60,15 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'This is a required notice and cannot be turned off.'
   end
 
+  test 'show preview embeds a complete document in the iframe' do
+    get queued_mail_path(@pending)
+
+    assert_response :success
+    srcdoc = css_select('iframe#mail_preview').first['srcdoc']
+    assert srcdoc.start_with?('<!DOCTYPE html>'), 'expected a full document in srcdoc'
+    assert srcdoc.strip.end_with?('</html>'), 'srcdoc was truncated, likely by unescaped quotes'
+  end
+
   test 'show preview does not double the banner on pre-rendered bodies' do
     TextFragment.ensure_exists!(key: 'outgoing_email_banner', title: 'Outgoing email banner', content: '')
     TextFragment.find_by!(key: 'outgoing_email_banner').update!(content: '<p>Office closed Monday.</p>')

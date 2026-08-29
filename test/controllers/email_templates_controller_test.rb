@@ -47,6 +47,11 @@ class EmailTemplatesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, 'Office closed Monday.'
     assert_includes response.body, 'Manage overdue payment reminders'
+
+    srcdoc = css_select('iframe#email_preview_frame').first['srcdoc']
+    assert srcdoc.start_with?('<!DOCTYPE html>'), 'expected a full document in srcdoc'
+    assert srcdoc.strip.end_with?('</html>'), 'srcdoc was truncated, likely by unescaped quotes'
+    assert_includes srcdoc, 'Your dues are past due.'
   end
 
   test 'preview shows unsaved edits on post' do
