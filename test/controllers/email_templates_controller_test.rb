@@ -28,6 +28,27 @@ class EmailTemplatesControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'Initial text'
   end
 
+  test 'preview includes the outgoing email banner and opt-out footer added on send' do
+    ReminderSetting.seed_defaults!
+    ReminderSetting.find_by!(key: 'payment_overdue').update!(allow_opt_out: true)
+    TextFragment.ensure_exists!(key: 'outgoing_email_banner', title: 'Outgoing email banner', content: '')
+    TextFragment.find_by!(key: 'outgoing_email_banner').update!(content: '<p>Office closed Monday.</p>')
+    template = EmailTemplate.create!(
+      key: 'payment_past_due',
+      name: 'Payment past due',
+      subject: 'Dues past due',
+      body_html: '<p>Your dues are past due.</p>',
+      body_text: 'Your dues are past due.',
+      enabled: true
+    )
+
+    get preview_email_template_path(template)
+
+    assert_response :success
+    assert_includes response.body, 'Office closed Monday.'
+    assert_includes response.body, 'Manage overdue payment reminders'
+  end
+
   test 'preview shows unsaved edits on post' do
     post preview_email_template_path(@template), params: {
       email_template: {

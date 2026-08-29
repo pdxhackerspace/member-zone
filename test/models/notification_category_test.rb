@@ -10,6 +10,13 @@ class NotificationCategoryTest < ActiveSupport::TestCase
     assert_empty missing, "Uncatalogued MemberMailer actions: #{missing.join(', ')}"
   end
 
+  test 'every email template key is cataloged or admin-only' do
+    covered = NotificationCategory.member_mailer_actions + NotificationCategory::ADMIN_MAILER_ACTIONS
+
+    missing = EmailTemplate::DEFAULT_TEMPLATES.keys.map(&:to_s) - covered
+    assert_empty missing, "Uncatalogued email template keys: #{missing.join(', ')}"
+  end
+
   test 'parking notices is the only reminder with opt-out disabled by default' do
     ReminderSetting.seed_defaults!
     parking = ReminderSetting.find_by!(key: 'parking_notices')

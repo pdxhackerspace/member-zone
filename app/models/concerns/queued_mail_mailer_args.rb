@@ -33,6 +33,14 @@ module QueuedMailMailerArgs
     end
   end
 
+  # Applicant emails carry their opt-out link on the verification token rather than a user account.
+  def application_verification_token
+    verification_id = mailer_args&.dig('application_verification_id')
+    return if verification_id.blank?
+
+    ApplicationVerification.find_by(id: verification_id)&.token
+  end
+
   class_methods do
     def dispatch_mailer(action, mailer_args)
       if mailer_args.last.is_a?(Hash)

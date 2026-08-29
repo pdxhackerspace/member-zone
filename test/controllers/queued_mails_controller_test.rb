@@ -49,6 +49,31 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_match @pending.to, response.body
   end
 
+  test 'show preview includes the banner and footer that delivery adds' do
+    TextFragment.ensure_exists!(key: 'outgoing_email_banner', title: 'Outgoing email banner', content: '')
+    TextFragment.find_by!(key: 'outgoing_email_banner').update!(content: '<p>Office closed Monday.</p>')
+
+    get queued_mail_path(@pending)
+
+    assert_response :success
+    assert_includes response.body, 'Office closed Monday.'
+    assert_includes response.body, 'This is a required notice and cannot be turned off.'
+  end
+
+  test 'show preview does not double the banner on pre-rendered bodies' do
+    TextFragment.ensure_exists!(key: 'outgoing_email_banner', title: 'Outgoing email banner', content: '')
+    TextFragment.find_by!(key: 'outgoing_email_banner').update!(content: '<p>Office closed Monday.</p>')
+    EmailTemplate.where(key: 'payment_past_due').delete_all
+    queued = QueuedMail.enqueue(:payment_past_due, users(:member_with_local_account), reason: 'Test')
+
+    get queued_mail_path(queued)
+
+    assert_response :success
+    assert_predicate queued, :pre_rendered_mail_body?
+    srcdoc = css_select('iframe#mail_preview').first['srcdoc']
+    assert_equal 1, srcdoc.scan('Office closed Monday.').size
+  end
+
   # ─── Edit ─────────────────────────────────────────────────────────
 
   test 'shows edit form for pending mail' do
