@@ -62,10 +62,14 @@
       display: block;
     }
     .html-preview {
-      background: white;
       max-width: 700px;
       margin: 0 auto;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .html-preview iframe {
+      display: block;
+      width: 100%;
+      min-height: 480px;
+      border: none;
     }
     .text-preview {
       background: white;
@@ -92,56 +96,11 @@
     .close-btn:hover {
       background: rgba(255,255,255,0.3);
     }
-    /* Email styles from mailer layout */
-    .email-wrapper {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .email-content {
-      background-color: #ffffff;
-      border-radius: 8px;
-      padding: 32px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .email-content h1 {
-      color: #1a1a1a;
-      font-size: 24px;
-      font-weight: 600;
-      margin-top: 0;
-      margin-bottom: 24px;
-      border-bottom: 2px solid #007bff;
-      padding-bottom: 12px;
-    }
-    .email-content h2 {
-      color: #333333;
-      font-size: 18px;
-      font-weight: 600;
-      margin-top: 24px;
-      margin-bottom: 12px;
-    }
-    .email-content p {
-      margin: 0 0 16px 0;
-      line-height: 1.6;
-    }
-    .email-content ul, .email-content ol {
-      margin: 0 0 16px 0;
-      padding-left: 24px;
-    }
-    .email-content li {
-      margin-bottom: 8px;
-    }
-    .email-content a {
-      color: #007bff;
-      text-decoration: none;
-    }
-    .email-footer {
-      margin-top: 32px;
-      padding-top: 16px;
-      border-top: 1px solid #e0e0e0;
-      font-size: 14px;
-      color: #666666;
-      text-align: center;
+    .preview-note {
+      max-width: 700px;
+      margin: 0 auto 12px auto;
+      font-size: 12px;
+      color: #6c757d;
     }
   </style>
 </head>
@@ -158,22 +117,19 @@
   </div>
 
   <div class="preview-content">
+    <div class="preview-note">
+      Rendered with the mailer layout, outgoing email banner, and notification footer, exactly as sent.
+    </div>
+
     <div id="html-pane" class="preview-pane active">
       <div class="html-preview">
-        <div class="email-wrapper">
-          <div class="email-content">
-            <%= @rendered[:body_html].html_safe %>
-          </div>
-          <div class="email-footer">
-            <p>&copy; <%= Date.current.year %> <%= ENV.fetch('ORGANIZATION_NAME', 'Member Zone') %></p>
-            <p>This is an automated message. Please do not reply directly to this email.</p>
-          </div>
-        </div>
+        <iframe id="email_preview_frame" srcdoc="<%= ERB::Util.html_escape(@preview.html) %>"
+                sandbox="allow-same-origin"></iframe>
       </div>
     </div>
 
     <div id="text-pane" class="preview-pane">
-      <div class="text-preview"><%= @rendered[:body_text] %></div>
+      <div class="text-preview"><%= @preview.text %></div>
     </div>
   </div>
 
@@ -182,11 +138,21 @@
       tab.addEventListener('click', function() {
         document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.preview-pane').forEach(p => p.classList.remove('active'));
-        
+
         this.classList.add('active');
         document.getElementById(this.getAttribute('data-tab') + '-pane').classList.add('active');
       });
     });
+
+    (function() {
+      var frame = document.getElementById('email_preview_frame');
+      if (!frame) return;
+      frame.addEventListener('load', function() {
+        try {
+          frame.style.height = Math.max(frame.contentDocument.documentElement.scrollHeight + 20, 480) + 'px';
+        } catch (e) {}
+      });
+    })();
   </script>
 </body>
 </html>

@@ -102,6 +102,13 @@ class NotificationCategory
       group: 'Account',
       reminder_key: nil,
       mailer_actions: %w[login_link_sent login_link_expired]
+    },
+    'invitations' => {
+      name: 'Invitations',
+      description: 'Your invitation to create a Member Zone account.',
+      group: 'Account',
+      reminder_key: nil,
+      mailer_actions: %w[member_invitation]
     }
   }.freeze
 

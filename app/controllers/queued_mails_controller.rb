@@ -26,7 +26,9 @@ class QueuedMailsController < AuthenticatedController
     @pending_count = QueuedMail.pending.count
   end
 
-  def show; end
+  def show
+    @preview = @queued_mail.rendered_preview
+  end
 
   def edit
     return if @queued_mail.pending?
