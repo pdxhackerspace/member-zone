@@ -30,6 +30,13 @@ class ReminderSetting < ApplicationRecord
                    'The initial issued email on creation is always sent.',
       enabled: false,
       allow_opt_out: false
+    },
+    'lapsed_access' => {
+      name: 'Lapsed member access reminder',
+      description: 'Daily reminder to inactive members who badged in yesterday that their membership has lapsed ' \
+                   'and how to reactivate.',
+      enabled: false,
+      allow_opt_out: true
     }
   }.freeze
 

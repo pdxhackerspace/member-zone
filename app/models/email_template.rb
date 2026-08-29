@@ -33,7 +33,11 @@ class EmailTemplate < ApplicationRecord
     '{{slack_link_html}}' => 'Slack self-link paragraph for HTML bodies (blank when unavailable)',
     '{{slack_link_text}}' => 'Slack self-link line for plain-text bodies (blank when unavailable)',
     '{{support_email}}' => 'Address members should write to for help',
-    '{{reactivation_months}}' => 'Months a lapsed member can resubscribe without reapplying'
+    '{{reactivation_months}}' => 'Months a lapsed member can resubscribe without reapplying',
+    '{{lapsed_at}}' => 'Date the membership lapsed (lapsed access reminder only)',
+    '{{profile_url}}' => 'Link to the member profile (lapsed access reminder only)',
+    '{{reactivation_guidance_html}}' => 'Reactivation instructions for HTML bodies (lapsed access reminder only)',
+    '{{reactivation_guidance_text}}' => 'Reactivation instructions for plain-text bodies (lapsed access reminder only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
@@ -417,7 +421,7 @@ class EmailTemplate < ApplicationRecord
     },
     'admin_dashboard_urgent_digest' => {
       name: 'Admin Dashboard: Urgent Items',
-      description: 'Daily 7am digest of urgent admin dashboard items for executive directors',
+      description: 'Daily 9:15am digest of urgent admin dashboard items for executive directors',
       subject: '{{organization_name}}: {{urgent_item_count}} urgent admin dashboard items',
       body_html: <<~HTML,
         <h1>Urgent admin dashboard items</h1>
@@ -646,6 +650,34 @@ class EmailTemplate < ApplicationRecord
         Reply to this email and we will find you a time.
 
         See you soon,
+        The {{organization_name}} Team
+      TEXT
+    },
+    'lapsed_access_reminder' => {
+      name: 'Lapsed Member Access Reminder',
+      description: 'Sent when an inactive member badged in yesterday',
+      subject: '{{organization_name}}: Your membership has lapsed',
+      body_html: <<~HTML,
+        <h1>Membership lapsed</h1>
+        <p>Hello {{member_name}},</p>
+        <p>Our access logs show you used {{organization_name}} facilities yesterday, but your membership lapsed on {{lapsed_at}}.</p>
+        <p>{{reactivation_guidance_html}}</p>
+        <p>Visit your <a href="{{profile_url}}">member profile</a> for reactivation options, or email <a href="mailto:{{support_email}}">{{support_email}}</a> if you need help.</p>
+        <p>Best regards,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Membership lapsed
+
+        Hello {{member_name}},
+
+        Our access logs show you used {{organization_name}} facilities yesterday, but your membership lapsed on {{lapsed_at}}.
+
+        {{reactivation_guidance_text}}
+
+        Visit your member profile for reactivation options: {{profile_url}}
+        Or email {{support_email}} if you need help.
+
+        Best regards,
         The {{organization_name}} Team
       TEXT
     },

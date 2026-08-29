@@ -47,6 +47,13 @@ class NotificationCategory
       reminder_key: 'application_link',
       mailer_actions: %w[application_link_reminder application_email_verification]
     },
+    'lapsed_access' => {
+      name: 'Lapsed member access reminders',
+      description: 'Reminder when you badge in after your membership has lapsed.',
+      group: 'Reminders',
+      reminder_key: 'lapsed_access',
+      mailer_actions: %w[lapsed_access_reminder]
+    },
     'parking_issued' => {
       name: 'Parking notices issued',
       description: 'Confirmation when a parking permit or ticket is created for you.',

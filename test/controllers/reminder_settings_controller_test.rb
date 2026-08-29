@@ -30,7 +30,36 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Orientation reminder', response.body
     assert_select 'input[type=submit][value=Save]', count: 0
     assert_select 'form[data-controller=?]', 'reminder-setting-form'
-    assert_select 'button', text: 'Send now', minimum: 5
+    assert_select 'button', text: 'Send now', minimum: 6
+  end
+
+  test 'index lists lapsed access reminder with preview counts' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Lapsed member access reminder', response.body
+    assert_match 'accessed yesterday', response.body
+  end
+
+  test 'show lists due inactive members for lapsed access' do
+    now = Time.zone.local(2026, 8, 6, 8, 5, 0)
+    user = User.create!(
+      email: 'due-lapsed-access@example.com',
+      full_name: 'Due Lapsed Access User',
+      service_account: false,
+      membership_state: 'inactive_member',
+      payment_type: 'unknown',
+      last_payment_date: (now - 30.days).to_date
+    )
+    user.update_columns(membership_state_entered_at: now - 45.days)
+    AccessLog.create!(user: user, logged_at: now - 1.day, name: user.display_name, action: 'opened')
+
+    travel_to now do
+      get reminder_setting_url('lapsed_access')
+    end
+
+    assert_response :success
+    assert_match user.display_name, response.body
   end
 
   test 'show lists members waiting on their orientation' do

@@ -79,27 +79,11 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
-  # Overdue Payment Reminder - Daily at 7:30am (cadence enforced per member)
-  Sidekiq::Cron::Job.create(
-    name: 'Overdue Payment Reminder - Daily at 7:30am',
-    cron: '30 7 * * *',
-    class: 'PaymentOverdueReminderJob',
-    active_job: true
-  )
-
   # Parking Notice Expiration - Daily at 7am
   Sidekiq::Cron::Job.create(
     name: 'Parking Notice Expiration - Daily at 7am',
     cron: '0 7 * * *',
     class: 'ParkingNoticeExpirationJob',
-    active_job: true
-  )
-
-  # Admin Dashboard Urgent Digest - Daily at 7am
-  Sidekiq::Cron::Job.create(
-    name: 'Admin Dashboard Urgent Digest - Daily at 7am',
-    cron: '0 7 * * *',
-    class: 'AdminDashboardUrgentDigestJob',
     active_job: true
   )
 
@@ -119,11 +103,27 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Overdue Payment Reminder - Daily at 7:30am (cadence enforced per member)
+  Sidekiq::Cron::Job.create(
+    name: 'Overdue Payment Reminder - Daily at 7:30am',
+    cron: '30 7 * * *',
+    class: 'PaymentOverdueReminderJob',
+    active_job: true
+  )
+
   # Orientation Reminder - Daily at 7:45am (cadence enforced per member)
   Sidekiq::Cron::Job.create(
     name: 'Orientation Reminder - Daily at 7:45am',
     cron: '45 7 * * *',
     class: 'OrientationReminderJob',
+    active_job: true
+  )
+
+  # Lapsed Member Access Reminder - Daily at 8:05am
+  Sidekiq::Cron::Job.create(
+    name: 'Lapsed Member Access Reminder - Daily at 8:05am',
+    cron: '5 8 * * *',
+    class: 'LapsedAccessReminderJob',
     active_job: true
   )
 
@@ -140,6 +140,16 @@ Sidekiq.configure_server do |config|
     name: 'Membership Application Reminders - Daily at 9am',
     cron: '0 9 * * *',
     class: 'MembershipApplicationReminderJob',
+    active_job: true
+  )
+
+  # Admin Dashboard Urgent Digest - Daily at 9:15am, after morning reminders so queued mail
+  # is included in mailer health checks and admins see the day's reminder backlog.
+  Sidekiq::Cron::Job.find('Admin Dashboard Urgent Digest - Daily at 7am')&.destroy
+  Sidekiq::Cron::Job.create(
+    name: 'Admin Dashboard Urgent Digest - Daily at 9:15am',
+    cron: '15 9 * * *',
+    class: 'AdminDashboardUrgentDigestJob',
     active_job: true
   )
 
