@@ -110,7 +110,7 @@ group :development do
   # gem "spring"
 
   # Code style checker
-  gem 'rubocop', '~> 1.88', require: false
+  gem 'rubocop', '~> 1.90', require: false
   gem 'rubocop-rails', '~> 2.36', require: false
 
   # Preview emails in browser instead of sending
