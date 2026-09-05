@@ -376,6 +376,7 @@ class MemberMailer < ApplicationMailer
     if send_from_template('lapsed_access_reminder', user, extras)
       # Email sent from database template
     else
+      @access_summary = extras[:access_summary]
       @lapsed_at = extras[:lapsed_at]
       @reactivation_guidance_html = extras[:reactivation_guidance_html]
       @reactivation_guidance_text = extras[:reactivation_guidance_text]
@@ -500,10 +501,13 @@ class MemberMailer < ApplicationMailer
     { days_since_approval: days.to_s }
   end
 
-  def self.lapsed_access_template_extras(user)
+  # +access_log_ids+ names the visits this reminder speaks for, so the copy describes those rather
+  # than guessing from the window. Callers without them fall back to the member's open visits.
+  def self.lapsed_access_template_extras(user, access_log_ids: nil, now: Time.current)
     lapsed_at = user.membership_state_entered_at
     guidance = lapsed_access_reactivation_guidance(user)
     {
+      access_summary: Reminders::LapsedAccessVisits.summary(user, access_log_ids: access_log_ids, now: now),
       lapsed_at: lapsed_at ? lapsed_at.strftime('%B %d, %Y') : 'recently',
       profile_url: profile_url_for(user),
       support_email: ENV.fetch('EMAIL_SUPPORT_ADDRESS', ENV.fetch('EMAIL_FROM_ADDRESS', 'support@example.com')),
@@ -589,7 +593,7 @@ class MemberMailer < ApplicationMailer
   end
 
   def self.merge_lapsed_access_template_keys!(vars, extra_args)
-    %i[lapsed_at profile_url support_email reactivation_months reactivation_guidance_html
+    %i[access_summary lapsed_at profile_url support_email reactivation_months reactivation_guidance_html
        reactivation_guidance_text].each do |key|
       vars[key] = extra_args[key].to_s if extra_args.key?(key)
     end

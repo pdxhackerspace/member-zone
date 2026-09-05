@@ -66,6 +66,8 @@ A member is emailed **once per batch of visits, however many visits that is**. W
 
 Widening the window therefore does not mean more email. It means each reminder covers more ground: set to 7 days, the first run picks up a week of visits in a single message. It is worth widening if the job has been off for a while, or if you want a Monday run to cover the weekend.
 
+The email names the visits it is about, through the `{{access_summary}}` variable in the **Lapsed Member Access Reminder** template — "yesterday", "3 times today", or "6 times between September 1 and September 5" as the case may be. Leave that variable in the copy if you reword the template: without it the email asserts nothing about when the member was here, and hardcoding "yesterday" in its place will be wrong as soon as the window is widened.
+
 The due list shows a **New visits** count per member, so you can see how much a given reminder is about to cover before you send it.
 
 **Email copy** is editable under Settings → Email templates (`Lapsed Member Access Reminder`). Reminders wait in the outbound mail review queue for approval before they go out. A message held for review records the visits it actually described, so visits that happen while it waits are not silently swallowed — they show up in the next reminder.

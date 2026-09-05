@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -898,7 +898,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_210000) do
     t.string "key", null: false
     t.integer "lookback_days", default: 1, null: false
     t.string "name", null: false
-    t.boolean "remind_under_review", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["enabled"], name: "index_reminder_settings_on_enabled"
     t.index ["key"], name: "index_reminder_settings_on_key", unique: true

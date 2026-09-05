@@ -56,7 +56,7 @@ module Reminders
     # +access_log_ids+ rides along in the queued mail's mailer_args so that a message held for
     # review stamps exactly the visits it described, not whatever the window covers on send day.
     def deliver_reminder_mail(user, access_log_ids)
-      extras = MemberMailer.lapsed_access_template_extras(user)
+      extras = MemberMailer.lapsed_access_template_extras(user, access_log_ids: access_log_ids, now: @now)
 
       QueuedMail.enqueue(:lapsed_access_reminder, user,
                          reason: reason_for(user, access_log_ids),

@@ -80,6 +80,22 @@ module Reminders
 
       assert_equal 6, AccessLog.where(user_id: user.id).where.not(lapsed_access_reminder_sent_at: nil).count
       assert_empty AccessLog.where(user_id: user.id).lapsed_access_unnotified
+      assert_includes ActionMailer::Base.deliveries.last.text_part.body.decoded, 'Visits: 6 times today'
+    end
+
+    # The copy used to claim "yesterday" flatly, which a same-morning visit or a widened window
+    # both make false.
+    test 'the email names the days it covers rather than assuming yesterday' do
+      @setting.update!(lookback_days: 7)
+      user = inactive_user(email: 'names-the-days@example.com', accessed_at: @now - 3.days)
+      AccessLog.create!(user: user, logged_at: @now - 2.hours, name: user.display_name)
+
+      travel_to @now do
+        run_reminder
+      end
+
+      assert_includes ActionMailer::Base.deliveries.last.text_part.body.decoded,
+                      'Visits: 2 times between August 3 and August 6'
     end
 
     test 'a second run the same day sends nothing more' do
@@ -171,6 +187,7 @@ module Reminders
       queued = QueuedMail.find_by!(recipient: user, mailer_action: 'lapsed_access_reminder')
       described_ids = queued.mailer_args['access_log_ids']
       assert_equal 2, described_ids.size
+      assert_includes queued.body_text, 'Visits: 2 times today'
       assert_equal 2,
                    AccessLog.where(user_id: user.id).lapsed_access_unnotified.count,
                    'visits must stay open until the reminder is actually sent'
@@ -231,8 +248,8 @@ module Reminders
         key: 'lapsed_access_reminder',
         name: 'Lapsed Member Access Reminder',
         subject: 'Lapsed {{member_name}} on {{lapsed_at}}',
-        body_html: '<p>{{reactivation_guidance_html}}</p><p>{{profile_url}}</p>',
-        body_text: "{{reactivation_guidance_text}}\n{{profile_url}}",
+        body_html: '<p>Visits: {{access_summary}}</p><p>{{reactivation_guidance_html}}</p><p>{{profile_url}}</p>',
+        body_text: "Visits: {{access_summary}}\n{{reactivation_guidance_text}}\n{{profile_url}}",
         enabled: true,
         send_immediately: send_immediately
       )
