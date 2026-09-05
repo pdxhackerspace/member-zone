@@ -5,6 +5,7 @@ class MailRecipientGuard
     admin_new_application
     staff_new_application
     staff_application_reminder
+    staff_application_nag
     admin_dashboard_urgent_digest
     blocked_recipient_delivery_attempt
   ].freeze

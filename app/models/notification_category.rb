@@ -47,6 +47,13 @@ class NotificationCategory
       reminder_key: 'application_link',
       mailer_actions: %w[application_link_reminder application_email_verification]
     },
+    'lapsed_access' => {
+      name: 'Lapsed member access reminders',
+      description: 'Reminder when you badge in after your membership has lapsed.',
+      group: 'Reminders',
+      reminder_key: 'lapsed_access',
+      mailer_actions: %w[lapsed_access_reminder]
+    },
     'parking_issued' => {
       name: 'Parking notices issued',
       description: 'Confirmation when a parking permit or ticket is created for you.',
@@ -95,6 +102,13 @@ class NotificationCategory
       group: 'Account',
       reminder_key: nil,
       mailer_actions: %w[login_link_sent login_link_expired]
+    },
+    'invitations' => {
+      name: 'Invitations',
+      description: 'Your invitation to create a Member Zone account.',
+      group: 'Account',
+      reminder_key: nil,
+      mailer_actions: %w[member_invitation]
     }
   }.freeze
 

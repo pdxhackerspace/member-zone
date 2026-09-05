@@ -22,12 +22,21 @@ People without accounts who opt out during the application flow are recorded in 
 
 Mandatory categories (membership status, parking issued, account security, etc.) always deliver.
 
-## Email footers
+## Email banner and footers
 
-`Notifications::FooterPresenter` renders opt-out or mandatory copy in `app/views/layouts/mailer.html.erb` and plain-text equivalents. Applicant emails link to `/apply/notifications/:token/opt-out`; members use signed `generates_token_for :notification_preferences` links that land on the preferences page for confirm-then-apply opt-out.
+Every outgoing email is wrapped in two pieces of chrome that templates must never carry themselves:
+
+- the `outgoing_email_banner` text fragment above the body, rendered by `Emails::BannerPresenter` (omitted entirely when the fragment is blank)
+- the opt-out or mandatory notice below the body, rendered by `Notifications::FooterPresenter`
+
+`ApplicationMailer#mail` assigns both, and `app/views/layouts/mailer.html.erb` / `mailer.text.erb` render them, so all four delivery paths (direct `MemberMailer` call, `EmailTemplateMailer` immediate send, and both `QueuedMailMailer` branches) get them automatically.
+
+Applicant emails link to `/apply/notifications/:token/opt-out`; members use signed `generates_token_for :notification_preferences` links that land on the preferences page for confirm-then-apply opt-out.
+
+`QueuedMail` stores template-backed bodies bare, so the admin previews (Mail Queue and Email Templates) compose the chrome through `Emails::BodyComposer.for_preview` in order to match what the recipient receives. `QueuedMail#rendered_preview` skips composition for `pre_rendered_mail_body?` records, whose stored HTML already went through the mailer layout. `Emails::BodyComposer.text` is also what `ApplicationMailer#plain_text_email_body` uses, so preview and delivery cannot drift.
 
 ## Adding a new member email
 
-1. Add the mailer action to a category in `NotificationCategory::CATALOG`, or to `MailRecipientGuard::ADMIN_MAILER_ACTIONS` if staff-only.
-2. Extend `test/models/notification_category_test.rb` coverage (the catalog completeness test will fail if you forget).
+1. Add the mailer action to a category in `NotificationCategory::CATALOG`, or to `MailRecipientGuard::ADMIN_MAILER_ACTIONS` if staff-only. This covers email template keys too, not just `MemberMailer` methods.
+2. Extend `test/models/notification_category_test.rb` coverage (the catalog completeness tests will fail if you forget).
 3. If the email is a new optional reminder, add a `ReminderSetting` catalog entry with `allow_opt_out`.

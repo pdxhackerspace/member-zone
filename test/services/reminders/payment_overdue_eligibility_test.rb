@@ -4,6 +4,10 @@ module Reminders
   class PaymentOverdueEligibilityTest < ActiveSupport::TestCase
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
+      # base_user? resolves membership state through effective_membership_state, which reads the
+      # real clock rather than the injected now. Without freezing it, these members drift out of
+      # their overdue grace period as the wall clock moves and stop being due.
+      travel_to @now
       MembershipSetting.instance.update!(
         payment_overdue_reminder_repeat_days: 7,
         overdue_grace_period_days: 30

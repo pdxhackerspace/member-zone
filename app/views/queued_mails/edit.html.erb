@@ -57,7 +57,7 @@
         <% if @queued_mail.errors.key?(:body_html) %>
           <div class="invalid-feedback"><%= @queued_mail.errors[:body_html].join(', ') %></div>
         <% end %>
-        <div class="form-text">HTML content of the email. The mailer layout wrapping is applied automatically when sent.</div>
+        <div class="form-text">HTML content of the email. The mailer layout, outgoing email banner, and opt-out footer are applied automatically when sent.</div>
       </div>
 
       <div class="mb-3">

@@ -1,0 +1,13 @@
+Membership lapsed
+
+Hello <%= @user.display_name %>,
+
+Our access logs show you used <%= @organization %> facilities <%= @access_summary %>, but your membership lapsed on <%= @lapsed_at %>.
+
+<%= @reactivation_guidance_text %>
+
+Visit your member profile for reactivation options: <%= @profile_url %>
+Or email <%= @support_email %> if you need help.
+
+Best regards,
+The <%= @organization %> Team

@@ -8,7 +8,8 @@ class ReminderSettingsController < AdminController
     'application_link' => Reminders::NotifyApplicationLink,
     'payment_overdue' => Reminders::NotifyPaymentOverdue,
     'orientation' => Reminders::NotifyOrientation,
-    'parking_notices' => Reminders::NotifyParkingNotices
+    'parking_notices' => Reminders::NotifyParkingNotices,
+    'lapsed_access' => Reminders::NotifyLapsedAccess
   }.freeze
 
   before_action :set_reminder_setting, only: %i[show update send_now]
@@ -33,6 +34,9 @@ class ReminderSettingsController < AdminController
     @parking_due_count = Reminders::ParkingNoticeEligibility.count_due
     @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
     @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
+    @lapsed_access_due_count = Reminders::LapsedAccessEligibility.count_due
+    @lapsed_access_window_count = Reminders::LapsedAccessEligibility.total_accessed_in_window
+    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
     @building_access_topic = TrainingTopic.building_access
     @membership_setting = MembershipSetting.instance
   end
@@ -45,8 +49,10 @@ class ReminderSettingsController < AdminController
     if @reminder_setting.update(reminder_setting_params)
       redirect_to reminder_settings_path, notice: "#{@reminder_setting.name} updated."
     else
-      load_show_data
-      render :show, status: :unprocessable_content
+      # The edit controls live on the index cards, which the show page does not render, so the
+      # errors have to travel back to the index rather than into a form.
+      problems = @reminder_setting.errors.full_messages.to_sentence
+      redirect_to reminder_settings_path, alert: "#{@reminder_setting.name} not updated — #{problems}."
     end
   end
 
@@ -74,7 +80,9 @@ class ReminderSettingsController < AdminController
   end
 
   def reminder_setting_params
-    params.expect(reminder_setting: %i[enabled allow_opt_out])
+    permitted = %i[enabled allow_opt_out]
+    permitted << :lookback_days if @reminder_setting.configurable_lookback?
+    params.expect(reminder_setting: permitted)
   end
 
   def send_now_blocked_reason(reminder)
@@ -95,11 +103,7 @@ class ReminderSettingsController < AdminController
 
     case @reminder_setting.key
     when 'slack_signup'
-      @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
-      @slack_due_count = @pagy.count
-      @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
-      @slack_source_enabled = MemberSource.enabled?('slack')
-      @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+      load_slack_signup_show_data
     when 'application_link'
       load_application_link_show_data
     when 'payment_overdue'
@@ -115,7 +119,25 @@ class ReminderSettingsController < AdminController
       @building_access_topic = TrainingTopic.building_access
     when 'parking_notices'
       load_parking_notices_show_data
+    when 'lapsed_access'
+      load_lapsed_access_show_data
     end
+  end
+
+  def load_slack_signup_show_data
+    @pagy, @due_users = pagy(Reminders::SlackSignupEligibility.due, limit: PER_PAGE)
+    @slack_due_count = @pagy.count
+    @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
+    @slack_source_enabled = MemberSource.enabled?('slack')
+    @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+  end
+
+  def load_lapsed_access_show_data
+    @pagy, @due_users = pagy(Reminders::LapsedAccessEligibility.due, limit: PER_PAGE)
+    @lapsed_access_due_count = @pagy.count
+    @lapsed_access_window_count = Reminders::LapsedAccessEligibility.total_accessed_in_window
+    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
+    @lapsed_access_visit_counts = Reminders::LapsedAccessEligibility.unnotified_access_counts(@due_users.map(&:id))
   end
 
   def load_parking_notices_show_data

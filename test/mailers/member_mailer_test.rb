@@ -174,4 +174,49 @@ class MemberMailerTest < ActionMailer::TestCase
     Rails.application.config.x.slack_oidc = original_oidc
     template&.destroy
   end
+
+  test 'lapsed_access_reminder renders fallback views when template is disabled' do
+    user = lapsed_member_for_fallback_views
+
+    travel_to Time.zone.local(2026, 9, 5, 8, 0, 0) do
+      AccessLog.create!(user: user, logged_at: 20.hours.ago, name: user.display_name, action: 'opened')
+      email = MemberMailer.lapsed_access_reminder(user).deliver_now
+
+      assert_equal [user.email], email.to
+      assert_includes email.subject, 'Your membership has lapsed'
+      assert_includes email.html_part.body.to_s, 'facilities yesterday'
+      assert_includes email.text_part.body.to_s, 'facilities yesterday'
+    end
+  end
+
+  # The copy used to say "yesterday" unconditionally, which a visit earlier the same morning and
+  # a widened lookback window both contradict.
+  test 'lapsed_access_reminder describes the visits rather than assuming yesterday' do
+    user = lapsed_member_for_fallback_views
+
+    travel_to Time.zone.local(2026, 9, 5, 8, 0, 0) do
+      AccessLog.create!(user: user, logged_at: 2.hours.ago, name: user.display_name, action: 'opened')
+      AccessLog.create!(user: user, logged_at: 30.minutes.ago, name: user.display_name, action: 'opened')
+      email = MemberMailer.lapsed_access_reminder(user).deliver_now
+
+      assert_includes email.html_part.body.to_s, 'facilities 2 times today'
+      assert_includes email.text_part.body.to_s, 'facilities 2 times today'
+    end
+  end
+
+  private
+
+  # A fresh member rather than a fixture, whose own access logs would be mistaken for the visits
+  # under test.
+  def lapsed_member_for_fallback_views
+    EmailTemplate.where(key: 'lapsed_access_reminder').update_all(enabled: false)
+    User.create!(
+      email: 'lapsed-fallback@example.com',
+      full_name: 'Lapsed Fallback User',
+      service_account: false,
+      membership_state: 'inactive_member',
+      payment_type: 'unknown',
+      last_payment_date: 30.days.ago.to_date
+    ).tap { |user| user.update_columns(membership_state_entered_at: 45.days.ago) }
+  end
 end

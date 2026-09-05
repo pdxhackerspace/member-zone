@@ -57,6 +57,13 @@ class EmailTemplatesController < AuthenticatedController
   def preview
     apply_preview_attributes if preview_request?
     @rendered = @email_template.preview
+    @preview = Emails::BodyComposer.for_preview(
+      body_html: @rendered[:body_html],
+      body_text: @rendered[:body_text],
+      mailer_action: @email_template.key,
+      user: current_user,
+      email: current_user&.email
+    )
     render layout: false
   end
 

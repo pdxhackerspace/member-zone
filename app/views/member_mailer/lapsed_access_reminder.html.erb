@@ -1,0 +1,12 @@
+<h1>Membership lapsed</h1>
+
+<p>Hello <%= @user.display_name %>,</p>
+
+<p>Our access logs show you used <%= @organization %> facilities <%= @access_summary %>, but your membership lapsed on <%= @lapsed_at %>.</p>
+
+<p><%= @reactivation_guidance_html.html_safe %></p>
+
+<p>Visit your <%= link_to 'member profile', @profile_url %> for reactivation options, or email <%= mail_to @support_email %> if you need help.</p>
+
+<p>Best regards,<br>
+The <%= @organization %> Team</p>

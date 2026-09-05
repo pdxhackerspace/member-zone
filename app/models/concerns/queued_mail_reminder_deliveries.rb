@@ -14,6 +14,7 @@ module QueuedMailReminderDeliveries
     record_slack_signup_reminder_delivery!(sent_time) if slack_signup_reminder_delivery?
     record_application_link_reminder_delivery!(sent_time) if application_link_reminder_delivery?
     record_orientation_reminder_delivery!(sent_time) if orientation_reminder_delivery?
+    record_lapsed_access_reminder_delivery!(sent_time) if lapsed_access_reminder_delivery?
     record_parking_notice_reminder_delivery!(sent_time) if parking_notice_reminder_delivery?
   end
 
@@ -35,6 +36,21 @@ module QueuedMailReminderDeliveries
 
   def orientation_reminder_delivery?
     mailer_action == 'orientation_reminder' && recipient.present?
+  end
+
+  def lapsed_access_reminder_delivery?
+    mailer_action == 'lapsed_access_reminder' && recipient.present?
+  end
+
+  def record_lapsed_access_reminder_delivery!(sent_time)
+    access_log_ids = mailer_args.is_a?(Hash) ? mailer_args['access_log_ids'] : nil
+    Reminders::NotifyLapsedAccess.record_delivery!(recipient, at: sent_time, access_log_ids: access_log_ids)
+  rescue StandardError => e
+    Rails.logger.error(
+      "[QueuedMail] lapsed_access_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
+      "#{e.class}: #{e.message}"
+    )
+    raise
   end
 
   def record_orientation_reminder_delivery!(sent_time)

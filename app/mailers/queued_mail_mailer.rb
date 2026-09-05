@@ -29,20 +29,12 @@ class QueuedMailMailer < ApplicationMailer
   end
 
   def assign_queued_notification_footer(queued_mail)
-    verification_token = verification_token_for(queued_mail)
     @notification_footer = Notifications::DeliveryGate.footer_for(
       mailer_action: queued_mail.mailer_action,
       user: queued_mail.recipient,
       email: queued_mail.to,
-      verification_token: verification_token
+      verification_token: queued_mail.application_verification_token
     )
-  end
-
-  def verification_token_for(queued_mail)
-    verification_id = queued_mail.mailer_args&.dig('application_verification_id')
-    return if verification_id.blank?
-
-    ApplicationVerification.find_by(id: verification_id)&.token
   end
 
   def mark_skip_duplicate_mail_log

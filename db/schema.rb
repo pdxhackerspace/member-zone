@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -78,6 +78,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
   create_table "access_logs", force: :cascade do |t|
     t.string "action"
     t.datetime "created_at", null: false
+    t.datetime "lapsed_access_reminder_sent_at"
     t.string "location"
     t.datetime "logged_at"
     t.string "name"
@@ -87,6 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
     t.index ["location"], name: "index_access_logs_on_location"
     t.index ["logged_at"], name: "index_access_logs_on_logged_at"
     t.index ["name"], name: "index_access_logs_on_name"
+    t.index ["user_id", "logged_at"], name: "index_access_logs_unnotified_lapsed_access", where: "(lapsed_access_reminder_sent_at IS NULL)"
     t.index ["user_id"], name: "index_access_logs_on_user_id"
   end
 
@@ -894,6 +896,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
     t.text "description"
     t.boolean "enabled", default: false, null: false
     t.string "key", null: false
+    t.integer "lookback_days", default: 1, null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["enabled"], name: "index_reminder_settings_on_enabled"
@@ -1155,6 +1158,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
     t.boolean "is_sponsored", default: false, null: false
     t.boolean "key_access_paused", default: false, null: false
     t.datetime "key_access_paused_at"
+    t.datetime "lapsed_access_reminder_sent_at"
     t.datetime "last_login_at"
     t.date "last_payment_date"
     t.datetime "last_synced_at"
@@ -1201,6 +1205,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_160000) do
     t.index ["extra_email_lookup_digests"], name: "index_users_on_extra_email_lookup_digests", using: :gin
     t.index ["is_sponsored"], name: "index_users_on_is_sponsored"
     t.index ["key_access_paused"], name: "index_users_on_key_access_paused"
+    t.index ["lapsed_access_reminder_sent_at"], name: "index_users_on_lapsed_access_reminder_sent_at"
     t.index ["legacy"], name: "index_users_on_legacy"
     t.index ["login_token"], name: "index_users_on_login_token", unique: true
     t.index ["membership_cancelled_at"], name: "index_users_on_membership_cancelled_at"

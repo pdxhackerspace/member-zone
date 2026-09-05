@@ -51,6 +51,22 @@ class QueuedMail < ApplicationRecord
     email_template_id.blank? && body_html.to_s.include?('email-wrapper')
   end
 
+  # Mirrors +QueuedMailMailer#deliver_queued+ so an admin preview shows the banner and opt-out
+  # footer that delivery adds to template-backed bodies, without doubling them on bodies that
+  # were already rendered through the mailer layout.
+  def rendered_preview
+    return Emails::BodyComposer::Result.new(html: body_html, text: body_text) if pre_rendered_mail_body?
+
+    Emails::BodyComposer.for_preview(
+      body_html: body_html,
+      body_text: body_text,
+      mailer_action: mailer_action,
+      user: recipient,
+      email: to,
+      verification_token: application_verification_token
+    )
+  end
+
   def self.enqueue(action, user, to: nil, reason: nil, **extra_args)
     dest = to || user.email
     return nil if dest.blank?

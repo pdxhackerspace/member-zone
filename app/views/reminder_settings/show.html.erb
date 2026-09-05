@@ -41,6 +41,13 @@
           · <span class="text-secondary"><%= @parking_awaiting_count %> active or expired, not cleared</span>
         <% end %>
       </div>
+    <% elsif @reminder_setting.key == 'lapsed_access' %>
+      <div class="text-13 text-secondary mt-1">
+        <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span> would be emailed on the next run
+        <% if @lapsed_access_window_count > @lapsed_access_due_count %>
+          · <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window total</span>
+        <% end %>
+      </div>
     <% end %>
   </div>
   <div class="d-flex gap-2">
@@ -270,6 +277,52 @@
         <% end %>
       <% else %>
         <p class="text-secondary text-13 mb-0 p-3">No parking notices are due for a reminder right now.</p>
+      <% end %>
+    </div>
+  </div>
+<% elsif @reminder_setting.key == 'lapsed_access' %>
+  <div class="alert alert-secondary text-13 py-2 mb-3">
+    Only members in the inactive state are reminded. Members who cancelled are excluded.
+    Each morning the job scans the last <%= @reminder_setting.lookback_days %> <%= 'day'.pluralize(@reminder_setting.lookback_days) %>
+    of access logs. One email covers every visit found, and those visits are not mentioned again — a member only
+    becomes due once they badge in again.
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <% if @due_users.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th class="num">New visits</th>
+                <th>Lapsed</th>
+                <th>Last reminder</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @due_users.each do |user| %>
+                <% visits = @lapsed_access_visit_counts[user.id].to_i %>
+                <tr>
+                  <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
+                  <td class="num <%= 'fw-medium' if visits > 1 %>"><%= visits %></td>
+                  <td><%= admin_profile_time(user.membership_state_entered_at, empty: 'Unknown') %></td>
+                  <td><%= admin_profile_time(user.lapsed_access_reminder_sent_at) %></td>
+                  <td class="text-secondary"><%= user.email %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <% if @pagy.pages > 1 %>
+          <div class="p-3 border-top">
+            <%== pagy_bootstrap_nav(@pagy) %>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-secondary text-13 mb-0 p-3">No inactive members are due for this reminder right now.</p>
       <% end %>
     </div>
   </div>

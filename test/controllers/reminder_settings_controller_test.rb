@@ -30,7 +30,98 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Orientation reminder', response.body
     assert_select 'input[type=submit][value=Save]', count: 0
     assert_select 'form[data-controller=?]', 'reminder-setting-form'
-    assert_select 'button', text: 'Send now', minimum: 5
+    assert_select 'button', text: 'Send now', minimum: 6
+  end
+
+  test 'index lists lapsed access reminder with preview counts' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Lapsed member access reminder', response.body
+    assert_match 'badged in during the window', response.body
+  end
+
+  test 'index offers a lookback window field only for reminders that scan a range' do
+    ReminderSetting.find_by!(key: 'lapsed_access').update!(lookback_days: 4)
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_select 'input#reminder_lookback_days_lapsed_access[value=?]', '4'
+    assert_select 'input#reminder_lookback_days_payment_overdue', count: 0
+    assert_match 'daily scan of the last 4 days of access logs', response.body
+  end
+
+  test 'update changes the lapsed access lookback window' do
+    reminder = ReminderSetting.find_by!(key: 'lapsed_access')
+
+    patch reminder_setting_url('lapsed_access'), params: { reminder_setting: { lookback_days: '14' } }
+
+    assert_redirected_to reminder_settings_url
+    assert_equal 14, reminder.reload.lookback_days
+  end
+
+  test 'update rejects an out-of-range lookback window' do
+    reminder = ReminderSetting.find_by!(key: 'lapsed_access')
+    reminder.update!(lookback_days: 3)
+
+    patch reminder_setting_url('lapsed_access'), params: { reminder_setting: { lookback_days: '0' } }
+
+    assert_redirected_to reminder_settings_url
+    assert_match(/not updated/i, flash[:alert])
+    assert_equal 3, reminder.reload.lookback_days
+  end
+
+  test 'update ignores a lookback window on reminders that do not scan a range' do
+    patch reminder_setting_url('payment_overdue'), params: {
+      reminder_setting: { enabled: '1', lookback_days: '30' }
+    }
+
+    assert_redirected_to reminder_settings_url
+    assert_equal 1, ReminderSetting.find_by!(key: 'payment_overdue').lookback_days
+  end
+
+  test 'show lists due inactive members for lapsed access' do
+    now = Time.zone.local(2026, 8, 6, 8, 5, 0)
+    user = User.create!(
+      email: 'due-lapsed-access@example.com',
+      full_name: 'Due Lapsed Access User',
+      service_account: false,
+      membership_state: 'inactive_member',
+      payment_type: 'unknown',
+      last_payment_date: (now - 30.days).to_date
+    )
+    user.update_columns(membership_state_entered_at: now - 45.days)
+    AccessLog.create!(user: user, logged_at: now - 1.hour, name: user.display_name, action: 'opened')
+
+    travel_to now do
+      get reminder_setting_url('lapsed_access')
+    end
+
+    assert_response :success
+    assert_match user.display_name, response.body
+  end
+
+  test 'show counts the new visits behind each due member' do
+    now = Time.zone.local(2026, 8, 6, 8, 5, 0)
+    user = User.create!(
+      email: 'repeat-visitor@example.com',
+      full_name: 'Repeat Visitor',
+      service_account: false,
+      membership_state: 'inactive_member',
+      payment_type: 'unknown',
+      last_payment_date: (now - 30.days).to_date
+    )
+    user.update_columns(membership_state_entered_at: now - 45.days)
+    3.times { |i| AccessLog.create!(user: user, logged_at: now - (i + 1).hours, name: user.display_name) }
+
+    travel_to now do
+      get reminder_setting_url('lapsed_access')
+    end
+
+    assert_response :success
+    assert_select 'th', text: 'New visits'
+    assert_select 'td.num', text: '3'
   end
 
   test 'show lists members waiting on their orientation' do

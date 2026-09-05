@@ -46,6 +46,17 @@
                   id: "reminder_allow_opt_out_#{reminder.key}" %>
             <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
           </div>
+          <% if reminder.configurable_lookback? %>
+            <div class="d-flex align-items-center gap-2">
+              <%= f.label :lookback_days, 'Scan back', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_lookback_days_#{reminder.key}" %>
+              <%= f.number_field :lookback_days,
+                    in: 1..ReminderSetting::MAX_LOOKBACK_DAYS,
+                    class: 'form-control form-control-sm num',
+                    style: 'width: 5rem;',
+                    id: "reminder_lookback_days_#{reminder.key}" %>
+              <span class="text-13 text-secondary text-nowrap"><%= 'day'.pluralize(reminder.lookback_days) %></span>
+            </div>
+          <% end %>
         </div>
       <% end %>
       <div class="d-flex flex-wrap align-items-center gap-2">

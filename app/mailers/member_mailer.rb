@@ -368,6 +368,27 @@ class MemberMailer < ApplicationMailer
     end
   end
 
+  def lapsed_access_reminder(user, _opts = {})
+    @user = user
+    @organization = organization_name
+    extras = self.class.lapsed_access_template_extras(user)
+
+    if send_from_template('lapsed_access_reminder', user, extras)
+      # Email sent from database template
+    else
+      @access_summary = extras[:access_summary]
+      @lapsed_at = extras[:lapsed_at]
+      @reactivation_guidance_html = extras[:reactivation_guidance_html]
+      @reactivation_guidance_text = extras[:reactivation_guidance_text]
+      @profile_url = extras[:profile_url]
+      @support_email = extras[:support_email]
+      mail(
+        to: @user.email,
+        subject: "#{@organization}: Your membership has lapsed"
+      )
+    end
+  end
+
   def application_link_reminder(recipient, opts = {})
     @user = recipient
     @organization = organization_name
@@ -480,6 +501,49 @@ class MemberMailer < ApplicationMailer
     { days_since_approval: days.to_s }
   end
 
+  # +access_log_ids+ names the visits this reminder speaks for, so the copy describes those rather
+  # than guessing from the window. Callers without them fall back to the member's open visits.
+  def self.lapsed_access_template_extras(user, access_log_ids: nil, now: Time.current)
+    lapsed_at = user.membership_state_entered_at
+    guidance = lapsed_access_reactivation_guidance(user)
+    {
+      access_summary: Reminders::LapsedAccessVisits.summary(user, access_log_ids: access_log_ids, now: now),
+      lapsed_at: lapsed_at ? lapsed_at.strftime('%B %d, %Y') : 'recently',
+      profile_url: profile_url_for(user),
+      support_email: ENV.fetch('EMAIL_SUPPORT_ADDRESS', ENV.fetch('EMAIL_FROM_ADDRESS', 'support@example.com')),
+      reactivation_months: MembershipSetting.reactivation_grace_period_months.to_s,
+      reactivation_guidance_html: guidance[:html],
+      reactivation_guidance_text: guidance[:text]
+    }
+  end
+
+  def self.lapsed_access_reactivation_guidance(user)
+    if user.within_reactivation_grace_period?
+      expires_on = user.reactivation_expires_on
+      expiry_phrase = expires_on ? " until #{expires_on.strftime('%B %d, %Y')}" : ''
+      {
+        html: '<strong>You can reactivate without reapplying</strong> by choosing a membership plan on your profile' \
+              "#{ERB::Util.html_escape(expiry_phrase)}.",
+        text: "You can reactivate without reapplying by choosing a membership plan on your profile#{expiry_phrase}."
+      }
+    else
+      {
+        html: '<strong>Your reactivation window has passed.</strong> Please contact the space directly to rejoin — ' \
+              'you will need to go through orientation again.',
+        text: 'Your reactivation window has passed. Please contact the space directly to rejoin — ' \
+              'you will need to go through orientation again.'
+      }
+    end
+  end
+
+  def self.profile_url_for(user)
+    url_options = Rails.application.config.action_mailer.default_url_options || {}
+    Rails.application.routes.url_helpers.user_url(user, **url_options)
+  rescue ArgumentError, ActionController::UrlGenerationError
+    base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
+    "#{base}/users/#{user.to_param}"
+  end
+
   def self.slack_link_url_for_template
     return '' unless SlackOidcConfig.configured?
 
@@ -525,6 +589,14 @@ class MemberMailer < ApplicationMailer
     merge_training_request_template_keys!(vars, extra_args)
     merge_parking_notice_template_keys!(vars, extra_args)
     merge_slack_signup_template_keys!(vars, extra_args)
+    merge_lapsed_access_template_keys!(vars, extra_args)
+  end
+
+  def self.merge_lapsed_access_template_keys!(vars, extra_args)
+    %i[access_summary lapsed_at profile_url support_email reactivation_months reactivation_guidance_html
+       reactivation_guidance_text].each do |key|
+      vars[key] = extra_args[key].to_s if extra_args.key?(key)
+    end
   end
 
   def self.merge_training_request_template_keys!(vars, extra_args)

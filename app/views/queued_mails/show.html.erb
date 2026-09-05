@@ -118,23 +118,24 @@
 
   <div class="col-lg-8 mb-4">
     <div class="card shadow-sm border-0">
-      <div class="card-header">
+      <div class="card-header d-flex align-items-center justify-content-between">
         <h5 class="mb-0">Message Preview</h5>
+        <span class="text-11 text-secondary">Banner and opt-out footer shown as sent</span>
       </div>
       <div class="card-body p-0">
-        <iframe id="mail_preview" srcdoc="<%= ERB::Util.html_escape(@queued_mail.body_html) %>"
+        <iframe id="mail_preview" srcdoc="<%= ERB::Util.html_escape(@preview.html) %>"
                 style="width: 100%; min-height: 400px; border: none;"
                 sandbox="allow-same-origin"></iframe>
       </div>
     </div>
 
-    <% if @queued_mail.body_text.present? %>
+    <% if @preview.text.present? %>
       <div class="card shadow-sm border-0 mt-3">
         <div class="card-header">
           <h5 class="mb-0">Plain Text Version</h5>
         </div>
         <div class="card-body">
-          <pre class="mb-0 text-body bg-body" style="white-space: pre-wrap;"><%= @queued_mail.body_text %></pre>
+          <pre class="mb-0 text-body bg-body" style="white-space: pre-wrap;"><%= @preview.text %></pre>
         </div>
       </div>
     <% end %>
