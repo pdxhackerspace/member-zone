@@ -54,6 +54,22 @@ Which training counts as orientation comes from **Building access training topic
 
 The report is broader than the reminder. A member who paid before booking their orientation is no longer a New member, so the reminder leaves them alone, but they still cannot get in and they still appear here — with their standing shown beside their name so a paying or overdue member stands out from the newly approved ones. They are the reason the report exists: because the Dues lapsed report leaves untrained members off, this is the only list they are on.
 
+### Lapsed member access reminder
+
+Tells **inactive members who have badged into the building** that their membership has lapsed and how to reactivate. Disabled by default. The daily job runs at 8:05 AM. Members who have told us they are cancelling are never reminded.
+
+**Timing** (on the reminder card itself, not Membership settings):
+
+- **Scan back — days** — how far back through the access logs each run looks. Defaults to 1 day, and can be set as high as 90.
+
+A member is emailed **once per batch of visits, however many visits that is**. When a reminder goes out it records itself against every access log entry in the window, so somebody who badged in six times gets one email rather than six, and those six visits are never brought up again. They only become due once they badge in after that — which is why the reminder repeats naturally for someone who keeps coming in, and goes quiet for someone who stops.
+
+Widening the window therefore does not mean more email. It means each reminder covers more ground: set to 7 days, the first run picks up a week of visits in a single message. It is worth widening if the job has been off for a while, or if you want a Monday run to cover the weekend.
+
+The due list shows a **New visits** count per member, so you can see how much a given reminder is about to cover before you send it.
+
+**Email copy** is editable under Settings → Email templates (`Lapsed Member Access Reminder`). Reminders wait in the outbound mail review queue for approval before they go out. A message held for review records the visits it actually described, so visits that happen while it waits are not silently swallowed — they show up in the next reminder.
+
 ## Member notification preferences
 
 Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off.

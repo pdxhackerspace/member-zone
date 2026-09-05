@@ -33,15 +33,21 @@ class ReminderSetting < ApplicationRecord
     },
     'lapsed_access' => {
       name: 'Lapsed member access reminder',
-      description: 'Daily reminder to inactive members who badged in yesterday that their membership has lapsed ' \
-                   'and how to reactivate.',
+      description: 'Daily reminder to inactive members who badged in recently that their membership has lapsed ' \
+                   'and how to reactivate. Each visit is only ever mentioned once.',
       enabled: false,
-      allow_opt_out: true
+      allow_opt_out: true,
+      lookback_days: 1,
+      configurable_lookback: true
     }
   }.freeze
 
+  MAX_LOOKBACK_DAYS = 90
+
   validates :key, presence: true, uniqueness: true
   validates :name, presence: true
+  validates :lookback_days,
+            numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: MAX_LOOKBACK_DAYS }
 
   scope :ordered, -> { order(:name) }
 
@@ -49,12 +55,27 @@ class ReminderSetting < ApplicationRecord
     find_by(key: key)&.enabled? == true
   end
 
+  def self.lookback_days_for(key)
+    find_by(key: key)&.lookback_days
+  end
+
   def self.seed_defaults!
     CATALOG.each do |key, attrs|
       find_or_create_by!(key: key) do |setting|
-        setting.assign_attributes(attrs)
+        setting.assign_attributes(persistable_attributes(attrs))
       end
     end
+  end
+
+  # The catalog also describes behaviour that has no column of its own, such as whether the
+  # lookback window is editable, so only real columns can be handed to the record.
+  def self.persistable_attributes(attrs)
+    attrs.slice(*column_names.map(&:to_sym))
+  end
+
+  # Only reminders that scan a time range have a meaningful lookback window to edit.
+  def configurable_lookback?
+    CATALOG.dig(key, :configurable_lookback) == true
   end
 
   def self.sync_catalog_attributes!

@@ -106,12 +106,15 @@
       <div class="text-13">
         <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @lapsed_access_yesterday_count %> inactive, accessed yesterday</span>
+        <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window</span>
       </div>
       <div class="text-12 text-secondary mt-1">
-        Timing: daily scan of yesterday's access logs for inactive members
+        Timing: daily scan of the last <%= reminder.lookback_days %> <%= 'day'.pluralize(reminder.lookback_days) %> of access logs for inactive members
         · Reactivation window: <%= @membership_setting.reactivation_grace_period_months %> <%= 'month'.pluralize(@membership_setting.reactivation_grace_period_months) %>
         · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        A member is emailed once per batch of visits. Visits already covered by a reminder are never mentioned again.
       </div>
     <% end %>
   <% end %>
