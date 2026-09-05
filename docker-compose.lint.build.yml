@@ -17,5 +17,5 @@ services:
       pull: true
       args:
         RUBY_VERSION: "4.0.6"
-        RUBOCOP_VERSION: "1.89.0"
+        RUBOCOP_VERSION: "1.90.0"
         RUBOCOP_RAILS_VERSION: "2.37.0"

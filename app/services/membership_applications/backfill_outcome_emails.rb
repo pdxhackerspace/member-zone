@@ -79,9 +79,8 @@ module MembershipApplications
 
     def log_line(application, message)
       prefix = dry_run ? '[DRY RUN] ' : ''
-      # rubocop:disable Rails/Output
+      # rubocop:disable-next Rails/Output
       puts "#{prefix}Application #{application.id} (#{application.email}, #{application.status}): #{message}"
-      # rubocop:enable Rails/Output
     end
 
     def find_queued_mail(application, excluded_queued_mail_ids:)
