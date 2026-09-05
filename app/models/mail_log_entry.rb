@@ -20,7 +20,7 @@ class MailLogEntry < ApplicationRecord
   end
 
   # Logs an immediate Action Mailer delivery (not via +QueuedMail+).
-  # rubocop:disable Metrics/ParameterLists -- mirrors mail metadata fields
+  # rubocop:disable-next Metrics/ParameterLists -- mirrors mail metadata fields
   def self.log_direct_delivery!(to:, subject:, mailer_class:, mailer_action:, details: nil, actor: nil,
                                 event: 'sent', body_html: nil, body_text: nil)
     detail = details.presence || [mailer_class, mailer_action].compact.join('#')
@@ -37,7 +37,6 @@ class MailLogEntry < ApplicationRecord
       delivery_body_text: body_text
     )
   end
-  # rubocop:enable Metrics/ParameterLists
 
   def self.log_queued_delivery!(queued_mail)
     create!(

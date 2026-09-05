@@ -1,4 +1,4 @@
-# rubocop:disable Rails/Output
+# rubocop:disable-next Rails/Output
 class MembershipActiveReconciler
   def initialize(dry_run:, scope: User.non_service_accounts)
     @dry_run = dry_run
@@ -31,4 +31,3 @@ class MembershipActiveReconciler
     end
   end
 end
-# rubocop:enable Rails/Output

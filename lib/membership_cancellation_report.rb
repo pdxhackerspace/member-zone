@@ -1,6 +1,6 @@
 # Operator-facing wrapper around Membership::CancellationReconciler for the
 # membership:preview_cancellations / membership:process_cancellations rake tasks.
-# rubocop:disable Rails/Output
+# rubocop:disable-next Rails/Output
 class MembershipCancellationReport
   def initialize(dry_run:)
     @dry_run = dry_run
@@ -101,4 +101,3 @@ class MembershipCancellationReport
     result.cancelled_at.to_date.iso8601
   end
 end
-# rubocop:enable Rails/Output

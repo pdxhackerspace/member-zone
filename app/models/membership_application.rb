@@ -65,7 +65,7 @@ class MembershipApplication < ApplicationRecord
       Arel.sql('membership_applications.id DESC')
     )
   }
-  # rubocop:disable Metrics/BlockLength
+  # rubocop:disable-next Metrics/BlockLength
   scope :admin_search, lambda { |query|
     raw = query.to_s.strip
     if raw.blank?
@@ -99,7 +99,6 @@ class MembershipApplication < ApplicationRecord
       matches
     end
   }
-  # rubocop:enable Metrics/BlockLength
 
   def draft?
     status == 'draft'
