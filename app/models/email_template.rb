@@ -37,7 +37,15 @@ class EmailTemplate < ApplicationRecord
     '{{lapsed_at}}' => 'Date the membership lapsed (lapsed access reminder only)',
     '{{profile_url}}' => 'Link to the member profile (lapsed access reminder only)',
     '{{reactivation_guidance_html}}' => 'Reactivation instructions for HTML bodies (lapsed access reminder only)',
-    '{{reactivation_guidance_text}}' => 'Reactivation instructions for plain-text bodies (lapsed access reminder only)'
+    '{{reactivation_guidance_text}}' => 'Reactivation instructions for plain-text bodies (lapsed access reminder only)',
+    '{{access_summary}}' => 'When the lapsed member badged in, e.g. "yesterday" or "3 times between ' \
+                            'April 24 and April 27" (lapsed access reminder only)',
+    '{{membership_state_label}}' => 'Standing that caused delivery to be blocked, e.g. banned (admin only)',
+    '{{recipient_name}}' => 'Name of the member the blocked message was addressed to (admin only)',
+    '{{delivery_to}}' => 'Address the blocked message was addressed to (admin only)',
+    '{{blocked_subject}}' => 'Subject line of the blocked message (admin only)',
+    '{{mailer_action}}' => 'Mailer action of the blocked message (admin only)',
+    '{{queued_mail_url}}' => 'Link to the rejected queued message (admin only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
@@ -765,31 +773,7 @@ class EmailTemplate < ApplicationRecord
 
   # Preview the template with sample data
   def preview
-    sample_variables = {
-      member_name: 'John Doe',
-      member_email: 'john.doe@example.com',
-      member_username: 'johndoe',
-      organization_name: ENV.fetch('ORGANIZATION_NAME', 'Member Zone'),
-      date: Date.current.strftime('%B %d, %Y'),
-      days_overdue: ' by 14 days',
-      reason: '<p><strong>Reason:</strong> Example reason</p>',
-      app_url: ENV.fetch('APP_BASE_URL', 'http://localhost:3000'),
-      training_topic: 'Laser Cutter',
-      invitation_url: "#{ENV.fetch('APP_BASE_URL', 'http://localhost:3000')}/invite/sample-token-abc123",
-      invitation_expiry: 'in 3 days',
-      invitation_type: 'Sponsored Member',
-      invitation_type_details: 'Sponsored membership — full access including building access, no dues required.',
-      application_url: "#{ENV.fetch('APP_BASE_URL', 'http://localhost:3000')}/membership_applications/1",
-      application_age_days: '8',
-      submitted_at: 8.days.ago.to_date.to_fs(:long),
-      requester_name: 'Alex Example',
-      requester_email: 'alex@example.com',
-      requester_slack: '@alex',
-      recipient_role: 'trainer',
-      trainer_names: 'Trainer One, Trainer Two',
-      contact_details: 'Email: alex@example.com<br>Slack: alex'
-    }.merge(admin_dashboard_preview_variables)
-    render(sample_variables)
+    render(PreviewVariables.all)
   end
 
   # Seed default templates
@@ -805,15 +789,6 @@ class EmailTemplate < ApplicationRecord
 
   def clear_send_immediately_if_blocked
     self.send_immediately = false if block_send_immediately?
-  end
-
-  def admin_dashboard_preview_variables
-    {
-      urgent_item_count: '2',
-      urgent_items_html: '<ul><li><strong>1 access controller issue</strong><br><span>1 offline</span></li></ul>',
-      urgent_items_text: "- 1 access controller issue\n  1 offline",
-      dashboard_url: ENV.fetch('APP_BASE_URL', 'http://localhost:3000')
-    }
   end
 
   def substitute_variables(text, variables)
