@@ -480,19 +480,21 @@ class MemberMailer < ApplicationMailer
     anchor = user.membership_approved_at
     days = anchor ? ((now - anchor) / 1.day).floor : 0
     link_url = slack_link_url_for_template
-    extras = {
-      days_since_approval: days.to_s,
-      slack_link_url: link_url,
-      slack_link_html: '',
-      slack_link_text: ''
+
+    { days_since_approval: days.to_s, slack_link_url: link_url }.merge(slack_link_fragments(link_url))
+  end
+
+  # The plain-text template places {{slack_link_text}} immediately before the next sentence, so the
+  # trailing blank line is what separates them — and is also what makes the sentence start cleanly
+  # at the beginning of a line when Slack is not configured and this is empty. Shared with
+  # +EmailTemplate::PreviewVariables+ so the admin preview cannot drift from what is actually sent.
+  def self.slack_link_fragments(link_url)
+    return { slack_link_html: '', slack_link_text: '' } if link_url.blank?
+
+    {
+      slack_link_html: %(<p><a href="#{link_url}">Associate your Slack account</a></p>),
+      slack_link_text: "Associate your Slack account: #{link_url}\n\n"
     }
-
-    if link_url.present?
-      extras[:slack_link_html] = %(<p><a href="#{link_url}">Associate your Slack account</a></p>)
-      extras[:slack_link_text] = "Associate your Slack account: #{link_url}\n\n"
-    end
-
-    extras
   end
 
   def self.orientation_template_extras(user, now: Time.current)
