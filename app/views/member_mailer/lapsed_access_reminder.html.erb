@@ -2,7 +2,7 @@
 
 <p>Hello <%= @user.display_name %>,</p>
 
-<p>Our access logs show you used <%= @organization %> facilities yesterday, but your membership lapsed on <%= @lapsed_at %>.</p>
+<p>Our access logs show you used <%= @organization %> facilities <%= @access_summary %>, but your membership lapsed on <%= @lapsed_at %>.</p>
 
 <p><%= @reactivation_guidance_html.html_safe %></p>
 

@@ -43,7 +43,8 @@ module QueuedMailReminderDeliveries
   end
 
   def record_lapsed_access_reminder_delivery!(sent_time)
-    Reminders::NotifyLapsedAccess.record_delivery!(recipient, at: sent_time)
+    access_log_ids = mailer_args.is_a?(Hash) ? mailer_args['access_log_ids'] : nil
+    Reminders::NotifyLapsedAccess.record_delivery!(recipient, at: sent_time, access_log_ids: access_log_ids)
   rescue StandardError => e
     Rails.logger.error(
       "[QueuedMail] lapsed_access_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \

@@ -44,8 +44,8 @@
     <% elsif @reminder_setting.key == 'lapsed_access' %>
       <div class="text-13 text-secondary mt-1">
         <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span> would be emailed on the next run
-        <% if @lapsed_access_yesterday_count > @lapsed_access_due_count %>
-          · <span class="text-secondary"><%= @lapsed_access_yesterday_count %> inactive, accessed yesterday total</span>
+        <% if @lapsed_access_window_count > @lapsed_access_due_count %>
+          · <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window total</span>
         <% end %>
       </div>
     <% end %>
@@ -283,7 +283,9 @@
 <% elsif @reminder_setting.key == 'lapsed_access' %>
   <div class="alert alert-secondary text-13 py-2 mb-3">
     Only members in the inactive state are reminded. Members who cancelled are excluded.
-    The job scans access logs from yesterday each morning.
+    Each morning the job scans the last <%= @reminder_setting.lookback_days %> <%= 'day'.pluralize(@reminder_setting.lookback_days) %>
+    of access logs. One email covers every visit found, and those visits are not mentioned again — a member only
+    becomes due once they badge in again.
   </div>
 
   <div class="card shadow-sm border-0">
@@ -294,6 +296,7 @@
             <thead>
               <tr>
                 <th>Member</th>
+                <th class="num">New visits</th>
                 <th>Lapsed</th>
                 <th>Last reminder</th>
                 <th>Email</th>
@@ -301,8 +304,10 @@
             </thead>
             <tbody>
               <% @due_users.each do |user| %>
+                <% visits = @lapsed_access_visit_counts[user.id].to_i %>
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
+                  <td class="num <%= 'fw-medium' if visits > 1 %>"><%= visits %></td>
                   <td><%= admin_profile_time(user.membership_state_entered_at, empty: 'Unknown') %></td>
                   <td><%= admin_profile_time(user.lapsed_access_reminder_sent_at) %></td>
                   <td class="text-secondary"><%= user.email %></td>

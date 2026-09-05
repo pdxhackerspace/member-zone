@@ -2,7 +2,7 @@ Membership lapsed
 
 Hello <%= @user.display_name %>,
 
-Our access logs show you used <%= @organization %> facilities yesterday, but your membership lapsed on <%= @lapsed_at %>.
+Our access logs show you used <%= @organization %> facilities <%= @access_summary %>, but your membership lapsed on <%= @lapsed_at %>.
 
 <%= @reactivation_guidance_text %>
 

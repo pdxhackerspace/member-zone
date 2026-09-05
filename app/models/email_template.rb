@@ -655,12 +655,12 @@ class EmailTemplate < ApplicationRecord
     },
     'lapsed_access_reminder' => {
       name: 'Lapsed Member Access Reminder',
-      description: 'Sent when an inactive member badged in yesterday',
+      description: 'Sent when an inactive member badged in within the reminder lookback window',
       subject: '{{organization_name}}: Your membership has lapsed',
       body_html: <<~HTML,
         <h1>Membership lapsed</h1>
         <p>Hello {{member_name}},</p>
-        <p>Our access logs show you used {{organization_name}} facilities yesterday, but your membership lapsed on {{lapsed_at}}.</p>
+        <p>Our access logs show you used {{organization_name}} facilities {{access_summary}}, but your membership lapsed on {{lapsed_at}}.</p>
         <p>{{reactivation_guidance_html}}</p>
         <p>Visit your <a href="{{profile_url}}">member profile</a> for reactivation options, or email <a href="mailto:{{support_email}}">{{support_email}}</a> if you need help.</p>
         <p>Best regards,<br>The {{organization_name}} Team</p>
@@ -670,7 +670,7 @@ class EmailTemplate < ApplicationRecord
 
         Hello {{member_name}},
 
-        Our access logs show you used {{organization_name}} facilities yesterday, but your membership lapsed on {{lapsed_at}}.
+        Our access logs show you used {{organization_name}} facilities {{access_summary}}, but your membership lapsed on {{lapsed_at}}.
 
         {{reactivation_guidance_text}}
 
