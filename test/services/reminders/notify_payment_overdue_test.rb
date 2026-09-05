@@ -4,6 +4,9 @@ module Reminders
   class NotifyPaymentOverdueTest < ActiveSupport::TestCase
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
+      # See PaymentOverdueEligibilityTest: eligibility partly resolves against the real clock,
+      # so these fixed dates only behave if the clock is frozen with them.
+      travel_to @now
       MembershipSetting.instance.update!(
         payment_overdue_reminder_repeat_days: 7,
         overdue_grace_period_days: 30
