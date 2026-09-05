@@ -4,7 +4,7 @@
 # `privilege:` is the key that reveals a row. A row with no key stays with administrators —
 # that is the default rather than an oversight, and each later phase moves rows off it as
 # the matching privilege gets enforced.
-# rubocop:disable Metrics/ModuleLength -- a catalogue; its length is its contents
+# rubocop:disable-next Metrics/ModuleLength -- a catalogue; its length is its contents
 module SettingsHelper
   def settings_items
     membership_settings_items + access_settings_items + payment_settings_items +
@@ -136,4 +136,3 @@ module SettingsHelper
     ]
   end
 end
-# rubocop:enable Metrics/ModuleLength

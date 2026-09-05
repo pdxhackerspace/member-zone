@@ -1,6 +1,6 @@
 # Mailer for member-related notifications
 # Uses database templates when available, falls back to view templates
-# rubocop:disable Metrics/ClassLength -- many small mailer actions; extraction would fragment templates
+# rubocop:disable-next Metrics/ClassLength -- many small mailer actions; extraction would fragment templates
 class MemberMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
 
@@ -813,4 +813,3 @@ class MemberMailer < ApplicationMailer
     end
   end
 end
-# rubocop:enable Metrics/ClassLength
