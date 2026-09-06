@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/pdxhackerspace/member-zone/actions/workflows/ci.yml/badge.svg)
 ![Staging image](https://github.com/pdxhackerspace/member-zone/actions/workflows/staging.yml/badge.svg)
-![Production image](https://github.com/pdxhackerspace/member-zone/actions/workflows/production.yml/badge.svg)
+![Release](https://github.com/pdxhackerspace/member-zone/actions/workflows/release.yml/badge.svg)
 ![Version](https://img.shields.io/github/v/release/pdxhackerspace/member-zone?label=version)
 ![Ruby](https://img.shields.io/badge/Ruby-3.3.11-red?logo=ruby)
 ![Rails](https://img.shields.io/badge/Rails-8.1-red?logo=rubyonrails)
@@ -29,6 +29,9 @@ bundle install
 bin/rails db:prepare
 bin/dev # starts Rails + CSS watcher
 ```
+
+New here? [docs/development-workflow.md](docs/development-workflow.md) covers running a dev
+instance, how pull requests and staging work, and how releases and version numbers are cut.
 
 ### Environment Variables
 

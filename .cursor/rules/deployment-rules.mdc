@@ -6,6 +6,9 @@ alwaysApply: true
 These rules govern how code is reviewed, merged, and deployed in this repository.
 They apply to all contributors, including AI coding assistants.
 
+`docs/development-workflow.md` explains the same process narratively, including how to run a
+local dev instance.
+
 ---
 
 ## Branch Model
