@@ -42,14 +42,9 @@ module Geocoding
       params
     end
 
+    # Nominatim's usage policy requires an identifying User-Agent.
     def default_user_agent
-      "MemberZone/#{app_version}"
-    end
-
-    def app_version
-      Rails.root.join('VERSION').read.strip
-    rescue StandardError
-      'unknown'
+      "MemberZone/#{AppVersion.semver}"
     end
   end
 end
