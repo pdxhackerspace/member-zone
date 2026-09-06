@@ -104,7 +104,9 @@ This project uses semantic versioning (MAJOR.MINOR.PATCH).
 **The newest `v*` git tag is the canonical version. There is no `VERSION` file** — do not
 reintroduce one, and never hand-edit a version number in a PR.
 
-Releasing is a button, not a branch. Once the code you want is on `main`:
+Releasing is a manual run of the `Release` workflow, not a branch and not a side effect of
+merging. Once the code you want is on `main`, either run it from the repository's Actions tab
+(**Actions** → **Release** → **Run workflow**) or from the terminal:
 
 ```bash
 gh workflow run release.yml -f bump=minor      # or patch / major

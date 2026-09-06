@@ -28,7 +28,8 @@ Six things worth knowing up front:
 - **The newest `v*` git tag is the version.** There is no `VERSION` file. Never hand-write a
   version number into a commit.
 - **Merging to `main` publishes nothing.** It only makes code eligible to release.
-- **Releasing is a manual button**, not a branch and not a merge.
+- **You trigger a release by hand** by running the `Release` workflow — from the Actions tab
+  or with `gh workflow run`. Merging never releases anything.
 - **Local development never builds a published image.** It bind-mounts your working copy.
 - **`ci` is the only required status check.** Everything else is advisory.
 - **Work branches target `staging`**, never `main`.
@@ -209,11 +210,33 @@ released.
 
 ## Releasing
 
+Releasing is a deliberate act you perform, not a consequence of merging something. You run
+the `Release` workflow (`.github/workflows/release.yml`) and tell it how to bump the version.
+
+### Triggering it from the terminal
+
 ```bash
 gh workflow run release.yml -f bump=minor                    # patch | minor | major
 gh workflow run release.yml -f bump=minor -f dry_run=true    # preview, changes nothing
 gh workflow run release.yml -f bump=patch -f sha=abc1234     # release an older commit
 ```
+
+Watch it with `gh run watch`, or `gh run list --workflow=release.yml` to find it.
+
+### Triggering it from GitHub
+
+1. Open the repository's **Actions** tab.
+2. Choose **Release** from the workflow list on the left.
+3. Click **Run workflow** in the banner above the list of past runs. A short form drops down.
+4. Leave **Use workflow from** on `main`, pick a **Semver bump**, and optionally fill in a
+   commit or tick the dry run.
+5. Click **Run workflow** in the form to start it.
+
+That banner exists only because the workflow declares `on: workflow_dispatch` — that is what
+makes a workflow manually runnable, and it is why the old `production.yml` had no such
+button: it fired on every push to `main`, whether you wanted a release or not.
+
+### What it does
 
 `release.yml` reads the newest `v*` tag, computes the next semver, builds the image with
 that version baked in, publishes `:latest` / `:X.Y.Z` / `:MAJOR`, then tags the commit and
