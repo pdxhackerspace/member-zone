@@ -57,6 +57,35 @@ class EmailTemplatePreviewVariablesTest < ActiveSupport::TestCase
     assert_includes rendered[:body_html], '/users/johndoe'
   end
 
+  test 'the slack signup preview keeps the paragraph break the template relies on' do
+    rendered = default_template('slack_signup_reminder').preview
+
+    assert_includes rendered[:body_text],
+                    "Associate your Slack account: #{sample_slack_url}\n\nIf you do not have a Slack account yet"
+    assert_includes rendered[:body_html], %(<a href="#{sample_slack_url}">Associate your Slack account</a>)
+  end
+
+  # The template puts {{slack_link_text}} immediately before the next sentence, so the sample owns
+  # the blank line between them. Deriving it from the mailer is what keeps the two in step.
+  test 'the slack fragments are the ones the mailer sends' do
+    samples = EmailTemplate::PreviewVariables.all
+    sent = MemberMailer.slack_link_fragments(sample_slack_url)
+
+    assert_equal sent[:slack_link_text], samples[:slack_link_text]
+    assert_equal sent[:slack_link_html], samples[:slack_link_html]
+  end
+
+  # Whitespace is part of the value for variables the templates place inline. A sample that trims
+  # it renders as running text with no error anywhere, so it is worth pinning explicitly.
+  test 'samples keep the padding their templates depend on' do
+    samples = EmailTemplate::PreviewVariables.all
+
+    assert samples[:slack_link_text].end_with?("\n\n"),
+           'slack_link_text separates itself from the sentence that follows it'
+    assert samples[:days_overdue].start_with?(' '),
+           'days_overdue is appended to a sentence and carries its own leading space'
+  end
+
   test 'the blocked recipient preview names the member and the blocked message' do
     rendered = default_template('blocked_recipient_delivery_attempt').preview
 
@@ -67,6 +96,10 @@ class EmailTemplatePreviewVariablesTest < ActiveSupport::TestCase
   end
 
   private
+
+  def sample_slack_url
+    "#{ENV.fetch('APP_BASE_URL', 'http://localhost:3000')}/slack/link"
+  end
 
   def default_template(key)
     attrs = EmailTemplate::DEFAULT_TEMPLATES.fetch(key)

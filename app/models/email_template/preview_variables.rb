@@ -69,12 +69,13 @@ class EmailTemplate
       }
     end
 
+    # Built by the mailer rather than copied from it. The plain-text fragment carries a trailing
+    # blank line that the template depends on, which is easy to leave out of a hand-written sample
+    # and silent when it is missing: the preview glues the link onto the sentence after it.
     def slack
-      {
-        slack_link_url: "#{app_base_url}/slack/link",
-        slack_link_html: %(<p>Associate your Slack account: <a href="#{app_base_url}/slack/link">link Slack</a></p>),
-        slack_link_text: "Associate your Slack account: #{app_base_url}/slack/link"
-      }
+      link_url = "#{app_base_url}/slack/link"
+
+      { slack_link_url: link_url }.merge(MemberMailer.slack_link_fragments(link_url))
     end
 
     # The multi-visit wording is the point of this reminder, so the preview shows that shape rather
