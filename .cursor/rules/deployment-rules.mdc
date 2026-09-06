@@ -36,8 +36,9 @@ Do not merge broken or half-finished work into `staging`.
 Use a Draft PR to share work-in-progress without triggering a review or merge.
 
 ### 5. Production is promoted from staging, not deployed directly
-To release to production, open a PR from `staging` → `main`.
-Get one approval. Merge. GitHub Actions handles the rest.
+To get code onto `main`, open a PR from `staging` → `main` and merge it. That merge does
+**not** release anything — it only makes the code eligible. Cut the release separately by
+running `release.yml` (see Versioning below).
 
 ### 6. Hotfixes are the only exception
 If production is broken and urgent:
@@ -55,12 +56,13 @@ Keep the branch list clean. GitHub can be configured to do this automatically.
 
 ---
 
-## What Happens on Merge
+## What Publishes an Image
 
-| Event              | Docker image tag       | Deploys to        |
-|--------------------|------------------------|-------------------|
-| Push to `staging`  | `:staging`             | Staging server    |
-| Merge to `main`    | `:latest` + `:vX.Y.Z`  | Production server |
+| Event | Docker image tags | Deploys to |
+|---|---|---|
+| PR merged into `staging` | `:staging` | Staging server |
+| PR merged into `main` | *(nothing)* | — |
+| `release.yml` run manually | `:latest`, `:X.Y.Z`, `:MAJOR` + git tag `vX.Y.Z` | Production server |
 
 ---
 
@@ -78,7 +80,7 @@ Before opening a PR, confirm:
 ## Merging Strategy
 
 Use **Squash and Merge** for feature/fix PRs into `staging`.
-Use **Merge Commit** for the `staging` → `main` release PR (preserves history).
+Use **Merge Commit** for the `staging` → `main` promotion PR (preserves history).
 
 ---
 
@@ -87,18 +89,36 @@ Use **Merge Commit** for the `staging` → `main` release PR (preserves history)
 - Never suggest pushing directly to `main` or `staging`
 - Always recommend opening a PR with a clear description
 - Treat secrets in code as a hard blocker — flag immediately, do not proceed
-- When helping with CI/CD changes, respect the two-workflow model:
-  one workflow for staging, one for production
+- When helping with CI/CD changes, keep the separation: `staging.yml` publishes staging
+  images on merge, `release.yml` is the only thing that versions and publishes production
 - If asked to "deploy" something, clarify whether staging or production is intended
+- Never reintroduce a `VERSION` file or hand-write a version number into a commit
 
 ## Versioning
 
 This project uses semantic versioning (MAJOR.MINOR.PATCH).
 
-The canonical version lives in `VERSION` (a plain text file in the root).
+**The newest `v*` git tag is the canonical version. There is no `VERSION` file** — do not
+reintroduce one, and never hand-edit a version number in a PR.
 
-When opening a release PR (staging → main):
-- Bump the version following semver: patch for fixes, minor for new features, major for breaking changes
-- The merge to main will automatically tag the commit and build a versioned Docker image
+Releasing is a button, not a branch. Once the code you want is on `main`:
 
-The version is available to the application as the `APP_VERSION` environment variable.
+```bash
+gh workflow run release.yml -f bump=minor      # or patch / major
+gh workflow run release.yml -f bump=minor -f dry_run=true   # preview only
+```
+
+`release.yml` reads the newest tag, computes the next version, builds the image with that
+version baked in, publishes `:latest` / `:X.Y.Z` / `:MAJOR`, then tags the commit and opens
+a GitHub Release. It refuses commits that are not on `main` and refuses to reuse a tag.
+
+The version reaches the app as `APP_VERSION`, baked at build time:
+
+| Build | `APP_VERSION` |
+|---|---|
+| Production release | `0.51.0+abc1234` |
+| Staging | `0.50.1+7.abc1234.staging` |
+| Local checkout | `git describe` output, else `dev` |
+
+Read it through `AppVersion` (`config/initializers/version.rb`): `.semver` for the number
+humans compare, `.commit` for the build metadata, `.current` for the whole string.

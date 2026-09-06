@@ -104,4 +104,4 @@ Sidekiq with sidekiq-cron; recurring jobs are declared inline in `config/initial
 
 Work branches (`feature/*`, `fix/*`) target **`staging`**, never `main`. Production is promoted by a `staging` → `main` PR. No direct pushes to either protected branch. Hotfixes may branch from `main` and PR into it, followed by a re-sync PR back to `staging`. Squash-merge into `staging`; merge-commit the release PR.
 
-The version lives in `VERSION` (plain text, semver) and is bumped in the release PR; merging to `main` tags the commit and builds `:latest` + `:vX.Y.Z` images to ghcr.io. Push to `staging` builds `:staging`.
+The newest `v*` git tag is the canonical version — there is no `VERSION` file, and nothing bumps a version by committing to it. Merging `staging` → `main` publishes nothing; releasing is a manual `gh workflow run release.yml -f bump=minor`, which computes the next semver from the newest tag, builds `:latest` + `:X.Y.Z` + `:MAJOR` to ghcr.io with the version baked in as `APP_VERSION`, then tags the commit and opens a GitHub Release. Merging a PR into `staging` builds `:staging`. Read the version through `AppVersion.semver` / `.commit` / `.current`.
