@@ -1,7 +1,7 @@
 module SensitiveFields
   extend ActiveSupport::Concern
 
-  # rubocop:disable Metrics/BlockLength
+  # rubocop:disable-next Metrics/BlockLength
   class_methods do
     def encrypts_sensitive_string(*field_names)
       field_names.each do |field_name|
@@ -106,5 +106,4 @@ module SensitiveFields
       end
     end
   end
-  # rubocop:enable Metrics/BlockLength
 end

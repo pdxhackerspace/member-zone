@@ -18,7 +18,7 @@ class Privilege < ApplicationRecord
   scope :topic_scoped, -> { where(privilege_scope: 'topic') }
   scope :ordered, -> { order(:category, :key) }
 
-  # rubocop:disable Layout/LineLength
+  # rubocop:disable-next Layout/LineLength
   CATALOG = [
     { key: 'members.view_list', label: 'View member directory', category: 'Members & profiles' },
     { key: 'members.view_profile', label: 'View full member profiles', category: 'Members & profiles' },
@@ -128,7 +128,6 @@ class Privilege < ApplicationRecord
     { key: 'api.users.search', label: 'Use the member picker API', category: 'Reports & audit' },
     { key: 'help.admin_faq', label: 'View the admin FAQ', category: 'Reports & audit' }
   ].freeze
-  # rubocop:enable Layout/LineLength
 
   def global?
     privilege_scope == 'global'
