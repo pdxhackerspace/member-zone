@@ -55,69 +55,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect VERSION-only main PR
-        id: version_only_main
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          CHANGED_FILES=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          CHANGED_COUNT=$(printf '%s\n' "$CHANGED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')
-          if [ "$BASE_REF" = "main" ] && [ "$CHANGED_COUNT" -eq 1 ] && [ "$CHANGED_FILES" = "VERSION" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Main PR only changes VERSION - skipping lint/tests."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip CI notice
-        if: steps.version_only_main.outputs.skip == 'true'
-        run: echo "CI skipped for VERSION-only PR into main."
-
       - name: Install libvips
-        if: steps.version_only_main.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libvips
 
       - name: Set up Ruby
-        if: steps.version_only_main.outputs.skip != 'true'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '4.0.6'
           bundler-cache: true
 
       - name: Set up Node.js
-        if: steps.version_only_main.outputs.skip != 'true'
         uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: 'yarn'
 
       - name: Install JS dependencies
-        if: steps.version_only_main.outputs.skip != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Lint (RuboCop)
-        if: steps.version_only_main.outputs.skip != 'true'
         run: bundle exec rubocop
 
-      - name: Type check
-        if: steps.version_only_main.outputs.skip != 'true'
-        run: |
-          # No standalone type checker (e.g. tsc) in this repo; Rails + Ruby only.
-          echo "Type check skipped — not applicable."
-
       - name: Run JavaScript tests
-        if: steps.version_only_main.outputs.skip != 'true'
         run: yarn test:js
 
       - name: Prepare database
-        if: steps.version_only_main.outputs.skip != 'true'
         run: bin/rails db:test:prepare
 
       - name: Run tests
-        if: steps.version_only_main.outputs.skip != 'true'
         run: bin/rails test

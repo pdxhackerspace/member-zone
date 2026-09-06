@@ -1,71 +1,36 @@
-# When the merge target is main, the head branch must be staging, hotfix/*, or release/*.
-# When the merge target is staging, the head branch must not be release/* and must not
-# change the VERSION file.
+# When the merge target is main, the head branch must be staging or hotfix/*.
 #
-# Add as required status checks for main and staging (or list additional base branches below).
+# Releases no longer travel through a branch: release.yml tags a commit that is
+# already on main, so there is nothing to police on the staging side.
+#
+# Add as a required status check for main.
 
 name: Enforce PR source branch rules
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-    branches: [main, staging]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   allowed-main-source:
-    if: ${{ github.event.pull_request.base.ref == 'main' }}
-
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Require staging, hotfix/*, or release/* when merging to main
+      - name: Require staging or hotfix/* when merging to main
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
           case "$HEAD_REF" in
-            staging|hotfix/*|release/*)
+            staging|hotfix/*)
               ;;
             *)
-              echo "::error::Pull requests into \`main\` must come from \`staging\`, \`hotfix/*\`, or \`release/*\`. This PR is from \`$HEAD_REF\`."
+              echo "::error::Pull requests into \`main\` must come from \`staging\` or \`hotfix/*\`. This PR is from \`$HEAD_REF\`."
               exit 1
               ;;
           esac
 
-          echo "OK: source branch and VERSION policy checks passed."
-
-  allowed-staging-source:
-    if: ${{ github.event.pull_request.base.ref == 'staging' }}
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Block release/* and VERSION changes into staging
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          case "$HEAD_REF" in
-            release/*)
-              echo "::error::Branches named \`release/*\` cannot be merged into \`staging\`."
-              exit 1
-              ;;
-          esac
-          if git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -qx 'VERSION'; then
-            echo "::error::Pull requests into \`staging\` must not modify the VERSION file."
-            exit 1
-          fi
-          echo "OK: source allowed for merge into staging."
+          echo "OK: source branch allowed for merge into main."
