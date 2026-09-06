@@ -226,6 +226,15 @@ class User < ApplicationRecord
   def can?(privilege_key, topic: nil)
     return true if is_admin?
 
+    privilege_conferred?(privilege_key, topic: topic)
+  end
+
+  # The same question with the is_admin bypass left out: does a role this member actually
+  # holds confer the privilege? Admins pass can? for everything, so this is the only way to
+  # tell authority someone was given from authority they merely cannot be locked out of.
+  # Callers use it where the difference matters — warning an admin before they exercise a
+  # decision that belongs to a role holder, for one.
+  def privilege_conferred?(privilege_key, topic: nil)
     key = privilege_key.to_s
     return true if global_privilege_keys.include?(key)
     return false if topic.nil?

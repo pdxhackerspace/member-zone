@@ -715,6 +715,47 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'form[action=?]', mark_needs_review_membership_application_path(app)
   end
 
+  # Approving belongs to the executive director. An admin keeps the button so an acceptance is
+  # never blocked, but has to acknowledge that they are stepping outside their role to use it.
+  test 'an admin without the approve role is warned before approving' do
+    sign_in_as_admin
+    app = decidable_application('decision-admin-bypass@example.com')
+
+    get membership_application_path(app)
+
+    assert_response :success
+    assert_select 'form[action=?][data-controller=?]',
+                  approve_membership_application_path(app), 'admin-override-confirm'
+    assert_select 'form[action=?] button[data-turbo-confirm]', approve_membership_application_path(app), count: 0
+    # Rejecting is not the director's alone, so it keeps the ordinary confirm.
+    assert_select 'form[action=?][data-controller]', reject_membership_application_path(app), count: 0
+    assert_select 'form[action=?] button[data-turbo-confirm]', reject_membership_application_path(app)
+  end
+
+  test 'an admin who also holds the approve role gets the ordinary confirm' do
+    admin = sign_in_as_admin
+    grant_privileges(admin, 'applications.approve')
+    app = decidable_application('decision-admin-with-role@example.com')
+
+    get membership_application_path(app)
+
+    assert_response :success
+    assert_select 'form[action=?][data-controller]', approve_membership_application_path(app), count: 0
+    assert_select 'form[action=?] button[data-turbo-confirm]', approve_membership_application_path(app)
+  end
+
+  test 'a reviewer with the approve role gets the ordinary confirm' do
+    reviewer = sign_in_as_reviewer
+    grant_privileges(reviewer, 'applications.view', 'applications.approve')
+    app = decidable_application('decision-approver-confirm@example.com')
+
+    get membership_application_path(app)
+
+    assert_response :success
+    assert_select 'form[action=?][data-controller]', approve_membership_application_path(app), count: 0
+    assert_select 'form[action=?] button[data-turbo-confirm]', approve_membership_application_path(app)
+  end
+
   test 'under review tab includes needs_review applications' do
     app = MembershipApplication.create!(
       email: 'needs-review-index@example.com',
@@ -979,6 +1020,7 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     post local_login_path, params: {
       session: { email: account.email, password: 'localpassword123' }
     }
+    User.find_by!(authentik_id: "local:#{account.id}")
   end
 
   # A non-admin who reaches applications through privileges alone. Callers grant whichever
