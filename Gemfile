@@ -80,7 +80,7 @@ gem 'bootsnap', require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # ruby-vips backs the default :vips variant processor; Active Storage requires it
 # eagerly at boot, so it must be declared even though nothing calls it directly.
-gem 'image_processing', '~> 2.0'
+gem 'image_processing', '~> 2.1'
 gem 'ruby-vips', '~> 2.2'
 
 # csv is no longer a default gem starting in Ruby 3.4
