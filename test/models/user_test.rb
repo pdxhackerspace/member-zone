@@ -154,6 +154,39 @@ class UserTest < ActiveSupport::TestCase
     assert admin.can?(:'applications.approve')
   end
 
+  # can? cannot answer "was this authority given to you?" — is_admin? makes it true for
+  # everything. privilege_conferred? is what callers ask when the difference matters.
+  test 'privilege_conferred? ignores the admin bypass' do
+    admin = User.create!(
+      authentik_id: 'conferred-test-admin',
+      email: 'conferred-test-admin@example.com',
+      is_admin: true,
+      active: true
+    )
+
+    assert admin.can?(:'applications.approve')
+    assert_not admin.privilege_conferred?(:'applications.approve')
+
+    grant_privileges(admin, 'applications.approve')
+
+    assert admin.privilege_conferred?(:'applications.approve')
+  end
+
+  test 'privilege_conferred? matches can? for a member who holds the role' do
+    member = User.create!(
+      authentik_id: 'conferred-test-member',
+      email: 'conferred-test-member@example.com',
+      active: true
+    )
+
+    assert_not member.privilege_conferred?(:'applications.approve')
+
+    grant_privileges(member, 'applications.approve')
+
+    assert member.privilege_conferred?(:'applications.approve')
+    assert_not member.privilege_conferred?(:'applications.reject')
+  end
+
   # Each verb is its own privilege: reviewing an application does not decide it, and deciding
   # it one way does not carry the others.
   test 'reviewing training does not confer the power to approve, reject, or park' do

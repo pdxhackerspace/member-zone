@@ -8,7 +8,7 @@ class ApplicationController < ActionController::Base
 
   helper_method :current_user, :user_signed_in?, :local_auth_enabled?, :authentik_enabled?,
                 :current_user_admin?, :true_user_admin?, :impersonating?, :true_user, :can?,
-                :can_for_any_topic?
+                :can_for_any_topic?, :admin_bypass_only?
 
   private
 
@@ -116,6 +116,17 @@ class ApplicationController < ActionController::Base
   # no particular topic is in hand yet.
   def can_for_any_topic?(privilege)
     current_user&.can_for_any_topic?(privilege) || false
+  end
+
+  # True when the check passes only because of the is_admin bypass, and no role the member
+  # holds confers the privilege. A handful of decisions are offered to administrators so the
+  # organization is never stuck, but belong to a role holder in the ordinary course —
+  # approving a membership application being the executive director's. Views use this to
+  # warn before an admin reaches for authority that is not theirs day to day.
+  def admin_bypass_only?(privilege, topic: nil)
+    return false unless can?(privilege, topic: topic)
+
+    !current_user.privilege_conferred?(privilege, topic: topic)
   end
 
   def require_privilege!(privilege, topic: nil)

@@ -167,12 +167,17 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
           <% if can_approve %>
-            <%= form_with url: approve_membership_application_path(@application), method: :post, local: true do %>
+            <%# An admin holding no role that grants applications.approve is seeing this button on the
+                is_admin bypass alone. They keep it — the organization must never be unable to accept a
+                member — but they get an acknowledgement instead of the one-click confirm. %>
+            <% approve_on_bypass = admin_bypass_only?(:'applications.approve') %>
+            <%= form_with url: approve_membership_application_path(@application), method: :post, local: true,
+                          data: (approve_on_bypass ? approve_override_confirm_data : {}) do %>
               <input type="hidden" name="admin_notes" id="approve_admin_notes" value="">
-              <button type="submit" class="btn btn-success review-btn"
-                      data-turbo-confirm="Approve this application?">
+              <%= button_tag type: :submit, class: 'btn btn-success review-btn',
+                             data: (approve_on_bypass ? {} : { turbo_confirm: 'Approve this application?' }) do %>
                 <i class="bi bi-check-circle me-1"></i> Approve
-              </button>
+              <% end %>
             <% end %>
           <% end %>
           <% if can_reject %>
