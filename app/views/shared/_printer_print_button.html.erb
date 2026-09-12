@@ -14,9 +14,9 @@
     <% end %>
   <% else %>
     <div class="btn-group">
-      <%# strategy=fixed keeps the menu from being clipped when the button sits inside .table-responsive %>
-      <button type="button" class="<%= toggle_class %>" data-bs-toggle="dropdown" data-bs-strategy="fixed"
-              aria-expanded="false">
+      <%# Popper strategy fixed keeps the menu from being clipped when the button sits inside .table-responsive %>
+      <button type="button" class="<%= toggle_class %>" data-bs-toggle="dropdown" aria-expanded="false"
+              data-bs-popper-config='{"strategy":"fixed"}'>
         <i class="bi bi-printer<%= ' me-1' unless small %>"></i><%= 'Print' unless small %>
       </button>
       <ul class="dropdown-menu dropdown-menu-end" id="<%= dropdown_id %>">

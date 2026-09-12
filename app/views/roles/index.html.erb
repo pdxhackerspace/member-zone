@@ -72,7 +72,7 @@
             <td class="text-end">
               <div class="dropdown">
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown"
-                        data-bs-strategy="fixed" aria-expanded="false">&ctdot;</button>
+                        data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">&ctdot;</button>
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li><%= link_to 'Edit privileges', edit_role_path(role), class: 'dropdown-item' %></li>
                   <li><hr class="dropdown-divider"></li>
