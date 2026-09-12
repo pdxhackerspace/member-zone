@@ -71,7 +71,8 @@
             <td class="num <%= 'text-secondary' if role.privileges.empty? %>"><%= role.privileges.size %></td>
             <td class="text-end">
               <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false">&ctdot;</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown"
+                        data-bs-strategy="fixed" aria-expanded="false">&ctdot;</button>
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li><%= link_to 'Edit privileges', edit_role_path(role), class: 'dropdown-item' %></li>
                   <li><hr class="dropdown-divider"></li>
