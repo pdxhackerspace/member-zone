@@ -24,7 +24,7 @@
     "nodemon": "^3.1.14",
     "postcss": "^8.5.28",
     "postcss-cli": "^11.0.0",
-    "sass": "^1.103.1"
+    "sass": "^1.104.0"
   },
   "devDependencies": {
     "@hotwired/stimulus": "^3.2.2",
