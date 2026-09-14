@@ -6,6 +6,8 @@ Admin-facing notes for MemberZone features.
 
 Settings → **Nags** lists automated member reminders. Each nag can be enabled or disabled independently. Preview counts and the due-member list are always visible, even when a nag is disabled.
 
+Each reminder lists every email template it can send, linked so you can jump straight to the copy. Parking notice reminders have eight — permit and ticket copy for each phase. A template that has been disabled is flagged on the reminder, because a disabled template means the reminder sends nothing.
+
 ### Slack signup reminder
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.
