@@ -37,4 +37,70 @@ class ReminderSettingTest < ActiveSupport::TestCase
     assert_equal 5, ReminderSetting.lookback_days_for('lapsed_access')
     assert_nil ReminderSetting.lookback_days_for('not_a_reminder')
   end
+
+  test 'every reminder names at least one email template it can send' do
+    ReminderSetting.ordered.each do |reminder|
+      assert_not_empty reminder.email_template_keys, "#{reminder.key} names no email template"
+    end
+  end
+
+  test 'parking notice reminders cover both permits and tickets in every phase' do
+    keys = ReminderSetting.find_by!(key: 'parking_notices').email_template_keys
+
+    assert_equal 8, keys.size
+    %w[expiring_soon expired overdue_reminder final_reminder].each do |phase|
+      assert_includes keys, "parking_permit_#{phase}"
+      assert_includes keys, "parking_ticket_#{phase}"
+    end
+  end
+
+  test 'email_template_keys is empty for a reminder outside the catalog' do
+    setting = ReminderSetting.new(key: 'not_a_reminder', name: 'Not a reminder')
+
+    assert_empty setting.email_template_keys
+    assert_empty setting.email_templates
+  end
+
+  test 'email_templates returns the records for the named keys in catalog order' do
+    create_template('parking_ticket_expiring_soon')
+    permit = create_template('parking_permit_expiring_soon')
+
+    templates = ReminderSetting.find_by!(key: 'parking_notices').email_templates
+
+    assert_equal %w[parking_permit_expiring_soon parking_ticket_expiring_soon], templates.map(&:key)
+    assert_equal permit, templates.first
+  end
+
+  test 'email_templates skips keys that have no template record' do
+    create_template('parking_permit_final_reminder')
+
+    templates = ReminderSetting.find_by!(key: 'parking_notices').email_templates
+
+    assert_equal %w[parking_permit_final_reminder], templates.map(&:key)
+  end
+
+  test 'email_templates_by_reminder_key covers every reminder without a query per reminder' do
+    create_template('lapsed_access_reminder')
+    create_template('payment_past_due')
+
+    by_key = ReminderSetting.email_templates_by_reminder_key
+
+    assert_equal ReminderSetting::CATALOG.keys.sort, by_key.keys.sort
+    assert_equal %w[lapsed_access_reminder], by_key['lapsed_access'].map(&:key)
+    assert_equal %w[payment_past_due], by_key['payment_overdue'].map(&:key)
+    assert_empty by_key['orientation']
+  end
+
+  private
+
+  def create_template(key)
+    EmailTemplate.create!(
+      key: key,
+      name: key.titleize,
+      subject: "Subject for #{key}",
+      body_html: '<p>Body</p>',
+      body_text: 'Body',
+      enabled: true
+    )
+  end
 end

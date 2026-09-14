@@ -278,6 +278,69 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/disabled/i, flash[:alert])
   end
 
+  test 'index links every email template a reminder can send' do
+    keys = ReminderSetting.find_by!(key: 'parking_notices').email_template_keys
+    templates = keys.map { |key| create_template(key) }
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Email templates:', response.body
+    templates.each do |template|
+      assert_select 'a[href=?]', email_template_path(template), text: template.name, minimum: 1
+    end
+  end
+
+  test 'index labels a reminder with one template in the singular' do
+    template = create_template('orientation_reminder')
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Email template:', response.body
+    assert_select 'a[href=?]', email_template_path(template), text: template.name, minimum: 1
+  end
+
+  test 'index warns when an enabled reminder points at a disabled template' do
+    create_template('lapsed_access_reminder', enabled: false)
+    ReminderSetting.find_by!(key: 'lapsed_access').update!(enabled: true)
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_select 'span.badge.text-bg-warning-subtle', text: 'disabled'
+  end
+
+  test 'index mutes a disabled template when the reminder is off too' do
+    create_template('lapsed_access_reminder', enabled: false)
+    ReminderSetting.find_by!(key: 'lapsed_access').update!(enabled: false)
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_select 'span.badge.text-bg-secondary-subtle', text: 'disabled'
+    assert_select 'span.badge.text-bg-warning-subtle', text: 'disabled', count: 0
+  end
+
+  test 'index omits the template line for a reminder whose templates are missing' do
+    EmailTemplate.where(key: ReminderSetting.catalog_email_template_keys).delete_all
+
+    get reminder_settings_url
+
+    assert_response :success
+    assert_no_match 'Email template:', response.body
+    assert_no_match 'Email templates:', response.body
+  end
+
+  test 'show links the email templates for the reminder' do
+    template = create_template('lapsed_access_reminder')
+
+    get reminder_setting_url('lapsed_access')
+
+    assert_response :success
+    assert_select 'a[href=?]', email_template_path(template), text: template.name
+  end
+
   private
 
   def sign_in_as_admin
@@ -285,5 +348,16 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     post local_login_path, params: {
       session: { email: account.email, password: 'localpassword123' }
     }
+  end
+
+  def create_template(key, enabled: true)
+    EmailTemplate.create!(
+      key: key,
+      name: key.titleize,
+      subject: "Subject for #{key}",
+      body_html: '<p>Body</p>',
+      body_text: 'Body',
+      enabled: enabled
+    )
   end
 end

@@ -14,6 +14,7 @@
         <span class="text-body"><%= opted_out_count %></span> members opted out
       </div>
     <% end %>
+    <%= render 'reminder_email_templates', reminder: reminder, email_templates: email_templates %>
   </div>
   <div class="card-footer reminder-setting-card-footer">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">

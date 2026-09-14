@@ -1,0 +1,14 @@
+<%# Every template this reminder can send. A disabled template sends nothing, which matters
+    enough to flag when the reminder itself is switched on. %>
+<% if email_templates.present? %>
+  <div class="text-12 text-secondary mt-1">
+    <%= 'Email template'.pluralize(email_templates.size) %>:
+    <% email_templates.each_with_index do |template, index| %>
+      <% if index.positive? %><span class="mx-1">·</span><% end %>
+      <%= link_to template.name, email_template_path(template), class: "text-secondary" %>
+      <% unless template.enabled? %>
+        <span class="badge <%= reminder.enabled? ? 'text-bg-warning-subtle' : 'text-bg-secondary-subtle' %>">disabled</span>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

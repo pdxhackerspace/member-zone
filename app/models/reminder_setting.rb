@@ -4,32 +4,42 @@ class ReminderSetting < ApplicationRecord
       name: 'Slack signup reminder',
       description: 'Gentle reminder to active members without a linked Slack account.',
       enabled: false,
-      allow_opt_out: true
+      allow_opt_out: true,
+      email_template_keys: %w[slack_signup_reminder]
     },
     'application_link' => {
       name: 'Application link reminder',
       description: 'Reminder when someone requested a membership application link but has not submitted yet.',
       enabled: false,
-      allow_opt_out: true
+      allow_opt_out: true,
+      email_template_keys: %w[application_link_reminder]
     },
     'payment_overdue' => {
       name: 'Overdue payment reminder',
       description: 'Weekly reminder to members whose dues are past due. Members who have cancelled are not reminded.',
       enabled: false,
-      allow_opt_out: true
+      allow_opt_out: true,
+      email_template_keys: %w[payment_past_due]
     },
     'orientation' => {
       name: 'Orientation reminder',
       description: 'Reminder to approved members who have not had their building access orientation yet.',
       enabled: false,
-      allow_opt_out: true
+      allow_opt_out: true,
+      email_template_keys: %w[orientation_reminder]
     },
     'parking_notices' => {
       name: 'Parking notice reminders',
       description: 'Pre-expiration, expiration, and follow-up reminders for parking permits and tickets. ' \
                    'The initial issued email on creation is always sent.',
       enabled: false,
-      allow_opt_out: false
+      allow_opt_out: false,
+      email_template_keys: %w[
+        parking_permit_expiring_soon parking_ticket_expiring_soon
+        parking_permit_expired parking_ticket_expired
+        parking_permit_overdue_reminder parking_ticket_overdue_reminder
+        parking_permit_final_reminder parking_ticket_final_reminder
+      ]
     },
     'lapsed_access' => {
       name: 'Lapsed member access reminder',
@@ -38,7 +48,8 @@ class ReminderSetting < ApplicationRecord
       enabled: false,
       allow_opt_out: true,
       lookback_days: 1,
-      configurable_lookback: true
+      configurable_lookback: true,
+      email_template_keys: %w[lapsed_access_reminder]
     }
   }.freeze
 
@@ -76,6 +87,36 @@ class ReminderSetting < ApplicationRecord
   # Only reminders that scan a time range have a meaningful lookback window to edit.
   def configurable_lookback?
     CATALOG.dig(key, :configurable_lookback) == true
+  end
+
+  # Nothing joins a reminder to its templates in the database — QueuedMail resolves a template
+  # from the mailer action at send time — so the catalog names the keys a reminder can send.
+  def email_template_keys
+    CATALOG.dig(key, :email_template_keys) || []
+  end
+
+  def email_templates
+    self.class.templates_for_keys(email_template_keys)
+  end
+
+  # Every reminder's templates in one query, for pages that list the whole catalog.
+  def self.email_templates_by_reminder_key
+    found = EmailTemplate.where(key: catalog_email_template_keys).index_by(&:key)
+    CATALOG.transform_values do |attrs|
+      attrs.fetch(:email_template_keys, []).filter_map { |key| found[key] }
+    end
+  end
+
+  def self.catalog_email_template_keys
+    CATALOG.values.flat_map { |attrs| attrs.fetch(:email_template_keys, []) }
+  end
+
+  # Catalog order is the order the reminder sends them in, which the database cannot express.
+  def self.templates_for_keys(keys)
+    return [] if keys.empty?
+
+    found = EmailTemplate.where(key: keys).index_by(&:key)
+    keys.filter_map { |key| found[key] }
   end
 
   def self.sync_catalog_attributes!
