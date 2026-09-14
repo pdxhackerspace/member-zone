@@ -40,6 +40,10 @@ gem 'omniauth-rails_csrf_protection'
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem 'jbuilder'
 
+# json 3.0 dropped the positional options argument to JSON.parse, which
+# ActiveSupport::JSON.decode still passes. Unpin once Rails supports json 3.
+gem 'json', '~> 2.21'
+
 # Use Redis adapter to run Action Cable in production
 gem 'redis', '>= 4.0.1'
 
@@ -110,7 +114,7 @@ group :development do
   # gem "spring"
 
   # Code style checker
-  gem 'rubocop', '~> 1.90', require: false
+  gem 'rubocop', '~> 1.91', require: false
   gem 'rubocop-rails', '~> 2.36', require: false
 
   # Preview emails in browser instead of sending
