@@ -49,6 +49,8 @@
         <% end %>
       </div>
     <% end %>
+    <%= render 'reminder_email_templates', reminder: @reminder_setting,
+                                           email_templates: @reminder_setting.email_templates %>
   </div>
   <div class="d-flex gap-2">
     <%= link_to "Back to Reminders", reminder_settings_path, class: "btn btn-outline-secondary btn-sm" %>

@@ -26,7 +26,9 @@
 <% @reminder_settings.each do |reminder| %>
   <% case reminder.key %>
   <% when 'slack_signup' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @slack_email_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @slack_email_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @slack_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
@@ -41,7 +43,9 @@
       </div>
     <% end %>
   <% when 'application_link' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @application_link_email_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @application_link_email_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @application_link_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
@@ -55,7 +59,9 @@
       </div>
     <% end %>
   <% when 'payment_overdue' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @payment_overdue_email_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @payment_overdue_email_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
@@ -69,7 +75,9 @@
       </div>
     <% end %>
   <% when 'orientation' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @orientation_email_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @orientation_email_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @orientation_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
@@ -83,7 +91,9 @@
       </div>
     <% end %>
   <% when 'parking_notices' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @parking_expiring_soon_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @parking_expiring_soon_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @parking_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
@@ -102,7 +112,9 @@
       </div>
     <% end %>
   <% when 'lapsed_access' %>
-    <%= render layout: 'reminder_card', locals: { reminder: reminder, email_template: @lapsed_access_email_template } do %>
+    <%= render layout: 'reminder_card',
+               locals: { reminder: reminder, email_template: @lapsed_access_email_template,
+                         email_templates: @reminder_email_templates[reminder.key] } do %>
       <div class="text-13">
         <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>

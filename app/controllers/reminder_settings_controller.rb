@@ -18,25 +18,20 @@ class ReminderSettingsController < AdminController
     ReminderSetting.seed_defaults!
     ReminderSetting.sync_catalog_attributes!
     @reminder_settings = ReminderSetting.ordered
+    load_index_email_templates
     @slack_due_count = Reminders::SlackSignupEligibility.count_due
     @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
     @slack_source_enabled = MemberSource.enabled?('slack')
-    @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
     @application_link_due_count = Reminders::ApplicationLinkEligibility.count_due
     @application_link_awaiting_count = Reminders::ApplicationLinkEligibility.total_awaiting
-    @application_link_email_template = EmailTemplate.find_by(key: 'application_link_reminder')
     @payment_overdue_due_count = Reminders::PaymentOverdueEligibility.count_due
     @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
-    @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
     @orientation_due_count = Reminders::OrientationEligibility.count_due
     @orientation_awaiting_count = Reminders::OrientationEligibility.total_awaiting
-    @orientation_email_template = EmailTemplate.find_by(key: 'orientation_reminder')
     @parking_due_count = Reminders::ParkingNoticeEligibility.count_due
     @parking_awaiting_count = Reminders::ParkingNoticeEligibility.total_awaiting
-    @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
     @lapsed_access_due_count = Reminders::LapsedAccessEligibility.count_due
     @lapsed_access_window_count = Reminders::LapsedAccessEligibility.total_accessed_in_window
-    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
     @building_access_topic = TrainingTopic.building_access
     @membership_setting = MembershipSetting.instance
   end
@@ -77,6 +72,18 @@ class ReminderSettingsController < AdminController
 
   def set_reminder_setting
     @reminder_setting = ReminderSetting.find_by!(key: params[:key])
+  end
+
+  # The cards link to the one template that headlines each reminder as well as to every
+  # template the reminder can send, so both shapes are loaded up front.
+  def load_index_email_templates
+    @reminder_email_templates = ReminderSetting.email_templates_by_reminder_key
+    @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+    @application_link_email_template = EmailTemplate.find_by(key: 'application_link_reminder')
+    @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
+    @orientation_email_template = EmailTemplate.find_by(key: 'orientation_reminder')
+    @parking_expiring_soon_template = EmailTemplate.find_by(key: 'parking_permit_expiring_soon')
+    @lapsed_access_email_template = EmailTemplate.find_by(key: 'lapsed_access_reminder')
   end
 
   def reminder_setting_params
