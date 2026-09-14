@@ -46,3 +46,8 @@
 
 bun.lock.claude/
 .claude/
+
+# Scratch space for local-only files: database dumps, backup keys, and anything
+# else that must never reach the repository. Contents are ignored wholesale.
+/.local/*
+!/.local/.gitkeep
