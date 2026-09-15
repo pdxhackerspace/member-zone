@@ -35,6 +35,16 @@ Applicant emails link to `/apply/notifications/:token/opt-out`; members use sign
 
 `QueuedMail` stores template-backed bodies bare, so the admin previews (Mail Queue and Email Templates) compose the chrome through `Emails::BodyComposer.for_preview` in order to match what the recipient receives. `QueuedMail#rendered_preview` skips composition for `pre_rendered_mail_body?` records, whose stored HTML already went through the mailer layout. `Emails::BodyComposer.text` is also what `ApplicationMailer#plain_text_email_body` uses, so preview and delivery cannot drift.
 
+## When delivery fails
+
+Templates flagged `send_immediately` skip review and go out from the request that raised them (recording training, approving an application, banning a member). A mail server that is disabled or unreachable must not take that request down or drop the message, so `QueuedMail::ImmediateSend` catches the failure and stores the already-rendered message as an **approved** `QueuedMail` carrying the error. It never returns for review — the template already said it may send unreviewed — and callers get the record instead of a `QueuedMail::ImmediateDelivery`.
+
+`MailDeliveryReadiness` decides whether an attempt is worth making at all: only `:smtp` delivery can be off, and only for a missing or placeholder `SMTP_ADDRESS`. Missing credentials are not disqualifying, because an unauthenticated relay is a legitimate setup. (`ApplicationHelper#smtp_configured?` is the stricter question of whether to offer an admin a send button.)
+
+`QueuedMailRetrySweepJob` runs every five minutes and retries approved, unsent messages on the backoff in `QueuedMailRetries` — 1 minute, 5, 15, an hour, 3 hours, 6 hours — up to `MAX_SEND_ATTEMPTS`. `QueuedMail.due_for_retry` decides due-ness in SQL rather than filtering a batch in Ruby, so a backlog of exhausted messages cannot starve newer mail behind it. While email is disabled the sweep does nothing rather than spending each message's attempt budget on a server that is not there. It also picks up messages whose delivery job was lost, once `UNATTEMPTED_GRACE` has passed since the last write. A message that exhausts its budget stays in the queue as **Send Failed**; the admin **Retry** button restores the budget and hands it back to the sweep.
+
+The sweep and `QueuedMailDeliveryJob` overlap on purpose — neither tries to guess when the other has given up. `QueuedMail#deliver_now!` ignores an already-sent message, and claims the row through `claim_for_delivery!` — a compare-and-swap on `updated_at` that spends the attempt — so only one caller can be delivering a given message at a time. It is a claim rather than a lease: a worker that dies mid-send leaves no recorded failure, so the message returns to the sweep after `UNATTEMPTED_GRACE` instead of staying stuck.
+
 ## Adding a new member email
 
 1. Add the mailer action to a category in `NotificationCategory::CATALOG`, or to `MailRecipientGuard::ADMIN_MAILER_ACTIONS` if staff-only. This covers email template keys too, not just `MemberMailer` methods.
