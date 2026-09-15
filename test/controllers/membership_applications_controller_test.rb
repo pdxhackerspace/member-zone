@@ -787,6 +787,36 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'application_rejected', qm.mailer_action
   end
 
+  test 'reject leaves the admin on the application when the message could not be sent' do
+    EmailTemplate.where(key: 'application_rejected').delete_all
+    EmailTemplate.create!(
+      key: 'application_rejected',
+      name: 'Application Rejected Immediate',
+      subject: 'About your application',
+      body_html: '<p>Sorry, {{member_name}}</p>',
+      body_text: 'Sorry, {{member_name}}',
+      enabled: true,
+      send_immediately: true
+    )
+    app = MembershipApplication.create!(
+      email: 'reject-unreachable@example.com',
+      status: 'submitted',
+      submitted_at: Time.current
+    )
+
+    with_unreachable_mail_server do
+      assert_difference 'QueuedMail.count', 1 do
+        post reject_membership_application_path(app), params: { admin_notes: 'Not a fit.' }
+      end
+    end
+
+    queued = QueuedMail.order(:created_at).last
+    assert_redirected_to membership_application_path(app)
+    assert_match(/retried automatically/, flash[:notice])
+    assert queued.queued_for_retry?
+    assert_equal 'rejected', app.reload.status
+  end
+
   test 'approve links existing user by email and still queues mail' do
     existing = users(:two)
     app = MembershipApplication.create!(

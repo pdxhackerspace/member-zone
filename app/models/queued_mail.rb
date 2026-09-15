@@ -3,6 +3,7 @@ class QueuedMail < ApplicationRecord
   include QueuedMailApplicationLinkReminders
   include QueuedMailMailerArgs
   include QueuedMailApproval
+  include QueuedMailRetries
 
   STATUSES = %w[pending approved rejected].freeze
 
@@ -78,23 +79,18 @@ class QueuedMail < ApplicationRecord
 
     template = EmailTemplate.find_enabled(action.to_s)
     variables = enqueue_render_variables(action, user, extra_args, template)
+    attrs = queued_mail_attrs(dest, reason || action.to_s.humanize, user, action.to_s, extra_args)
 
     if !MailRecipientGuard.blocked?(user) && template&.send_immediately?
-      return deliver_immediately(template, dest, variables, mailer_action: action.to_s, user: user)
+      return deliver_immediately(template, dest, variables, mailer_action: action.to_s, user: user,
+                                                            queued_mail_attrs: attrs)
     end
 
     record = if template
-               create_queued_mail_from_template(
-                 template,
-                 variables,
-                 queued_mail_attrs(dest, reason || action.to_s.humanize, user, action.to_s, extra_args)
-               )
+               create_queued_mail_from_template(template, variables, attrs)
              else
                message = dispatch_mailer(action, build_mailer_args(action, user, to, extra_args))
-               create_queued_mail_from_message(
-                 message,
-                 queued_mail_attrs(dest, reason || action.to_s.humanize, user, action.to_s, extra_args)
-               )
+               create_queued_mail_from_message(message, attrs)
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued #{action.to_s.humanize} to #{dest}")
@@ -115,23 +111,18 @@ class QueuedMail < ApplicationRecord
 
     variables = MemberMailer.build_template_variables(template_recipient, extra_args)
     blocked = MailRecipientGuard.blocked?(recipient_user) || MailRecipientGuard.blocked_email?(dest)
+    attrs = queued_mail_attrs(dest, 'Application rejected', recipient_user, action, extra_args)
 
     if !blocked && template&.send_immediately?
-      return deliver_immediately(template, dest, variables, mailer_action: action, user: recipient_user)
+      return deliver_immediately(template, dest, variables, mailer_action: action, user: recipient_user,
+                                                            queued_mail_attrs: attrs)
     end
 
     record = if template
-               create_queued_mail_from_template(
-                 template,
-                 variables,
-                 queued_mail_attrs(dest, 'Application rejected', recipient_user, action, extra_args)
-               )
+               create_queued_mail_from_template(template, variables, attrs)
              else
                message = MemberMailer.application_rejected(template_recipient, **extra_args)
-               create_queued_mail_from_message(
-                 message,
-                 queued_mail_attrs(dest, 'Application rejected', recipient_user, action, extra_args)
-               )
+               create_queued_mail_from_message(message, attrs)
              end
 
     MailLogEntry.log!(record, 'created', details: "Queued application rejected to #{dest}")
@@ -157,26 +148,10 @@ class QueuedMail < ApplicationRecord
     )
   end
 
-  def self.deliver_immediately(template, dest, variables, **options)
-    rendered = template.render(variables)
-    mail = EmailTemplateMailer::RenderedMail.new(
-      to: dest,
-      subject: rendered[:subject],
-      body_html: rendered[:body_html],
-      body_text: rendered[:body_text] || '',
-      mailer_action: options.fetch(:mailer_action, template.key),
-      user: options[:user],
-      verification_token: options[:verification_token]
-    )
-    EmailTemplateMailer.send_rendered(mail).deliver_now
-
-    ImmediateDelivery.new(
-      to: dest,
-      subject: rendered[:subject],
-      body_html: rendered[:body_html],
-      body_text: rendered[:body_text] || '',
-      email_template: template
-    )
+  # Returns an +ImmediateDelivery+ when the message went out, or a +QueuedMail+ holding it for
+  # retry when email is disabled or the mail server refused it. See +QueuedMail::ImmediateSend+.
+  def self.deliver_immediately(template, dest, variables, **)
+    ImmediateSend.call(template, dest, variables, **)
   end
 
   def self.queued_mail_attrs(dest, reason, recipient, action, args)
@@ -235,11 +210,14 @@ class QueuedMail < ApplicationRecord
     recipient.present? && (email_template.present? || mailer_action.present?)
   end
 
+  # Safe to call from anywhere that thinks the message is due: an already-sent message is left
+  # alone, and the claim keeps a retry sweep and an in-flight delivery job from both sending it.
   def deliver_now!
+    return if sent?
     return if MailRecipientGuard.block_delivery_to!(self)
     return if Notifications::DeliveryGate.block_queued_delivery!(self)
+    return unless claim_for_delivery!
 
-    increment!(:send_attempts)
     QueuedMailMailer.deliver_queued(self).deliver_now
     sent_time = Time.current
     update!(sent_at: sent_time, last_error: nil, last_error_at: nil)
@@ -250,8 +228,10 @@ class QueuedMail < ApplicationRecord
     raise
   end
 
+  # An admin asking for a retry also restores the automatic attempt budget, so a message that had
+  # given up starts being swept again if this attempt fails too.
   def retry_delivery!
-    update!(last_error: nil, last_error_at: nil)
+    update!(last_error: nil, last_error_at: nil, send_attempts: 0)
     QueuedMailDeliveryJob.perform_later(id)
   end
 
