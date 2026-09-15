@@ -40,6 +40,7 @@ class EmailTemplate < ApplicationRecord
     '{{reactivation_guidance_text}}' => 'Reactivation instructions for plain-text bodies (lapsed access reminder only)',
     '{{access_summary}}' => 'When the lapsed member badged in, e.g. "yesterday" or "3 times between ' \
                             'April 24 and April 27" (lapsed access reminder only)',
+    '{{parking_notice_url}}' => 'Link the member can open the permit or ticket at (parking emails only)',
     '{{membership_state_label}}' => 'Standing that caused delivery to be blocked, e.g. banned (admin only)',
     '{{recipient_name}}' => 'Name of the member the blocked message was addressed to (admin only)',
     '{{delivery_to}}' => 'Address the blocked message was addressed to (admin only)',
