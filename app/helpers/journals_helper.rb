@@ -1,37 +1,50 @@
 module JournalsHelper
+  include Journals::ParkingNoticeRendering
+
   def render_change_rows(changes_hash)
     return content_tag(:span, 'No field changes recorded', class: 'text-muted') if changes_hash.blank?
 
     # Handle special training-related entries
     return render_training_change(changes_hash['training']) if changes_hash['training'].is_a?(Hash)
     return render_key_fob_change(changes_hash['key_fob']) if changes_hash['key_fob'].is_a?(Hash)
+    return render_parking_notice_change(changes_hash['parking_notice']) if changes_hash['parking_notice'].is_a?(Hash)
 
     if changes_hash['trainer_capability'].is_a?(Hash)
       return render_trainer_capability_change(changes_hash['trainer_capability'])
     end
 
+    render_change_table(changes_hash)
+  end
+
+  def render_change_table(changes_hash)
     content_tag(:div, class: 'table-responsive') do
       content_tag(:table, class: 'table table-sm mb-0 align-middle') do
-        thead = content_tag(:thead, class: 'bg-body-tertiary') do
+        change_table_head + change_table_body(changes_hash)
+      end
+    end
+  end
+
+  def change_table_head
+    content_tag(:thead, class: 'bg-body-tertiary') do
+      content_tag(:tr) do
+        content_tag(:th, 'Field') +
+          content_tag(:th, 'From') +
+          content_tag(:th, 'To')
+      end
+    end
+  end
+
+  def change_table_body(changes_hash)
+    content_tag(:tbody) do
+      safe_join(
+        changes_hash.map do |attr, vals|
           content_tag(:tr) do
-            content_tag(:th, 'Field') +
-              content_tag(:th, 'From') +
-              content_tag(:th, 'To')
+            content_tag(:td, attr.humanize) +
+              content_tag(:td, display_change_value(vals['from'])) +
+              content_tag(:td, display_change_value(vals['to']))
           end
         end
-
-        tbody = content_tag(:tbody) do
-          changes_hash.map do |attr, vals|
-            content_tag(:tr) do
-              content_tag(:td, attr.humanize) +
-                content_tag(:td, display_change_value(vals['from'])) +
-                content_tag(:td, display_change_value(vals['to']))
-            end
-          end.join.html_safe
-        end
-
-        thead + tbody
-      end
+      )
     end
   end
 
