@@ -17,7 +17,7 @@ class QueuedMailRetrySweepJob < ApplicationJob
       return
     end
 
-    due = QueuedMail.awaiting_retry.limit(BATCH_SIZE).select(&:retry_due?)
+    due = QueuedMail.due_for_retry.limit(BATCH_SIZE).to_a
     return if due.empty?
 
     Rails.logger.info("[QueuedMailRetrySweep] retrying #{due.size} #{'message'.pluralize(due.size)}")

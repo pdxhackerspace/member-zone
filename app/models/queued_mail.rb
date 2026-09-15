@@ -210,11 +210,14 @@ class QueuedMail < ApplicationRecord
     recipient.present? && (email_template.present? || mailer_action.present?)
   end
 
+  # Safe to call from anywhere that thinks the message is due: an already-sent message is left
+  # alone, and the claim keeps a retry sweep and an in-flight delivery job from both sending it.
   def deliver_now!
+    return if sent?
     return if MailRecipientGuard.block_delivery_to!(self)
     return if Notifications::DeliveryGate.block_queued_delivery!(self)
+    return unless claim_for_delivery!
 
-    increment!(:send_attempts)
     QueuedMailMailer.deliver_queued(self).deliver_now
     sent_time = Time.current
     update!(sent_at: sent_time, last_error: nil, last_error_at: nil)
