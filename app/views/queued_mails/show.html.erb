@@ -109,6 +109,19 @@
               <% if @queued_mail.last_error_at %>
                 <div class="text-muted small"><%= time_ago_in_words(@queued_mail.last_error_at) %> ago</div>
               <% end %>
+              <% if @queued_mail.retries_exhausted? %>
+                <div class="text-muted small">
+                  Automatic retries stopped after <%= @queued_mail.send_attempts %> attempts.
+                </div>
+              <% elsif @queued_mail.next_retry_at %>
+                <div class="text-muted small">
+                  <% if @queued_mail.next_retry_at.past? %>
+                    Retrying automatically within a few minutes.
+                  <% else %>
+                    Retrying automatically in <%= distance_of_time_in_words_to_now(@queued_mail.next_retry_at) %>.
+                  <% end %>
+                </div>
+              <% end %>
             </dd>
           <% end %>
         </dl>

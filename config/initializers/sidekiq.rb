@@ -169,6 +169,15 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Queued Mail Retry Sweep - Every 5 minutes. Picks up messages that could not be sent when they
+  # were raised, so an SMTP outage delays mail instead of losing it.
+  Sidekiq::Cron::Job.create(
+    name: 'Queued Mail Retry Sweep - Every 5 minutes',
+    cron: '*/5 * * * *',
+    class: 'QueuedMailRetrySweepJob',
+    active_job: true
+  )
+
   # Member Geocoding - Hourly
   Sidekiq::Cron::Job.create(
     name: 'Member Geocoding - Hourly',

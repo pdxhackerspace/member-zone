@@ -29,6 +29,44 @@ module ActiveSupport
       topic
     end
 
+    # Fails delivery the way an unreachable mail server does in production: the exception comes back
+    # out of +deliver_now+ to whoever raised the mail.
+    class UnreachableServerDelivery
+      attr_accessor :settings
+
+      def initialize(settings = {})
+        @settings = settings
+      end
+
+      def deliver!(_mail)
+        raise SocketError, 'getaddrinfo(3): Name or service not known'
+      end
+    end
+
+    ActionMailer::Base.add_delivery_method :unreachable_server_test, UnreachableServerDelivery
+
+    def with_unreachable_mail_server
+      original = ActionMailer::Base.delivery_method
+      ActionMailer::Base.delivery_method = :unreachable_server_test
+      yield
+    ensure
+      ActionMailer::Base.delivery_method = original
+    end
+
+    # Puts the app in the state the admin UI calls "email delivery is disabled": configured for
+    # SMTP, with the placeholder host that an unset SMTP_ADDRESS leaves behind.
+    def with_email_disabled
+      config = Rails.configuration.action_mailer
+      original_method = config.delivery_method
+      original_settings = config.smtp_settings
+      config.delivery_method = :smtp
+      config.smtp_settings = { address: MailDeliveryReadiness::PLACEHOLDER_SMTP_ADDRESS }
+      yield
+    ensure
+      config.delivery_method = original_method
+      config.smtp_settings = original_settings
+    end
+
     # Swaps Authentik::Client for a stand-in. Reading the constant first matters: Zeitwerk
     # leaves it as a pending autoload, and remove_const on a pending autoload returns nil,
     # so the restore would pin Authentik::Client to nil for the rest of the worker process.

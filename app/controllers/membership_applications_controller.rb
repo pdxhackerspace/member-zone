@@ -135,35 +135,16 @@ class MembershipApplicationsController < ApplicationController
       return
     end
 
-    delivery = result.queued_mail
-    if delivery.is_a?(QueuedMail)
-      redirect_to edit_queued_mail_path(delivery),
-                  notice: 'Application approved. Review and edit the queued welcome email, ' \
-                          'then approve it in the mail queue to send.'
-    elsif delivery.is_a?(QueuedMail::ImmediateDelivery)
-      redirect_to membership_application_path(@application),
-                  notice: "Application approved. The welcome email was sent immediately to #{delivery.to}."
-    else
-      redirect_to membership_application_path(@application),
-                  notice: 'Application approved. No welcome email was queued (recipient has no email address).'
-    end
+    path, notice = outcome_email_destination(result.queued_mail, 'Application approved.', 'welcome email')
+    redirect_to path, notice: notice
   end
 
   def reject
     notes = params[:admin_notes]
-    qm = @application.reject!(current_user, notes: notes)
+    delivery = @application.reject!(current_user, notes: notes)
 
-    if qm.is_a?(QueuedMail)
-      redirect_to edit_queued_mail_path(qm),
-                  notice: 'Application rejected. Review and edit the queued message, ' \
-                          'then approve it in the mail queue to send.'
-    elsif qm.is_a?(QueuedMail::ImmediateDelivery)
-      redirect_to membership_application_path(@application),
-                  notice: "Application rejected. The rejection email was sent immediately to #{qm.to}."
-    else
-      redirect_to membership_application_path(@application),
-                  notice: 'Application rejected. No email was queued (recipient has no email address).'
-    end
+    path, notice = outcome_email_destination(delivery, 'Application rejected.', 'rejection email')
+    redirect_to path, notice: notice
   end
 
   def delay_for_review = review_parking!(:delay_for_review!, 'Application marked as under review.')
@@ -189,6 +170,28 @@ class MembershipApplicationsController < ApplicationController
   end
 
   private
+
+  # Where to send the admin after approving or rejecting, given what became of the outcome email:
+  # held for review (go edit it), sent, queued for retry because email was unavailable (nothing to
+  # review — the sweep will send it), or never raised at all.
+  def outcome_email_destination(delivery, prefix, label)
+    application_path = membership_application_path(@application)
+
+    case delivery
+    when QueuedMail
+      if delivery.queued_for_retry?
+        [application_path, "#{prefix} The #{label} could not be sent yet, so it is waiting in the " \
+                           'mail queue and will be retried automatically.']
+      else
+        [edit_queued_mail_path(delivery),
+         "#{prefix} Review and edit the queued #{label}, then approve it in the mail queue to send."]
+      end
+    when QueuedMail::ImmediateDelivery
+      [application_path, "#{prefix} The #{label} was sent immediately to #{delivery.to}."]
+    else
+      [application_path, "#{prefix} No #{label} was queued (recipient has no email address)."]
+    end
+  end
 
   def membership_application_status_counts
     {

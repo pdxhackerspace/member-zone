@@ -20,7 +20,9 @@ class QueuedMail
       )
       template = EmailTemplate.find_enabled(action)
       variables = MemberMailer.build_template_variables(recipient, merged_args)
-      return deliver_immediately(template, variables, merged_args) if send_immediately?(template)
+      if send_immediately?(template)
+        return deliver_immediately(template, variables, merged_args, queued_mail_attrs(action, merged_args))
+      end
 
       create_queued_mail(recipient, action, merged_args, template, variables)
     end
@@ -31,18 +33,23 @@ class QueuedMail
       !MailRecipientGuard.blocked_email?(@dest) && template&.send_immediately?
     end
 
-    def deliver_immediately(template, variables, merged_args)
+    def deliver_immediately(template, variables, merged_args, attrs)
       QueuedMail.deliver_immediately(
         template,
         @dest,
         variables,
         mailer_action: 'application_link_reminder',
-        verification_token: merged_args[:verification_token]
+        verification_token: merged_args[:verification_token],
+        queued_mail_attrs: attrs
       )
     end
 
+    def queued_mail_attrs(action, merged_args)
+      QueuedMail.queued_mail_attrs(@dest, @reason || 'Application link reminder', nil, action, merged_args)
+    end
+
     def create_queued_mail(recipient, action, merged_args, template, variables)
-      attrs = QueuedMail.queued_mail_attrs(@dest, @reason || 'Application link reminder', nil, action, merged_args)
+      attrs = queued_mail_attrs(action, merged_args)
       record = if template
                  QueuedMail.create_queued_mail_from_template(template, variables, attrs)
                else
