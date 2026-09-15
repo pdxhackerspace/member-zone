@@ -8,6 +8,8 @@ Settings → **Nags** lists automated member reminders. Each nag can be enabled 
 
 Each reminder lists every email template it can send, linked so you can jump straight to the copy. Parking notice reminders have eight — permit and ticket copy for each phase. A template that has been disabled is flagged on the reminder, because a disabled template means the reminder sends nothing.
 
+Every parking permit and ticket email ends with a link to the notice it is about, so the member can open it, add a note, or clear it without hunting through their profile. The link is the `{{parking_notice_url}}` variable, and it points at the member's own view of the notice rather than the admin page.
+
 ### Slack signup reminder
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.

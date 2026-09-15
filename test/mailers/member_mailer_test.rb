@@ -204,7 +204,61 @@ class MemberMailerTest < ActionMailer::TestCase
     end
   end
 
+  test 'parking_permit_issued links to the notice the member can open' do
+    EmailTemplate.where(key: 'parking_permit_issued').delete_all
+    notice = parking_notices(:active_permit)
+
+    mail = MemberMailer.parking_permit_issued(notice.user, **parking_notice_opts(notice))
+
+    html = mail.html_part&.body&.decoded || mail.body.decoded
+    assert_includes html, "http://www.example.com/member_parking_permits/#{notice.id}"
+    assert_includes html, 'View your parking permit'
+  end
+
+  test 'parking_ticket_expired links to the notice the member can open' do
+    EmailTemplate.where(key: 'parking_ticket_expired').delete_all
+    notice = parking_notices(:expired_ticket)
+
+    mail = MemberMailer.parking_ticket_expired(notice.user, **parking_notice_opts(notice))
+
+    html = mail.html_part&.body&.decoded || mail.body.decoded
+    assert_includes html, "http://www.example.com/member_parking_permits/#{notice.id}"
+    assert_includes html, 'View this parking ticket'
+  end
+
+  # The link has to reach the member through the notice id the queued message carries, since that is
+  # the only route into a template body an admin has edited.
+  test 'parking notice template variables carry the member-facing notice link' do
+    notice = parking_notices(:active_permit)
+
+    variables = MemberMailer.build_template_variables(notice.user, parking_notice_opts(notice))
+
+    assert_equal "http://www.example.com/member_parking_permits/#{notice.id}", variables[:parking_notice_url]
+  end
+
+  # A queued message from before the link existed, or a mailer called by hand, names no notice. The
+  # member's parking tab lists them all rather than leaving an empty href in the body.
+  test 'parking notice link falls back to the parking tab when no notice is named' do
+    user = users(:one)
+
+    variables = MemberMailer.build_template_variables(user, notice_type: 'Permit')
+
+    assert_includes variables[:parking_notice_url], "/users/#{user.to_param}"
+    assert_includes variables[:parking_notice_url], 'tab=parking'
+  end
+
   private
+
+  def parking_notice_opts(notice)
+    {
+      location: notice.location_display,
+      location_detail: notice.location_detail.to_s,
+      description: notice.description,
+      expires_at: notice.expires_at.strftime('%B %d, %Y'),
+      notice_type: notice.notice_type_display,
+      parking_notice_id: notice.id
+    }
+  end
 
   # A fresh member rather than a fixture, whose own access logs would be mistaken for the visits
   # under test.
