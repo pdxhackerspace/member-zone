@@ -35,6 +35,7 @@ class MembershipSettingsController < AuthenticatedController
                                          new_member_grace_period_days
                                          new_member_expiry_days
                                          overdue_grace_period_days
+                                         payment_overdue_reminder_grace_days
                                          payment_overdue_reminder_repeat_days
                                          orientation_reminder_repeat_days
                                          parking_notice_reminder_days_before_expiration

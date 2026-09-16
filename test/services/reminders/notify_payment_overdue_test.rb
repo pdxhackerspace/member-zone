@@ -8,6 +8,7 @@ module Reminders
       # so these fixed dates only behave if the clock is frozen with them.
       travel_to @now
       MembershipSetting.instance.update!(
+        payment_overdue_reminder_grace_days: 5,
         payment_overdue_reminder_repeat_days: 7,
         overdue_grace_period_days: 30
       )
@@ -60,6 +61,16 @@ module Reminders
       assert_nil user.reload.payment_overdue_reminder_sent_at
     end
 
+    test 'leaves a member alone until the reminder grace period has passed' do
+      user = overdue_user(email: 'still-in-grace@example.com', overdue_for: 2)
+
+      assert_no_difference -> { ActionMailer::Base.deliveries.size } do
+        NotifyPaymentOverdue.call(now: @now)
+      end
+
+      assert_nil user.reload.payment_overdue_reminder_sent_at
+    end
+
     test 'leaves cancelled members alone' do
       user = overdue_user(email: 'cancelled-not-nagged@example.com')
       user.record_cancellation!
@@ -79,7 +90,9 @@ module Reminders
 
     private
 
-    def overdue_user(email:, paid_through: nil)
+    # Ten days behind clears the five-day reminder grace period without running into the
+    # thirty-day overdue grace period at the far end.
+    def overdue_user(email:, paid_through: nil, overdue_for: 10)
       user = User.create!(
         email: email,
         full_name: 'Overdue Notify Target',
@@ -88,7 +101,7 @@ module Reminders
         payment_type: 'unknown',
         dues_due_at: paid_through
       )
-      user.update_columns(membership_state_entered_at: @now - 2.days)
+      user.update_columns(membership_state_entered_at: @now - overdue_for.days)
       user.reload
     end
   end

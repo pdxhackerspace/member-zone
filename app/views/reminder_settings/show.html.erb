@@ -26,6 +26,9 @@
         <% if @payment_overdue_total_count > @payment_overdue_due_count %>
           · <span class="text-secondary"><%= @payment_overdue_total_count %> overdue total</span>
         <% end %>
+        <% if @payment_overdue_grace_count.to_i.positive? %>
+          · <span class="text-secondary"><%= @payment_overdue_grace_count %> still inside the grace period</span>
+        <% end %>
       </div>
     <% elsif @reminder_setting.key == 'orientation' %>
       <div class="text-13 text-secondary mt-1">
@@ -139,8 +142,24 @@
   </div>
 <% elsif @reminder_setting.key == 'payment_overdue' %>
   <div class="alert alert-secondary text-13 py-2 mb-3">
+    Nobody is reminded on the day their payment was due. A member has
+    <strong><%= @membership_setting.payment_overdue_reminder_grace_days %></strong>
+    <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %>
+    after their dues date before the first reminder, then one every
+    <%= @membership_setting.payment_overdue_reminder_repeat_days %> days for as long as they stay overdue.
     Members who have told us they are cancelling are not reminded — they keep access until their paid-through date and
     then become inactive.
+  </div>
+
+  <div class="alert alert-secondary text-13 py-2 mb-3">
+    After <strong><%= @membership_setting.overdue_grace_period_days %></strong> days overdue a member becomes inactive,
+    this reminder stops, and the one-off “Membership Lapsed” email goes out instead. That one is a membership status
+    email rather than a reminder, so this toggle does not control it and it reaches the people who have already run out
+    of overdue grace rather than the people currently overdue.
+    <% if @membership_lapsed_email_template %>
+      <%= link_to "Membership Lapsed template", email_template_path(@membership_lapsed_email_template),
+                  class: "alert-link" %>
+    <% end %>
   </div>
 
   <div class="card shadow-sm border-0">
@@ -160,7 +179,7 @@
               <% @due_users.each do |user| %>
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
-                  <td><%= admin_profile_time(user.dues_paid_through_at, empty: 'Unknown') %></td>
+                  <td><%= admin_profile_time(Reminders::PaymentOverdueEligibility.overdue_since(user), empty: 'Unknown') %></td>
                   <td><%= admin_profile_time(user.payment_overdue_reminder_sent_at) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>

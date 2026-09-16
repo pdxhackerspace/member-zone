@@ -29,14 +29,30 @@ The nag only sends when the Slack member source is enabled.
 
 Reminds members whose dues are past due. Disabled by default. The daily job runs at 7:30 AM and reminds each overdue member at most once per repeat interval.
 
+Nobody is reminded on the day their payment was due. A member gets a grace period after their dues date — five days out of the box — before the first reminder, which leaves room for a late bank transfer or a retried card to land on its own. The reminders page shows how many overdue members are currently being held back by it.
+
 Members who have told us they are cancelling are never reminded, and neither are members whose overdue grace period has already run out — by then the conversation is about reactivating, not paying a late invoice.
 
 **Timing** (Settings → Membership settings):
 
-- **Overdue grace period (days)** — how long an overdue member keeps building access, and therefore how long they can be reminded
+- **Overdue payment reminder — grace period (days)** — days after the dues date before the first reminder. Defaults to 5; set it to 0 to remind on the day payment was due
 - **Overdue payment reminder — repeat interval (days)** — minimum days between reminders to the same member
+- **Overdue grace period (days)** — how long an overdue member keeps building access, and therefore how long they can be reminded
 
 **Email copy** is editable under Settings → Email templates (`Payment Past Due`). Reminders wait in the outbound mail review queue for approval before they go out.
+
+#### How this relates to the “Membership Lapsed” email
+
+They are two stages of the same story, sent to two different groups, and only one of them is a reminder:
+
+| | Payment Past Due | Membership Lapsed |
+| --- | --- | --- |
+| Who gets it | Members who are overdue but still have access | Members who have just fallen inactive |
+| When | Repeatedly, from the end of the reminder grace period until the overdue grace period runs out | Once, at the moment they become inactive |
+| Controlled by | The Overdue payment reminder toggle | Nothing — it is a membership status email, not a reminder |
+| Members can opt out under | Overdue payment reminders | Membership status updates |
+
+A member who ignores every Payment Past Due email eventually runs out of overdue grace, becomes inactive, stops receiving that reminder, and gets one Membership Lapsed email instead. A member who cancelled gets neither. So a name appearing in one list and not the other usually means the two emails caught them at different points in that sequence, not that something is misconfigured.
 
 Members who have not been through building access orientation are left off the **Dues lapsed** report — chasing an invoice is the wrong first conversation with someone who has never been let in. They still get the reminder email if their dues lapse, and they are listed on the **Approved members awaiting orientation** report, so nobody drops out of sight.
 

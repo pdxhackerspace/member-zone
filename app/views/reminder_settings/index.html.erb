@@ -66,12 +66,19 @@
         <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span>
         <span class="text-secondary">would be emailed today ·</span>
         <span class="text-secondary"><%= @payment_overdue_total_count %> overdue</span>
+        <% if @payment_overdue_grace_count.to_i.positive? %>
+          <span class="text-secondary">· <%= @payment_overdue_grace_count %> still inside the grace period</span>
+        <% end %>
       </div>
       <div class="text-12 text-secondary mt-1">
         Timing:
-        every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days while overdue,
+        first reminder <%= @membership_setting.payment_overdue_reminder_grace_days %> <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %> after the dues date,
+        then every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days,
         stopping after <%= @membership_setting.overdue_grace_period_days %> days when they become inactive
         · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
+      </div>
+      <div class="text-12 text-secondary mt-1">
+        Once they become inactive the one-off “Membership Lapsed” email takes over — it is a membership status email, not part of this reminder.
       </div>
     <% end %>
   <% when 'orientation' %>

@@ -25,7 +25,9 @@ class ReminderSettingsController < AdminController
     @application_link_due_count = Reminders::ApplicationLinkEligibility.count_due
     @application_link_awaiting_count = Reminders::ApplicationLinkEligibility.total_awaiting
     @payment_overdue_due_count = Reminders::PaymentOverdueEligibility.count_due
-    @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
+    payment_overdue_counts = Reminders::PaymentOverdueEligibility.overdue_counts
+    @payment_overdue_total_count = payment_overdue_counts[:total]
+    @payment_overdue_grace_count = payment_overdue_counts[:within_grace]
     @orientation_due_count = Reminders::OrientationEligibility.count_due
     @orientation_awaiting_count = Reminders::OrientationEligibility.total_awaiting
     @parking_due_count = Reminders::ParkingNoticeEligibility.count_due
@@ -114,10 +116,7 @@ class ReminderSettingsController < AdminController
     when 'application_link'
       load_application_link_show_data
     when 'payment_overdue'
-      @pagy, @due_users = pagy(Reminders::PaymentOverdueEligibility.due, limit: PER_PAGE)
-      @payment_overdue_due_count = @pagy.count
-      @payment_overdue_total_count = Reminders::PaymentOverdueEligibility.total_overdue
-      @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
+      load_payment_overdue_show_data
     when 'orientation'
       @pagy, @due_users = pagy(Reminders::OrientationEligibility.due, limit: PER_PAGE)
       @orientation_due_count = @pagy.count
@@ -137,6 +136,16 @@ class ReminderSettingsController < AdminController
     @slack_without_slack_count = Reminders::SlackSignupEligibility.total_without_slack
     @slack_source_enabled = MemberSource.enabled?('slack')
     @slack_email_template = EmailTemplate.find_by(key: 'slack_signup_reminder')
+  end
+
+  def load_payment_overdue_show_data
+    @pagy, @due_users = pagy(Reminders::PaymentOverdueEligibility.due, limit: PER_PAGE)
+    @payment_overdue_due_count = @pagy.count
+    counts = Reminders::PaymentOverdueEligibility.overdue_counts
+    @payment_overdue_total_count = counts[:total]
+    @payment_overdue_grace_count = counts[:within_grace]
+    @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
+    @membership_lapsed_email_template = EmailTemplate.find_by(key: 'membership_lapsed')
   end
 
   def load_lapsed_access_show_data
