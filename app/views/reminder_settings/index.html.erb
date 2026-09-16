@@ -74,11 +74,11 @@
         Timing:
         first reminder <%= @membership_setting.payment_overdue_reminder_grace_days %> <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %> after the dues date,
         then every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days,
-        stopping after <%= @membership_setting.overdue_grace_period_days %> days when they become inactive
+        then the lapse notice once at <%= @membership_setting.overdue_grace_period_days %> days
         · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
       </div>
       <div class="text-12 text-secondary mt-1">
-        Once they become inactive the one-off “Membership Lapsed” email takes over — it is a membership status email, not part of this reminder.
+        The lapse notice fires when a member becomes inactive and is not controlled by this toggle.
       </div>
     <% end %>
   <% when 'orientation' %>

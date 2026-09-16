@@ -39,11 +39,13 @@ Members who have told us they are cancelling are never reminded, and neither are
 - **Overdue payment reminder — repeat interval (days)** — minimum days between reminders to the same member
 - **Overdue grace period (days)** — how long an overdue member keeps building access, and therefore how long they can be reminded
 
-**Email copy** is editable under Settings → Email templates (`Payment Past Due`). Reminders wait in the outbound mail review queue for approval before they go out.
+**Email copy** is editable under Settings → Email templates (`Payment Past Due` and `Membership Lapsed`), and both are linked from the reminder. Reminders wait in the outbound mail review queue for approval before they go out.
 
-#### How this relates to the “Membership Lapsed” email
+#### The “Membership Lapsed” email
 
-They are two stages of the same story, sent to two different groups, and only one of them is a reminder:
+The lapse notice is listed on this reminder rather than off on its own, because it is the last thing an overdue member hears and admins were finding it nowhere else. The reminder page lays the sequence out in order: a grace period with nothing sent, then repeating Payment Past Due reminders, then the one-off lapse notice.
+
+It is still not a reminder, and the difference matters:
 
 | | Payment Past Due | Membership Lapsed |
 | --- | --- | --- |

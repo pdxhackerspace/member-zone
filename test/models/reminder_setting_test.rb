@@ -44,6 +44,14 @@ class ReminderSettingTest < ActiveSupport::TestCase
     end
   end
 
+  # The lapse notice is not sent by the reminder job, but an admin looking for the emails an
+  # overdue member receives has only one place to look, so it is named alongside the reminder.
+  test 'the overdue payment reminder names the lapse notice after the past due reminder' do
+    keys = ReminderSetting.find_by!(key: 'payment_overdue').email_template_keys
+
+    assert_equal %w[payment_past_due membership_lapsed], keys
+  end
+
   test 'parking notice reminders cover both permits and tickets in every phase' do
     keys = ReminderSetting.find_by!(key: 'parking_notices').email_template_keys
 
@@ -81,13 +89,14 @@ class ReminderSettingTest < ActiveSupport::TestCase
 
   test 'email_templates_by_reminder_key covers every reminder without a query per reminder' do
     create_template('lapsed_access_reminder')
+    create_template('membership_lapsed')
     create_template('payment_past_due')
 
     by_key = ReminderSetting.email_templates_by_reminder_key
 
     assert_equal ReminderSetting::CATALOG.keys.sort, by_key.keys.sort
     assert_equal %w[lapsed_access_reminder], by_key['lapsed_access'].map(&:key)
-    assert_equal %w[payment_past_due], by_key['payment_overdue'].map(&:key)
+    assert_equal %w[payment_past_due membership_lapsed], by_key['payment_overdue'].map(&:key)
     assert_empty by_key['orientation']
   end
 

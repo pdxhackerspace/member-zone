@@ -257,7 +257,15 @@ confused for each other. `payment_past_due` repeats while a member is `overdue_m
 still has access; `membership_lapsed` fires once on entry to `inactive_member`, which is
 where `overdue_grace_period_days` lands them. One member moves through both in sequence, so
 the two lists overlap only in the sense that the second is fed by people who have aged out of
-the first. Only `payment_past_due` is governed by the `payment_overdue` `ReminderSetting`.
+the first.
+
+Because that sequence is one story to an admin, `membership_lapsed` is named in the
+`payment_overdue` reminder's `email_template_keys` and the reminder page lays out all three
+stages. That is presentation only: the reminder job does not send it, the reminder's
+`enabled` flag does not gate it, and members opt out of it under `membership_status` rather
+than `payment_overdue`. `email_template_keys` says "emails this reminder's subject matter
+covers", not "emails this job sends" — the same reason the parking reminder's description
+has to mention the issued-on-creation emails it does not send.
 
 The orientation reminder is a `ReminderSetting` keyed `orientation`, **disabled by default**.
 `OrientationReminderJob` runs daily at 7:45 AM and `Reminders::OrientationEligibility` decides

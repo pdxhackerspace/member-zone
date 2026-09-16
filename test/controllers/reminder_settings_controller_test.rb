@@ -41,6 +41,30 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'badged in during the window', response.body
   end
 
+  test 'the overdue payment reminder page lays out the whole sequence including the lapse notice' do
+    MembershipSetting.instance.update!(
+      payment_overdue_reminder_grace_days: 5,
+      payment_overdue_reminder_repeat_days: 7,
+      overdue_grace_period_days: 30
+    )
+    lapsed_template = EmailTemplate.create!(
+      key: 'membership_lapsed',
+      name: 'Membership Lapsed',
+      subject: 'Your dues have lapsed',
+      body_html: '<p>Body</p>',
+      body_text: 'Body',
+      enabled: true
+    )
+
+    get reminder_setting_url('payment_overdue')
+
+    assert_response :success
+    assert_match 'What an overdue member hears, in order', response.body
+    assert_match 'reminder grace period', response.body
+    assert_select 'a[href=?]', email_template_path(lapsed_template), minimum: 1
+    assert_match 'The Enabled switch on the reminders page controls the past-due reminders only.', response.body
+  end
+
   test 'index offers a lookback window field only for reminders that scan a range' do
     ReminderSetting.find_by!(key: 'lapsed_access').update!(lookback_days: 4)
 

@@ -144,6 +144,7 @@ class ReminderSettingsController < AdminController
     counts = Reminders::PaymentOverdueEligibility.overdue_counts
     @payment_overdue_total_count = counts[:total]
     @payment_overdue_grace_count = counts[:within_grace]
+    @payment_overdue_reminded_count = counts[:total] - counts[:within_grace]
     @payment_overdue_email_template = EmailTemplate.find_by(key: 'payment_past_due')
     @membership_lapsed_email_template = EmailTemplate.find_by(key: 'membership_lapsed')
   end
