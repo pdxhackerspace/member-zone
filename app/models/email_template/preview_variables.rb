@@ -16,6 +16,7 @@ class EmailTemplate
         .merge(training)
         .merge(slack)
         .merge(lapsed_access)
+        .merge(parking)
         .merge(admin_dashboard)
         .merge(blocked_recipient)
     end
@@ -91,6 +92,10 @@ class EmailTemplate
         reactivation_guidance_text: 'You can reactivate without reapplying by choosing a membership plan on ' \
                                     'your profile until March 15, 2027.'
       }
+    end
+
+    def parking
+      { parking_notice_url: "#{app_base_url}/member_parking_permits/1" }
     end
 
     def admin_dashboard

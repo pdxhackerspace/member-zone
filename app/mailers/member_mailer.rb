@@ -463,7 +463,7 @@ class MemberMailer < ApplicationMailer
   # Public class method so QueuedMail can call it for regeneration.
   def self.build_template_variables(user, extra_args = {})
     vars = base_template_variables(user)
-    merge_template_extras!(vars, extra_args)
+    merge_template_extras!(vars, extra_args, user)
     vars
   end
 
@@ -546,6 +546,27 @@ class MemberMailer < ApplicationMailer
     "#{base}/users/#{user.to_param}"
   end
 
+  # Members reach both permits and tickets through +member_parking_permits+; the admin
+  # +parking_notices+ pages need a privilege they do not hold. Without an id — a mailer called
+  # directly rather than through a notice — their parking tab is the closest thing to the notice.
+  def self.parking_notice_url_for(user, parking_notice_id)
+    return parking_tab_url_for(user) if parking_notice_id.blank?
+
+    url_options = Rails.application.config.action_mailer.default_url_options || {}
+    Rails.application.routes.url_helpers.member_parking_permit_url(parking_notice_id, **url_options)
+  rescue ArgumentError, ActionController::UrlGenerationError
+    base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
+    "#{base}/member_parking_permits/#{parking_notice_id}"
+  end
+
+  def self.parking_tab_url_for(user)
+    url_options = Rails.application.config.action_mailer.default_url_options || {}
+    Rails.application.routes.url_helpers.user_url(user, tab: 'parking', **url_options)
+  rescue ArgumentError, ActionController::UrlGenerationError
+    base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
+    "#{base}/users/#{user.to_param}?tab=parking"
+  end
+
   def self.slack_link_url_for_template
     return '' unless SlackOidcConfig.configured?
 
@@ -579,7 +600,7 @@ class MemberMailer < ApplicationMailer
     }
   end
 
-  def self.merge_template_extras!(vars, extra_args)
+  def self.merge_template_extras!(vars, extra_args, user)
     vars[:days_overdue] = extra_args[:days_overdue] ? " by #{extra_args[:days_overdue]} days" : ''
     vars[:reason] = if extra_args[:reason].present?
                       "<p><strong>Reason:</strong> #{extra_args[:reason]}</p>"
@@ -589,7 +610,7 @@ class MemberMailer < ApplicationMailer
     vars[:training_topic] = extra_args[:training_topic] if extra_args[:training_topic].present?
     vars[:application_url] = extra_args[:application_url].to_s if extra_args.key?(:application_url)
     merge_training_request_template_keys!(vars, extra_args)
-    merge_parking_notice_template_keys!(vars, extra_args)
+    merge_parking_notice_template_keys!(vars, extra_args, user)
     merge_slack_signup_template_keys!(vars, extra_args)
     merge_lapsed_access_template_keys!(vars, extra_args)
   end
@@ -617,12 +638,15 @@ class MemberMailer < ApplicationMailer
     vars[:slack_link_text] = extra_args[:slack_link_text].to_s if extra_args.key?(:slack_link_text)
   end
 
-  def self.merge_parking_notice_template_keys!(vars, extra_args)
+  def self.merge_parking_notice_template_keys!(vars, extra_args, user)
     vars[:location] = extra_args[:location].to_s if extra_args.key?(:location)
     vars[:location_detail] = extra_args[:location_detail].to_s if extra_args.key?(:location_detail)
     vars[:description] = extra_args[:description].to_s if extra_args.key?(:description)
     vars[:expires_at] = extra_args[:expires_at].to_s if extra_args.key?(:expires_at)
     vars[:notice_type] = extra_args[:notice_type].to_s if extra_args.key?(:notice_type)
+    return unless extra_args.key?(:parking_notice_id) || extra_args.key?(:notice_type)
+
+    vars[:parking_notice_url] = parking_notice_url_for(user, extra_args[:parking_notice_id])
   end
 
   class << self
@@ -790,19 +814,7 @@ class MemberMailer < ApplicationMailer
   def send_parking_notice_mail(template_key, user, opts = {})
     @user = user
     @organization = organization_name
-
-    extra_vars = {
-      location: opts[:location].to_s,
-      location_detail: opts[:location_detail].to_s,
-      description: opts[:description].to_s,
-      expires_at: opts[:expires_at].to_s,
-      notice_type: opts[:notice_type].to_s
-    }
-    @location = extra_vars[:location]
-    @location_detail = extra_vars[:location_detail]
-    @description = extra_vars[:description]
-    @expires_at = extra_vars[:expires_at]
-    @notice_type = extra_vars[:notice_type]
+    extra_vars = assign_parking_notice_vars(user, opts)
 
     subject_label = template_key.humanize.titleize
     if send_from_template(template_key, user, extra_vars)
@@ -813,5 +825,24 @@ class MemberMailer < ApplicationMailer
         subject: "#{@organization}: #{subject_label}"
       )
     end
+  end
+
+  # Returns the template variables, and mirrors them onto instance variables for the fallback views.
+  def assign_parking_notice_vars(user, opts)
+    vars = {
+      location: opts[:location].to_s,
+      location_detail: opts[:location_detail].to_s,
+      description: opts[:description].to_s,
+      expires_at: opts[:expires_at].to_s,
+      notice_type: opts[:notice_type].to_s,
+      parking_notice_url: self.class.parking_notice_url_for(user, opts[:parking_notice_id])
+    }
+    @location = vars[:location]
+    @location_detail = vars[:location_detail]
+    @description = vars[:description]
+    @expires_at = vars[:expires_at]
+    @notice_type = vars[:notice_type]
+    @parking_notice_url = vars[:parking_notice_url]
+    vars
   end
 end

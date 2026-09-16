@@ -2,3 +2,4 @@
 <p>The deadline for the parking ticket at <strong><%= @location %></strong> is <%= @expires_at %>.</p>
 <p><strong>Description:</strong> <%= @description %></p>
 <p>Please remove or address the project before the deadline.</p>
+<p><%= link_to 'View this parking ticket', @parking_notice_url %></p>

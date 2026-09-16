@@ -2,3 +2,4 @@
 <p>This is a final reminder about the parking ticket at <strong><%= @location %></strong>, which expired on <%= @expires_at %>.</p>
 <p><strong>Description:</strong> <%= @description %></p>
 <p><strong>If the project is not removed promptly, your belongings may be disposed of.</strong></p>
+<p><%= link_to 'View this parking ticket', @parking_notice_url %></p>
