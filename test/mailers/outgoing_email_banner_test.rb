@@ -93,7 +93,7 @@ class OutgoingEmailBannerTest < ActionMailer::TestCase
 
     assert_equal 1, html.scan('Unique banner once.').size
     assert_equal 1, text.scan('Unique banner once.').size
-    assert_equal 1, text.scan('Manage overdue payment reminders').size
+    assert_equal 1, text.scan('Manage overdue dues and lapse notices').size
   end
 
   test 'deliver_queued adds banner once for template-backed queued mail' do

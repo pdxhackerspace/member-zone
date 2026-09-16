@@ -23,7 +23,7 @@ module Emails
       assert_includes preview.html, 'Office closed'
       assert_includes preview.html, 'Your dues are past due.'
       assert_includes preview.html, 'notification-footer'
-      assert_includes preview.html, 'Manage overdue payment reminders'
+      assert_includes preview.html, 'Manage overdue dues and lapse notices'
 
       assert_operator preview.html.index('Office closed'), :<, preview.html.index('Your dues are past due.')
       assert_operator preview.html.index('Your dues are past due.'), :<, preview.html.index('notification-footer')
@@ -40,7 +40,7 @@ module Emails
 
       assert_operator preview.text.index('Office closed'), :<, preview.text.index('Your dues are past due.')
       assert_operator preview.text.index('Your dues are past due.'), :<,
-                      preview.text.index('Manage overdue payment reminders')
+                      preview.text.index('Manage overdue dues and lapse notices')
     end
 
     test 'for_preview omits the banner when the fragment is blank' do

@@ -29,6 +29,13 @@ module ActiveSupport
       topic
     end
 
+    # The overdue payment reminder is off by default, and the membership_lapsed email is its
+    # last stage, so anything expecting a lapse notice has to switch the reminder on first.
+    def enable_payment_overdue_reminder!
+      ReminderSetting.seed_defaults!
+      ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
+    end
+
     # Fails delivery the way an unreachable mail server does in production: the exception comes back
     # out of +deliver_now+ to whoever raised the mail.
     class UnreachableServerDelivery

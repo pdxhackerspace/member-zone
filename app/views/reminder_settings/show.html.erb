@@ -141,6 +141,14 @@
     </div>
   </div>
 <% elsif @reminder_setting.key == 'payment_overdue' %>
+  <% unless @reminder_setting.enabled? %>
+    <div class="alert alert-warning text-13 py-2 mb-3">
+      This reminder is off, so an overdue member hears nothing at all — no past-due reminders, and no lapse notice when
+      they fall inactive.
+      <%= link_to "Turn it on from the reminders page", reminder_settings_path, class: "alert-link" %>.
+    </div>
+  <% end %>
+
   <%= render 'payment_overdue_sequence' %>
 
   <div class="alert alert-secondary text-13 py-2 mb-3">

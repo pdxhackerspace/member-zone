@@ -7,12 +7,14 @@ class NotificationCategory
   Entry = Data.define(:key, :name, :description, :group, :reminder_key, :mailer_actions)
 
   CATALOG = {
+    # The lapse notice sits here rather than under membership_status so that one switch
+    # covers everything a member hears about falling behind on dues, start to finish.
     'payment_overdue' => {
-      name: 'Overdue payment reminders',
-      description: 'Reminders when your membership dues are past due.',
+      name: 'Overdue dues and lapse notices',
+      description: 'Reminders while your membership dues are past due, and the notice if your membership lapses.',
       group: 'Reminders',
       reminder_key: 'payment_overdue',
-      mailer_actions: %w[payment_past_due]
+      mailer_actions: %w[payment_past_due membership_lapsed]
     },
     'orientation' => {
       name: 'Orientation reminders',
@@ -63,10 +65,10 @@ class NotificationCategory
     },
     'membership_status' => {
       name: 'Membership status updates',
-      description: 'Changes to your membership standing, including cancellation, lapse, and sponsorship.',
+      description: 'Changes to your membership standing, including cancellation and sponsorship.',
       group: 'Membership',
       reminder_key: nil,
-      mailer_actions: %w[membership_cancelled membership_banned membership_lapsed membership_sponsored]
+      mailer_actions: %w[membership_cancelled membership_banned membership_sponsored]
     },
     'application_outcome' => {
       name: 'Application updates',

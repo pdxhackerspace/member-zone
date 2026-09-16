@@ -229,7 +229,7 @@ queue unless its template opts out of review.
 | --- | --- | --- |
 | Entering `cancelled_member` | `membership_cancelled` | Once, guarded by `membership_cancelled_email_sent_at` |
 | `ban!` | `membership_banned` | Once per ban |
-| Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled** |
+| Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled**, and only while the `payment_overdue` reminder is enabled |
 | Being in `overdue_member` | `payment_past_due` | Weekly from `payment_overdue_reminder_grace_days` after the dues date, while the reminder is enabled |
 | Being in `new_member` | `orientation_reminder` | Every `orientation_reminder_repeat_days`, while the reminder is enabled |
 | `mark_deceased!` | — | No email |
@@ -259,13 +259,16 @@ where `overdue_grace_period_days` lands them. One member moves through both in s
 the two lists overlap only in the sense that the second is fed by people who have aged out of
 the first.
 
-Because that sequence is one story to an admin, `membership_lapsed` is named in the
-`payment_overdue` reminder's `email_template_keys` and the reminder page lays out all three
-stages. That is presentation only: the reminder job does not send it, the reminder's
-`enabled` flag does not gate it, and members opt out of it under `membership_status` rather
-than `payment_overdue`. `email_template_keys` says "emails this reminder's subject matter
-covers", not "emails this job sends" — the same reason the parking reminder's description
-has to mention the issued-on-creation emails it does not send.
+Because that sequence is one story to the member, the `payment_overdue` reminder owns all of
+it. `membership_lapsed` is named in the reminder's `email_template_keys`, sits in the
+`payment_overdue` notification category rather than `membership_status`, and
+`MembershipNotifications#notify_membership_lapsed` returns early unless the reminder is
+enabled. One switch silences the whole sequence and one opt-out covers both emails.
+
+Two things still differ, and both are visible on the reminder page. `NotifyPaymentOverdue`
+does not send the lapse notice — the state change does, which is why "Send now" only covers
+the past-due reminders — and the reminder ships **disabled**, so a deployment that has never
+turned it on sends no lapse notices at all.
 
 The orientation reminder is a `ReminderSetting` keyed `orientation`, **disabled by default**.
 `OrientationReminderJob` runs daily at 7:45 AM and `Reminders::OrientationEligibility` decides

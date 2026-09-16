@@ -49,7 +49,13 @@ module MembershipNotifications
   # "Your membership has lapsed" is for someone who drifted off without saying anything. A
   # member who cancelled reached the same state on purpose, was told at the time that their
   # access ran to their paid-through date, and does not need chasing about the date arriving.
+  #
+  # The lapse notice is the last stage of the overdue payment reminder and is switched on
+  # and off with it. An organization that does not chase members for late dues does not want
+  # the parting email about it either — and a half-on sequence, where the reminders are
+  # silent but the lapse notice still lands, is the confusing shape this used to have.
   def notify_membership_lapsed
+    return unless ReminderSetting.enabled?('payment_overdue')
     return if cancellation_on_file?
 
     QueuedMail.enqueue(:membership_lapsed, self, reason: "Membership lapsed for #{display_name}")

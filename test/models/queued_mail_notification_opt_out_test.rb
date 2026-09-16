@@ -76,6 +76,6 @@ class QueuedMailNotificationOptOutTest < ActiveSupport::TestCase
 
     assert_not mail.approve!(users(:one))
     assert_equal :opt_out, mail.approval_blocked_reason
-    assert_includes mail.approval_blocked_alert, 'opted out of overdue payment reminders'
+    assert_includes mail.approval_blocked_alert, 'opted out of overdue dues and lapse notices'
   end
 end
