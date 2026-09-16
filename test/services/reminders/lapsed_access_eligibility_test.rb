@@ -36,12 +36,14 @@ module Reminders
       end
     end
 
-    test 'due excludes members who cancelled' do
+    test 'due includes members who cancelled but are still badging in' do
       user = inactive_user(email: 'cancelled-inactive@example.com')
       user.note_cancellation!
 
       travel_to @now do
-        assert_not_includes LapsedAccessEligibility.due(now: @now), user.reload
+        assert user.reload.cancellation_on_file?
+        assert_includes LapsedAccessEligibility.due(now: @now), user
+        assert LapsedAccessEligibility.due?(user, now: @now)
       end
     end
 

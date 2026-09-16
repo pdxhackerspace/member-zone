@@ -284,7 +284,8 @@
   </div>
 <% elsif @reminder_setting.key == 'lapsed_access' %>
   <div class="alert alert-secondary text-13 py-2 mb-3">
-    Only members in the inactive state are reminded. Members who cancelled are excluded.
+    Only members in the inactive state are reminded, including those who cancelled — if they are still badging in,
+    they still need to hear that their membership has lapsed.
     Each morning the job scans the last <%= @reminder_setting.lookback_days %> <%= 'day'.pluralize(@reminder_setting.lookback_days) %>
     of access logs. One email covers every visit found, and those visits are not mentioned again — a member only
     becomes due once they badge in again.
