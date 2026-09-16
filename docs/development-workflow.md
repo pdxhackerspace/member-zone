@@ -202,8 +202,17 @@ workflow manually from the Actions tab.
 gh pr create --base main --head staging --title "Promote staging"
 ```
 
-Use a **merge commit** so history is preserved. Only `staging` and `hotfix/*` may merge into
-`main`; `allowed-main-source` flags anything else.
+Use a **merge commit** so history is preserved. The "Promote to main with a merge commit"
+ruleset enforces this — squash and rebase are not offered on `main`, so the button you get is
+the right one. Feature PRs into `staging` are unaffected and still squash.
+
+This is not bookkeeping pedantry. A squash copies staging's changes onto `main` instead of
+absorbing staging's commits, so the branches never share an ancestor, and every later
+promotion replays changes `main` already has. `db/schema.rb` conflicts on its version line
+every time as a result. PRs #766, #767, and #772 were all cleanups after exactly that.
+
+Only `staging` and `hotfix/*` may merge into `main`; `allowed-main-source` flags anything
+else.
 
 This publishes no image and changes no version. It only makes the code eligible to be
 released.
