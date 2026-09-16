@@ -9,7 +9,18 @@ module Notifications
 
     test 'does not block mandatory categories' do
       assert_not DeliveryGate.blocked?(mailer_action: 'parking_permit_issued', user: @user)
+      assert_not DeliveryGate.blocked?(mailer_action: 'membership_cancelled', user: @user)
+    end
+
+    # The lapse notice is the last stage of the overdue reminder, so opting out of being
+    # chased for late dues opts out of hearing how it ended too.
+    test 'opting out of overdue dues email covers the lapse notice' do
       assert_not DeliveryGate.blocked?(mailer_action: 'membership_lapsed', user: @user)
+
+      NotificationOptOut.opt_out!(@user, category: 'payment_overdue', channel: 'email')
+
+      assert DeliveryGate.blocked?(mailer_action: 'membership_lapsed', user: @user)
+      assert DeliveryGate.blocked?(mailer_action: 'payment_past_due', user: @user)
     end
 
     test 'does not block when reminder allows opt-out but member is subscribed' do

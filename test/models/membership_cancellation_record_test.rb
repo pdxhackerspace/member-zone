@@ -8,6 +8,9 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
   setup do
     MembershipSetting.instance.update!(overdue_grace_period_days: 30)
     EmailTemplate.where(key: %w[membership_cancelled membership_lapsed]).update_all(enabled: true)
+    # The lapse notice is the last stage of the overdue payment reminder and only sends
+    # while that reminder is on.
+    enable_payment_overdue_reminder!
   end
 
   test 'recording a cancellation stamps the date' do

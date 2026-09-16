@@ -9,6 +9,7 @@ module Reminders
       # their overdue grace period as the wall clock moves and stop being due.
       travel_to @now
       MembershipSetting.instance.update!(
+        payment_overdue_reminder_grace_days: 5,
         payment_overdue_reminder_repeat_days: 7,
         overdue_grace_period_days: 30
       )
@@ -42,6 +43,67 @@ module Reminders
       user.update_columns(membership_state_entered_at: @now - 31.days)
 
       assert_not PaymentOverdueEligibility.due?(user.reload, now: @now)
+    end
+
+    test 'due excludes a member on the day their payment was due' do
+      user = overdue_user(email: 'due-today@example.com', overdue_for: 0)
+
+      assert PaymentOverdueEligibility.within_grace_period?(user, now: @now)
+      assert_not PaymentOverdueEligibility.due?(user, now: @now)
+      assert_not_includes PaymentOverdueEligibility.due(now: @now), user
+    end
+
+    test 'due excludes a member still inside the reminder grace period' do
+      user = overdue_user(email: 'inside-grace@example.com', overdue_for: 4)
+
+      assert_not PaymentOverdueEligibility.due?(user, now: @now)
+    end
+
+    test 'due includes a member the day the reminder grace period ends' do
+      user = overdue_user(email: 'grace-just-up@example.com', overdue_for: 5)
+
+      assert_not PaymentOverdueEligibility.within_grace_period?(user, now: @now)
+      assert PaymentOverdueEligibility.due?(user, now: @now)
+      assert_includes PaymentOverdueEligibility.due(now: @now), user
+    end
+
+    test 'reminder grace period follows the setting' do
+      user = overdue_user(email: 'longer-grace@example.com', overdue_for: 6)
+      MembershipSetting.instance.update!(payment_overdue_reminder_grace_days: 10)
+
+      assert_not PaymentOverdueEligibility.due?(user, now: @now)
+
+      MembershipSetting.instance.update!(payment_overdue_reminder_grace_days: 0)
+
+      assert PaymentOverdueEligibility.due?(user, now: @now)
+    end
+
+    # A member whose stored state has not caught up is overdue as of the dues date that
+    # passed, not as of whenever Membership::TickJob gets around to moving them.
+    test 'grace period for a current member runs from their paid-through date' do
+      user = User.create!(
+        email: 'current-inside-grace@example.com',
+        full_name: 'Barely Past Due',
+        service_account: false,
+        membership_state: 'current_member',
+        payment_type: 'cash',
+        dues_due_at: @now - 2.days
+      )
+      user.update_columns(membership_state: 'current_member', membership_state_entered_at: @now - 60.days)
+
+      assert_equal 'overdue_member', user.reload.effective_membership_state
+      assert_not PaymentOverdueEligibility.due?(user, now: @now)
+    end
+
+    test 'overdue_counts reports members held back by the grace period' do
+      overdue_user(email: 'counted-due@example.com', overdue_for: 10)
+      overdue_user(email: 'counted-in-grace@example.com', overdue_for: 1)
+
+      counts = PaymentOverdueEligibility.overdue_counts(now: @now)
+
+      assert_equal 2, counts[:total]
+      assert_equal 1, counts[:within_grace]
+      assert_equal 1, PaymentOverdueEligibility.count_due(now: @now)
     end
 
     test 'due excludes members reminded inside the repeat window' do
@@ -100,7 +162,7 @@ module Reminders
           service_account: false,
           membership_state: 'current_member',
           payment_type: 'cash',
-          dues_due_at: @now - 3.days
+          dues_due_at: @now - 10.days
         )
         user.update_columns(membership_state: 'current_member', membership_state_entered_at: @now - 60.days)
 
@@ -148,7 +210,9 @@ module Reminders
 
     private
 
-    def overdue_user(email:)
+    # Ten days behind clears the five-day reminder grace period without running into the
+    # thirty-day overdue grace period at the far end.
+    def overdue_user(email:, overdue_for: 10)
       user = User.create!(
         email: email,
         full_name: 'Overdue Member',
@@ -156,7 +220,7 @@ module Reminders
         membership_state: 'overdue_member',
         payment_type: 'unknown'
       )
-      user.update_columns(membership_state_entered_at: @now - 2.days)
+      user.update_columns(membership_state_entered_at: @now - overdue_for.days)
       user.reload
     end
 

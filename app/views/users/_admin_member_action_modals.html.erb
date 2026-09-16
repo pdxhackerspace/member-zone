@@ -79,7 +79,7 @@
           </p>
           <ul class="text-13 text-secondary">
             <li>They keep access until <%= user.dues_paid_through_at&.to_date&.strftime("%b %-d, %Y") || "their next dues date" %></li>
-            <li>They stop receiving overdue payment reminders</li>
+            <li>They stop receiving overdue payment reminders, and hear nothing when their membership lapses</li>
             <li>A "sorry to see you go" email is queued for review</li>
           </ul>
         </div>

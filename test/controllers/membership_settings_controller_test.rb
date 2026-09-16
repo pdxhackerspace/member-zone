@@ -50,6 +50,15 @@ class MembershipSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 9, @membership_setting.slack_signup_reminder_max_account_age_months
   end
 
+  test 'update saves the overdue payment reminder grace period' do
+    patch membership_settings_url, params: {
+      membership_setting: membership_setting_params.merge(payment_overdue_reminder_grace_days: 3)
+    }
+
+    assert_redirected_to membership_settings_url
+    assert_equal 3, @membership_setting.reload.payment_overdue_reminder_grace_days
+  end
+
   private
 
   def membership_setting_params
@@ -66,7 +75,8 @@ class MembershipSettingsControllerTest < ActionDispatch::IntegrationTest
       slack_signup_reminder_repeat_delay_days: @membership_setting.slack_signup_reminder_repeat_delay_days,
       slack_signup_reminder_max_account_age_months: @membership_setting.slack_signup_reminder_max_account_age_months,
       application_link_reminder_delay_days: @membership_setting.application_link_reminder_delay_days,
-      application_link_reminder_max_count: @membership_setting.application_link_reminder_max_count
+      application_link_reminder_max_count: @membership_setting.application_link_reminder_max_count,
+      payment_overdue_reminder_grace_days: @membership_setting.payment_overdue_reminder_grace_days
     }
   end
 

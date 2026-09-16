@@ -12,7 +12,7 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
       get notification_preferences_path
       assert_response :success
       assert_match 'Notifications', response.body
-      assert_match 'Overdue payment reminders', response.body
+      assert_match 'Overdue dues and lapse notices', response.body
       assert_match 'Parking permit and ticket reminders', response.body
     end
   end

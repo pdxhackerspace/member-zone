@@ -41,6 +41,43 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'badged in during the window', response.body
   end
 
+  test 'the overdue payment reminder page lays out the whole sequence including the lapse notice' do
+    MembershipSetting.instance.update!(
+      payment_overdue_reminder_grace_days: 5,
+      payment_overdue_reminder_repeat_days: 7,
+      overdue_grace_period_days: 30
+    )
+    ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
+    lapsed_template = EmailTemplate.create!(
+      key: 'membership_lapsed',
+      name: 'Membership Lapsed',
+      subject: 'Your dues have lapsed',
+      body_html: '<p>Body</p>',
+      body_text: 'Body',
+      enabled: true
+    )
+
+    get reminder_setting_url('payment_overdue')
+
+    assert_response :success
+    assert_match 'What an overdue member hears, in order', response.body
+    assert_match 'reminder grace period', response.body
+    assert_select 'a[href=?]', email_template_path(lapsed_template), minimum: 1
+    assert_match 'All three stages are governed by the Enabled switch', response.body
+    assert_no_match(/no lapse notice when/, response.body)
+  end
+
+  # The reminder is off by default and now gates the lapse notice too, so the page has to say
+  # that an overdue member is hearing nothing at all rather than just fewer reminders.
+  test 'the overdue payment reminder page warns that a disabled reminder silences the lapse notice' do
+    ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: false)
+
+    get reminder_setting_url('payment_overdue')
+
+    assert_response :success
+    assert_select '.alert-warning', text: /no lapse notice when\s+they fall inactive/
+  end
+
   test 'index offers a lookback window field only for reminders that scan a range' do
     ReminderSetting.find_by!(key: 'lapsed_access').update!(lookback_days: 4)
 
