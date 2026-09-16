@@ -110,6 +110,11 @@
           value: content_tag(:strong, @membership_setting.application_link_reminder_max_count),
           help: "Stop after this many reminders or when the link expires, whichever comes first." %>
       <%= render "show_field",
+          label: "Overdue payment reminder — grace period",
+          value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_grace_days), " ",
+                            "day".pluralize(@membership_setting.payment_overdue_reminder_grace_days)]),
+          help: "Days after the dues date passes before the first overdue reminder. 0 reminds on the day payment was due." %>
+      <%= render "show_field",
           label: "Overdue payment reminder — repeat interval",
           value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_repeat_days), " ",
                             "day".pluralize(@membership_setting.payment_overdue_reminder_repeat_days)]),

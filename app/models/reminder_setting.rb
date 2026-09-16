@@ -16,10 +16,16 @@ class ReminderSetting < ApplicationRecord
     },
     'payment_overdue' => {
       name: 'Overdue payment reminder',
-      description: 'Weekly reminder to members whose dues are past due. Members who have cancelled are not reminded.',
+      description: 'Weekly reminder to members whose dues are past due, and the one-off notice when their overdue ' \
+                   'grace period runs out and they lapse. Members who have cancelled are not reminded. The lapse ' \
+                   'notice is a membership status email and sends whether or not this reminder is enabled.',
       enabled: false,
       allow_opt_out: true,
-      email_template_keys: %w[payment_past_due]
+      # The lapse notice is not sent by the reminder job — Membership::TickJob walks the
+      # member into inactive_member and the state-entry email follows. It is named here so
+      # that the whole sequence an overdue member sees is in one place, which is the only
+      # place an admin goes looking for it.
+      email_template_keys: %w[payment_past_due membership_lapsed]
     },
     'orientation' => {
       name: 'Orientation reminder',

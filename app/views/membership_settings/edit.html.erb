@@ -185,6 +185,15 @@
         </div>
 
         <div class="mb-3">
+          <%= f.label :payment_overdue_reminder_grace_days, "Overdue payment reminder — grace period (days)", class: "form-label" %>
+          <%= f.number_field :payment_overdue_reminder_grace_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">
+            Days to wait after the dues date passes before the first overdue reminder, so a late transfer or a retried card can land first.
+            Use <strong>0</strong> to remind on the day payment was due.
+          </div>
+        </div>
+
+        <div class="mb-3">
           <%= f.label :payment_overdue_reminder_repeat_days, "Overdue payment reminder — repeat interval (days)", class: "form-label" %>
           <%= f.number_field :payment_overdue_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
           <div class="form-text">Minimum days between overdue payment reminders for the same member.</div>

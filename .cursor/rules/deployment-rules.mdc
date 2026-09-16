@@ -85,6 +85,10 @@ Before opening a PR, confirm:
 Use **Squash and Merge** for feature/fix PRs into `staging`.
 Use **Merge Commit** for the `staging` → `main` promotion PR (preserves history).
 
+A ruleset enforces the second one: `main` offers no squash or rebase button. Squashing a
+promotion copies staging's changes rather than absorbing its commits, so the branches stop
+sharing an ancestor and every later promotion conflicts on `db/schema.rb`.
+
 ---
 
 ## Notes for AI Assistants

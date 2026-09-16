@@ -129,9 +129,22 @@ module Membership
     end
 
     test 'falling inactive queues the lapsed-membership email' do
+      enable_payment_overdue_reminder!
       member(state: 'overdue_member', entered_at: 31.days.ago, email: 'tick-lapsed@example.com')
 
       assert_difference -> { QueuedMail.where(mailer_action: 'membership_lapsed').count }, 1 do
+        TickJob.new.perform
+      end
+    end
+
+    # The lapse notice is the last stage of the overdue payment reminder, so an organization
+    # that does not chase late dues does not send the parting email about them either.
+    test 'falling inactive sends nothing while the overdue reminder is off' do
+      ReminderSetting.seed_defaults!
+      ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: false)
+      member(state: 'overdue_member', entered_at: 31.days.ago, email: 'tick-quietly-lapsed@example.com')
+
+      assert_no_difference -> { QueuedMail.where(mailer_action: 'membership_lapsed').count } do
         TickJob.new.perform
       end
     end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_15_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_16_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -640,6 +640,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_140000) do
     t.integer "parking_notice_reminder_days_before_expiration", default: 3, null: false
     t.integer "payment_currency_buffer_days", default: 2, null: false
     t.integer "payment_grace_period_days", default: 14, null: false
+    t.integer "payment_overdue_reminder_grace_days", default: 5, null: false
     t.integer "payment_overdue_reminder_repeat_days", default: 7, null: false
     t.integer "planless_payment_window_days", default: 32, null: false
     t.integer "reactivation_grace_period_months", default: 12, null: false

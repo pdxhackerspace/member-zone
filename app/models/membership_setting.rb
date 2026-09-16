@@ -15,6 +15,7 @@ class MembershipSetting < ApplicationRecord
   validates :new_member_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :new_member_expiry_days, presence: true, numericality: { greater_than: 0 }
   validates :overdue_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :payment_overdue_reminder_grace_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :payment_overdue_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :orientation_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
   validates :parking_notice_reminder_days_before_expiration,
@@ -26,33 +27,38 @@ class MembershipSetting < ApplicationRecord
 
   belongs_to :building_access_training_topic, class_name: 'TrainingTopic', optional: true
 
+  # What the singleton row starts with when the table is empty. Mirrors the column
+  # defaults, which is what an existing row gets when a new setting is added.
+  DEFAULTS = {
+    payment_grace_period_days: 14,
+    reactivation_grace_period_months: 12,
+    invitation_expiry_hours: 72,
+    login_link_expiry_hours: 180,
+    admin_login_link_expiry_minutes: 15,
+    application_verification_expiry_hours: 24,
+    manual_payment_due_soon_days: 7,
+    application_review_time_cap_days: 15,
+    slack_signup_reminder_initial_delay_days: 7,
+    slack_signup_reminder_repeat_delay_days: 14,
+    slack_signup_reminder_max_account_age_months: 6,
+    application_link_reminder_delay_days: 3,
+    application_link_reminder_max_count: 3,
+    new_member_grace_period_days: 14,
+    new_member_expiry_days: 90,
+    overdue_grace_period_days: 30,
+    payment_overdue_reminder_grace_days: 5,
+    payment_overdue_reminder_repeat_days: 7,
+    orientation_reminder_repeat_days: 14,
+    parking_notice_reminder_days_before_expiration: 3,
+    parking_notice_expired_reminder_repeat_days: 7,
+    parking_notice_final_reminder_days_after_expiration: 14,
+    planless_payment_window_days: 32,
+    payment_currency_buffer_days: 2
+  }.freeze
+
   # Singleton pattern - only one row should exist
   def self.instance
-    first_or_create!(
-      payment_grace_period_days: 14,
-      reactivation_grace_period_months: 12,
-      invitation_expiry_hours: 72,
-      login_link_expiry_hours: 180,
-      admin_login_link_expiry_minutes: 15,
-      application_verification_expiry_hours: 24,
-      manual_payment_due_soon_days: 7,
-      application_review_time_cap_days: 15,
-      slack_signup_reminder_initial_delay_days: 7,
-      slack_signup_reminder_repeat_delay_days: 14,
-      slack_signup_reminder_max_account_age_months: 6,
-      application_link_reminder_delay_days: 3,
-      application_link_reminder_max_count: 3,
-      new_member_grace_period_days: 14,
-      new_member_expiry_days: 90,
-      overdue_grace_period_days: 30,
-      payment_overdue_reminder_repeat_days: 7,
-      orientation_reminder_repeat_days: 14,
-      parking_notice_reminder_days_before_expiration: 3,
-      parking_notice_expired_reminder_repeat_days: 7,
-      parking_notice_final_reminder_days_after_expiration: 14,
-      planless_payment_window_days: 32,
-      payment_currency_buffer_days: 2
-    )
+    first_or_create!(DEFAULTS)
   end
 
   # Convenience methods for accessing settings
@@ -125,6 +131,12 @@ class MembershipSetting < ApplicationRecord
   # How long an overdue member keeps access before falling inactive.
   def self.overdue_grace_period_days
     instance.overdue_grace_period_days
+  end
+
+  # How long a member is left alone after their dues date passes before the first overdue
+  # reminder. Nobody is emailed on the day the payment is due.
+  def self.payment_overdue_reminder_grace_days
+    instance.payment_overdue_reminder_grace_days
   end
 
   def self.payment_overdue_reminder_repeat_days

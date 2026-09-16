@@ -26,6 +26,9 @@
         <% if @payment_overdue_total_count > @payment_overdue_due_count %>
           · <span class="text-secondary"><%= @payment_overdue_total_count %> overdue total</span>
         <% end %>
+        <% if @payment_overdue_grace_count.to_i.positive? %>
+          · <span class="text-secondary"><%= @payment_overdue_grace_count %> still inside the grace period</span>
+        <% end %>
       </div>
     <% elsif @reminder_setting.key == 'orientation' %>
       <div class="text-13 text-secondary mt-1">
@@ -138,9 +141,19 @@
     </div>
   </div>
 <% elsif @reminder_setting.key == 'payment_overdue' %>
+  <% unless @reminder_setting.enabled? %>
+    <div class="alert alert-warning text-13 py-2 mb-3">
+      This reminder is off, so an overdue member hears nothing at all — no past-due reminders, and no lapse notice when
+      they fall inactive.
+      <%= link_to "Turn it on from the reminders page", reminder_settings_path, class: "alert-link" %>.
+    </div>
+  <% end %>
+
+  <%= render 'payment_overdue_sequence' %>
+
   <div class="alert alert-secondary text-13 py-2 mb-3">
-    Members who have told us they are cancelling are not reminded — they keep access until their paid-through date and
-    then become inactive.
+    Members who have told us they are cancelling are left out of all of this — they keep access until their
+    paid-through date and then become inactive without being chased or sent the lapse notice.
   </div>
 
   <div class="card shadow-sm border-0">
@@ -160,7 +173,7 @@
               <% @due_users.each do |user| %>
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
-                  <td><%= admin_profile_time(user.dues_paid_through_at, empty: 'Unknown') %></td>
+                  <td><%= admin_profile_time(Reminders::PaymentOverdueEligibility.overdue_since(user), empty: 'Unknown') %></td>
                   <td><%= admin_profile_time(user.payment_overdue_reminder_sent_at) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>

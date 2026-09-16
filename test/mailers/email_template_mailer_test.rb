@@ -10,7 +10,7 @@ class EmailTemplateMailerTest < ActionMailer::TestCase
   test 'send_rendered includes notification footer for member template action' do
     mail = EmailTemplateMailer.send_rendered(member_rendered_mail)
 
-    assert_includes mail.text_part.body.decoded, 'Manage overdue payment reminders'
+    assert_includes mail.text_part.body.decoded, 'Manage overdue dues and lapse notices'
     assert_match %r{/notifications/[^?\s]+}, mail.text_part.body.decoded
   end
 

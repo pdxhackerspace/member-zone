@@ -11,7 +11,7 @@ class MemberMailerNotificationFooterTest < ActionMailer::TestCase
     mail = MemberMailer.payment_past_due(@user, days_overdue: 7)
 
     assert_includes mail.html_part.body.decoded, 'notification settings'
-    assert_includes mail.text_part.body.decoded, 'Manage overdue payment reminders'
+    assert_includes mail.text_part.body.decoded, 'Manage overdue dues and lapse notices'
   end
 
   test 'parking_permit_issued includes mandatory footer' do

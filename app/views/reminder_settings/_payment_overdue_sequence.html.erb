@@ -1,0 +1,81 @@
+<%# The three stages an overdue member moves through, in one place. Admins kept reading the
+    past-due reminder and the lapse notice as two unrelated mailings going to two unrelated
+    groups; they are consecutive, and the counts below are the same people at different
+    points in the sequence. %>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-3">
+    <div class="h-section-label mb-2">What an overdue member hears, in order</div>
+    <div class="table-responsive">
+      <table class="table table-compact mb-0">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Email</th>
+            <th>Who is there now</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-nowrap">
+              Dues date, for
+              <%= @membership_setting.payment_overdue_reminder_grace_days %>
+              <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %>
+            </td>
+            <td class="text-secondary">Nothing — reminder grace period</td>
+            <td>
+              <% if @payment_overdue_grace_count.to_i.positive? %>
+                <span class="fw-medium"><%= @payment_overdue_grace_count %></span> waiting
+              <% else %>
+                <span class="text-secondary">Nobody waiting</span>
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <td class="text-nowrap">
+              Until <%= @membership_setting.overdue_grace_period_days %> days overdue
+            </td>
+            <td>
+              <% if @payment_overdue_email_template %>
+                <%= link_to @payment_overdue_email_template.name, email_template_path(@payment_overdue_email_template),
+                            class: "text-decoration-none" %>
+              <% else %>
+                Payment Past Due
+              <% end %>
+              <span class="text-secondary">
+                · repeats every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days
+              </span>
+            </td>
+            <td>
+              <% if @payment_overdue_reminded_count.to_i.positive? %>
+                <span class="fw-medium"><%= @payment_overdue_reminded_count %></span> being reminded
+              <% else %>
+                <span class="text-secondary">Nobody being reminded</span>
+              <% end %>
+              <span class="text-secondary">· <%= @payment_overdue_due_count %> due on the next run</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="text-nowrap">
+              At <%= @membership_setting.overdue_grace_period_days %> days overdue
+            </td>
+            <td>
+              <% if @membership_lapsed_email_template %>
+                <%= link_to @membership_lapsed_email_template.name, email_template_path(@membership_lapsed_email_template),
+                            class: "text-decoration-none" %>
+              <% else %>
+                Membership Lapsed
+              <% end %>
+              <span class="text-secondary">· once, as they fall inactive</span>
+            </td>
+            <td class="text-secondary">Anyone still unpaid when their grace runs out</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-12 text-secondary mt-2">
+      All three stages are governed by the Enabled switch on the reminders page, and a member who opts out opts out of
+      the whole sequence. The lapse notice fires on the move to inactive rather than on the daily run, so “Send now”
+      covers the past-due reminders only.
+    </div>
+  </div>
+</div>

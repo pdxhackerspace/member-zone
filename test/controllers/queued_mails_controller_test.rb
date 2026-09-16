@@ -219,7 +219,7 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     post approve_queued_mail_path(mail)
 
     assert_redirected_to queued_mail_path(mail)
-    assert_match 'opted out of overdue payment reminders', flash[:alert]
+    assert_match 'opted out of overdue dues and lapse notices', flash[:alert]
     assert_no_match 'banned', flash[:alert]
   end
 
