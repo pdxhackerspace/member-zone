@@ -60,7 +60,9 @@ The report is broader than the reminder. A member who paid before booking their 
 
 ### Lapsed member access reminder
 
-Tells **inactive members who have badged into the building** that their membership has lapsed and how to reactivate. Disabled by default. The daily job runs at 8:05 AM. Members who have told us they are cancelling are never reminded.
+Tells **inactive members who have badged into the building** that their membership has lapsed and how to reactivate. Disabled by default. The daily job runs at 8:05 AM.
+
+Having cancelled is not a reason to stay quiet. A member who cancelled and stopped coming has no recent access logs and never comes up; a member who cancelled and is still letting themselves in is precisely who this reminder is for. The only standing that matters is being inactive.
 
 **Timing** (on the reminder card itself, not Membership settings):
 
