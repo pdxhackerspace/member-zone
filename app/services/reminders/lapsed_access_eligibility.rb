@@ -50,11 +50,13 @@ module Reminders
           .count
     end
 
+    # A cancellation on file is deliberately not a reason to stay quiet. Somebody who cancelled
+    # and stopped coming has no access logs and never reaches this point anyway; somebody who
+    # cancelled and is still badging in is exactly who the reminder is for.
     def self.due?(user, now: Time.current)
       return false if user.service_account?
       return false if user.email.blank?
       return false unless user.membership_state == 'inactive_member'
-      return false if user.cancellation_on_file?
       return false if pending_reminder_mail?(user)
 
       unnotified_access_logs(user, now: now).exists?
