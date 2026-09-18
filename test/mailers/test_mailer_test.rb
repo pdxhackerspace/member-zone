@@ -1,6 +1,8 @@
 require 'test_helper'
 
 class TestMailerTest < ActionMailer::TestCase
+  include ActiveJob::TestHelper
+
   class FailingDelivery
     def initialize(_settings = {}); end
 
@@ -30,6 +32,19 @@ class TestMailerTest < ActionMailer::TestCase
         assert_raises(RuntimeError) { test_send.deliver_now }
       end
     end
+  end
+
+  # Skipping the queue capture means the exception reaches the delivery job, so without a
+  # single-attempt job the queue adapter picks it up and redelivers on its own schedule — the same
+  # "arrives hours later" problem the queue skip was there to prevent, one layer down.
+  test 'a failed test send is attempted once and not retried by the delivery job' do
+    with_failing_delivery do
+      assert_nothing_raised do
+        perform_enqueued_jobs { test_send.deliver_later }
+      end
+    end
+
+    assert_empty enqueued_jobs, 'a diagnostic must not be retried on the delivery job schedule'
   end
 
   test 'a failed test send is still recorded in the mail log' do
