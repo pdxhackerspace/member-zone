@@ -81,7 +81,9 @@ module Reminders
       user = awaiting_user(email: 'orientation-deferred@example.com')
       NotifyOrientation.call(now: @now)
 
-      QueuedMail.find_by!(recipient: user, mailer_action: 'orientation_reminder').deliver_now!
+      queued = QueuedMail.find_by!(recipient: user, mailer_action: 'orientation_reminder')
+      queued.update!(status: 'approved')
+      queued.deliver_now!
 
       assert_not_nil user.reload.orientation_reminder_sent_at
     end

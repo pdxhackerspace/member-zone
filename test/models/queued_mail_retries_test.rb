@@ -86,7 +86,61 @@ class QueuedMailRetriesTest < ActiveSupport::TestCase
     assert_not_nil @queued_mail.reload.sent_at
   end
 
+  test 'deliver_now! refuses a message that is out of attempts until an admin retries it' do
+    @queued_mail.update!(send_attempts: QueuedMailRetries::MAX_SEND_ATTEMPTS)
+
+    assert_no_difference 'ActionMailer::Base.deliveries.size' do
+      @queued_mail.deliver_now!
+    end
+    assert_match(/automatic retries stopped/, @queued_mail.undeliverable_reason)
+    assert_equal QueuedMailRetries::MAX_SEND_ATTEMPTS, @queued_mail.reload.send_attempts,
+                 'a refused attempt must not be charged to the budget'
+
+    @queued_mail.retry_delivery!
+
+    assert_equal 0, @queued_mail.reload.send_attempts
+    assert_nil @queued_mail.undeliverable_reason
+  end
+
+  test 'deliver_now! leaves a message that is not approved alone' do
+    @queued_mail.update!(status: 'pending')
+
+    assert_no_difference 'ActionMailer::Base.deliveries.size' do
+      @queued_mail.deliver_now!
+    end
+  end
+
+  # Only the handoff is a delivery failure. A message the mail server took, whose bookkeeping then
+  # failed, must not look failed — the sweep would deliver it again within the minute.
+  test 'deliver_now! does not mark a delivered message failed when its log entry cannot be written' do
+    with_broken_delivery_log do
+      assert_difference 'ActionMailer::Base.deliveries.size', 1 do
+        @queued_mail.deliver_now!
+      end
+    end
+
+    @queued_mail.reload
+
+    assert_predicate @queued_mail, :sent?
+    assert_nil @queued_mail.last_error
+    assert_not_predicate @queued_mail, :delivery_failed?
+  end
+
   private
+
+  # Breaks the post-delivery log write without touching the handoff itself. Prepending and then
+  # emptying the module leaves the original method reachable again.
+  def with_broken_delivery_log
+    breaker = Module.new do
+      def log_queued_delivery!(_queued_mail)
+        raise 'log table is gone'
+      end
+    end
+    MailLogEntry.singleton_class.prepend(breaker)
+    yield
+  ensure
+    breaker.module_eval { remove_method(:log_queued_delivery!) }
+  end
 
   # Leaves only the messages a test creates for itself in the retry queue.
   def clear_the_queue

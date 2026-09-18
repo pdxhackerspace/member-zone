@@ -40,6 +40,24 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test 'failed filter shows only messages that could not be sent' do
+    failed = queued_mails(:approved_mail)
+    failed.update!(sent_at: nil, last_error: 'Net::SMTPServerBusy: try later', last_error_at: Time.current)
+
+    get queued_mails_path(filter: 'failed')
+
+    assert_response :success
+    assert_select 'a[href=?]', queued_mail_path(failed)
+    assert_select 'a[href=?]', queued_mail_path(@pending), false
+  end
+
+  test 'unknown filter falls back to the pending queue' do
+    get queued_mails_path(filter: 'nonsense')
+
+    assert_response :success
+    assert_select 'a[href=?]', queued_mail_path(@pending)
+  end
+
   # ─── Show ─────────────────────────────────────────────────────────
 
   test 'shows queued mail' do

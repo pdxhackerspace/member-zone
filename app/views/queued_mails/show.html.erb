@@ -3,15 +3,15 @@
     <h1 class="h3 mb-1">Queued Message</h1>
     <p class="text-muted mb-0">
       <% if @queued_mail.delivery_failed? %>
-        <span class="badge text-bg-danger">Send Failed</span>
+        <span class="badge text-bg-danger-subtle">Send failed</span>
       <% elsif @queued_mail.delivery_pending? %>
-        <span class="badge text-bg-info">Sending...</span>
+        <span class="badge text-bg-info-subtle">Sending</span>
       <% elsif @queued_mail.sent? %>
-        <span class="badge text-bg-success">Sent</span>
+        <span class="badge text-bg-success-subtle">Sent</span>
       <% elsif @queued_mail.pending? %>
-        <span class="badge text-bg-warning">Pending Review</span>
+        <span class="badge text-bg-warning-subtle">Pending review</span>
       <% elsif @queued_mail.rejected? %>
-        <span class="badge text-bg-secondary">Rejected</span>
+        <span class="badge text-bg-secondary-subtle">Rejected</span>
       <% end %>
     </p>
   </div>
@@ -110,11 +110,16 @@
                 <div class="text-muted small"><%= time_ago_in_words(@queued_mail.last_error_at) %> ago</div>
               <% end %>
               <% if @queued_mail.retries_exhausted? %>
-                <div class="text-muted small">
+                <div class="text-12 text-secondary">
                   Automatic retries stopped after <%= @queued_mail.send_attempts %> attempts.
+                  Retry restores the budget.
+                </div>
+              <% elsif (blocked = MailDeliveryReadiness.unavailable_reason) %>
+                <div class="text-12 text-secondary">
+                  Waiting to retry — <%= blocked %>.
                 </div>
               <% elsif @queued_mail.next_retry_at %>
-                <div class="text-muted small">
+                <div class="text-12 text-secondary">
                   <% if @queued_mail.next_retry_at.past? %>
                     Retrying automatically within a few minutes.
                   <% else %>
