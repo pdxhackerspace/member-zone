@@ -78,6 +78,9 @@ class KeyfobSignInTest < ApplicationSystemTestCase
 
     visit login_path
 
+    # Asserted alongside the password form, so that a login page which failed to render for some
+    # unrelated reason cannot satisfy this by being empty.
+    assert_field 'session[email]'
     assert_no_button 'Sign In with Keyfob'
   end
 

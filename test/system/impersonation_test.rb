@@ -10,14 +10,8 @@ require 'application_system_test_case'
 # breaks if the banner or the exit control regresses.
 class ImpersonationTest < ApplicationSystemTestCase
   setup do
-    @original_local_auth_enabled = Rails.application.config.x.local_auth.enabled
-    Rails.application.config.x.local_auth.enabled = true
     @admin_account = local_accounts(:active_admin)
     @member = users(:one)
-  end
-
-  teardown do
-    Rails.application.config.x.local_auth.enabled = @original_local_auth_enabled
   end
 
   test 'an admin can impersonate a member and get back out again' do

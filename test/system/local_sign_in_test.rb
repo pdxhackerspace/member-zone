@@ -5,13 +5,7 @@ require 'application_system_test_case'
 # actually signs someone in, which is the one thing every other system test depends on.
 class LocalSignInTest < ApplicationSystemTestCase
   setup do
-    @original_local_auth_enabled = Rails.application.config.x.local_auth.enabled
-    Rails.application.config.x.local_auth.enabled = true
     @account = local_accounts(:active_admin)
-  end
-
-  teardown do
-    Rails.application.config.x.local_auth.enabled = @original_local_auth_enabled
   end
 
   test 'a member signs in with their password' do
