@@ -71,7 +71,19 @@ class RfidWebhookService
     def claim_recent(since_time, claim_token)
       return nil if claim_token.blank?
 
-      recent_scans(since_time).each do |scan|
+      scans = recent_scans(since_time)
+
+      # A session that already holds a claim gets that same scan back and is offered nothing
+      # else. This has to be checked before taking anything new: scans are walked newest first,
+      # so a session that polls again after claiming — a second tab, or a back-navigation from
+      # the PIN page, both of which keep the token and the wait window — would otherwise take a
+      # newer unclaimed scan on top of the one it holds. That binds the browser to a fob that
+      # badged in after it, offering a PIN box for somebody else's membership, and strands the
+      # first claim so the member who made it can never claim their own scan.
+      held = scans.find { |scan| claimed_by?(scan[:rfid], claim_token) }
+      return held if held
+
+      scans.each do |scan|
         return scan if claim(scan[:rfid], claim_token)
       end
 

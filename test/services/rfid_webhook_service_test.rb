@@ -67,6 +67,40 @@ class RfidWebhookServiceTest < ActiveSupport::TestCase
     assert_not RfidWebhookService.claimed_by?(@rfid, 'token-b')
   end
 
+  # The same session polls on after it has claimed something — a second tab, or the back button
+  # from the PIN page, both of which keep the claim token and the wait window. Scans are walked
+  # newest first, so without holding its existing claim first it would take a fob that badged in
+  # after its own: a PIN box for somebody else's membership.
+  test 'a session holding a claim is never given a newer scan on top of it' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    someone_else = unique_rfid
+    travel 30.seconds do
+      RfidWebhookService.store(someone_else, '1111')
+
+      assert_equal @rfid, RfidWebhookService.claim_recent(started, 'token-a')[:rfid]
+      assert_not RfidWebhookService.claimed_by?(someone_else, 'token-a')
+    end
+  end
+
+  # The other half of the same bug: taking a second claim also stranded the first one, leaving the
+  # scan claimed by a session that had moved on and locked out the member who actually badged.
+  test 'a scan a polling session passed over is still claimable by its own member' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    someone_else = unique_rfid
+    travel 30.seconds do
+      RfidWebhookService.store(someone_else, '1111')
+      RfidWebhookService.claim_recent(started, 'token-a')
+
+      assert_equal someone_else, RfidWebhookService.claim_recent(started, 'token-b')[:rfid]
+    end
+  end
+
   test 'a scan made before the browser started waiting is ignored' do
     RfidWebhookService.store(@rfid, @pin)
 

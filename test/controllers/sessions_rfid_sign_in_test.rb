@@ -159,6 +159,30 @@ class SessionsRfidSignInTest < ActionDispatch::IntegrationTest
     assert_equal 0, RfidWebhookService.failed_attempts(@rfid)
   end
 
+  # The back button from the PIN page, which keeps the claim token and the wait window. Scans are
+  # claimed newest first, so a session that returns here after someone else has badged in would
+  # pick up their scan and be shown a PIN box for their membership instead of its own.
+  test 'returning to the wait page does not pick up another member\'s scan' do
+    reach_pin_entry
+
+    other_member = users(:two)
+    other_rfid = unique_rfid
+    Rfid.create!(user: other_member, rfid: other_rfid)
+
+    travel 30.seconds do
+      RfidWebhookService.store(other_rfid, '1111', rfid_readers(:one).id, rfid_readers(:one).name)
+
+      get rfid_wait_path
+      assert_redirected_to rfid_verify_path
+
+      # Still this session's own fob, and the PIN that finishes the sign-in is still its own.
+      post rfid_submit_pin_path, params: { pin: @pin }
+
+      assert_redirected_to root_path
+      assert_equal @member.id, session[:user_id]
+    end
+  end
+
   test 'a scan belonging to no member does not sign anyone in' do
     orphan = unique_rfid
     start_waiting_for_keyfob
