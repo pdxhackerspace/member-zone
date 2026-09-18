@@ -107,7 +107,11 @@ class EmailTemplatesController < AuthenticatedController
         body_text: rendered[:body_text]
       ).deliver_later
 
-      redirect_to email_templates_path, notice: "Test email sent to #{test_user.email}."
+      # Delivery is a background job, and a test send gets one attempt, so this cannot promise the
+      # mail arrived — say where the answer is instead of claiming success on the job's behalf.
+      redirect_to email_templates_path,
+                  notice: "Test email queued for #{test_user.email}. " \
+                          'If it does not arrive, the Mail Log records why.'
     else
       redirect_to email_templates_path, alert: 'Could not send test email - no email address available.'
     end
