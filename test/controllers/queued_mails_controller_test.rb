@@ -58,6 +58,62 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'a[href=?]', queued_mail_path(@pending)
   end
 
+  test 'every filter chip carries the size of its bucket' do
+    get queued_mails_path
+
+    assert_response :success
+    QueuedMailsHelper::FILTER_CHIPS.each do |chip|
+      assert_select '.filter-chip', text: /#{chip[:label]}\s+\d+/, count: 1
+    end
+    assert_select '.filter-chip.active', text: /Pending\s+\d+/, count: 1
+  end
+
+  test 'a chip for an empty bucket is not a link' do
+    QueuedMail.where(status: 'rejected').delete_all
+
+    get queued_mails_path
+
+    assert_response :success
+    assert_select 'span.filter-chip.muted', text: /Rejected\s+0/
+    assert_select 'a.filter-chip[href=?]', queued_mails_path(filter: 'rejected'), false
+  end
+
+  test 'index shows 50 messages a page' do
+    create_queued_mails(55)
+
+    get queued_mails_path
+
+    assert_response :success
+    assert_select 'tbody tr', QueuedMailsController::PER_PAGE
+    assert_select 'ul.pagination a[href*=?]', 'page=2'
+  end
+
+  test 'the rest of the queue is on the following page' do
+    create_queued_mails(55)
+    total = QueuedMail.pending.count
+
+    get queued_mails_path(page: 2)
+
+    assert_response :success
+    assert_select 'tbody tr', total - QueuedMailsController::PER_PAGE
+  end
+
+  test 'paging through a filtered queue keeps the filter' do
+    create_queued_mails(55, status: 'rejected')
+
+    get queued_mails_path(filter: 'rejected')
+
+    assert_response :success
+    assert_select 'ul.pagination a[href*=?]', 'filter=rejected'
+  end
+
+  test 'a queue that fits on one page shows no pagination' do
+    get queued_mails_path
+
+    assert_response :success
+    assert_select 'ul.pagination', false
+  end
+
   # ─── Show ─────────────────────────────────────────────────────────
 
   test 'shows queued mail' do
@@ -335,6 +391,14 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def create_queued_mails(count, status: 'pending')
+    count.times do |i|
+      QueuedMail.create!(to: "bulk#{i}@example.com", subject: "Bulk message #{i}",
+                         body_html: '<p>Bulk</p>', reason: 'Pagination fixture',
+                         mailer_action: 'application_received', status: status)
+    end
+  end
 
   def sign_in_as_local_admin
     account = local_accounts(:active_admin)

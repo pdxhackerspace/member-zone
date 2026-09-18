@@ -47,6 +47,10 @@ A direct `deliver_later` — `message_received`, the staff application notices, 
 
 Skipping the capture re-raises, which hands the failure to the queue adapter — roughly 25 attempts over three weeks on Sidekiq's defaults. That is the right default for mail a member is waiting on, so `TestMailer` also sets `delivery_job = SingleAttemptMailDeliveryJob`, which discards instead of retrying. Otherwise a test send comes back hours later by the other route, which is the problem the skip was there to avoid one layer down. The mail log entry and the `MailerDeliveryMonitor` record are written before the discard, so the failure is still visible; `EmailTemplatesController#test_send` says so rather than reporting success on the job's behalf.
 
+### Where an admin looks
+
+Two pages cover outgoing mail and share their chrome (`shared/_filter_chip`, `FilteredListHelper`) so they read the same way. The **Mail Queue** is present tense — what a message *is* — filtered into Pending, Failed, Approved, Rejected and All. The **Mail Log** is past tense — what happened to it — filtered by event, with recipient and subject search and a column showing where the message stands now, so an old failure line says whether it has since gone out. Every chip carries its own count, which is the point of them: a backlog is visible without clicking into it, and an empty bucket renders unclickable rather than offering an empty page. Both lists page at 50 rows.
+
 ### One retry engine
 
 `QueuedMailRetrySweepJob` is the **only** thing that retries mail. It runs every five minutes and works the backoff in `QueuedMailRetries` — 1 minute, 5, 15, an hour, 3 hours, 6 hours — up to `MAX_SEND_ATTEMPTS`. `QueuedMail.due_for_retry` decides due-ness in SQL rather than filtering a batch in Ruby, so a backlog of exhausted messages cannot starve newer mail behind it. It also picks up messages whose delivery job was lost, once `UNATTEMPTED_GRACE` has passed since the last write. A message that exhausts its budget stays in the queue under the **Failed** filter; the admin **Retry** button restores the budget and hands it back to the sweep.
