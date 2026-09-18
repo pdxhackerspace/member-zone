@@ -33,10 +33,9 @@ module MailLogHelper
     EVENT_LABELS.fetch(event, event.humanize)
   end
 
-  def mail_log_chip_class(chip, count)
-    active = chip[:state].nil? ? @state.blank? : @state == chip[:state]
-    ['filter-chip', 'text-decoration-none', chip[:variant], ('active' if active),
-     ('muted' if count.zero?)].compact.join(' ')
+  # The All chip carries no state, so it is the selected one when nothing is filtered.
+  def mail_log_chip_active?(state)
+    state.nil? ? @state.blank? : @state == state
   end
 
   # What the message itself is doing now, as opposed to the event the row records. A log line saying

@@ -24,17 +24,12 @@
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
   <% MailLogHelper::STATE_CHIPS.each do |chip| %>
-    <% count = @filter_counts.fetch(chip[:state] || 'all', 0) %>
-    <% classes = mail_log_chip_class(chip, count) %>
-    <% if count.zero? %>
-      <span class="<%= classes %>" aria-disabled="true">
-        <%= chip[:label] %> <span class="count"><%= count %></span>
-      </span>
-    <% else %>
-      <%= link_to mail_log_path(state: chip[:state], q: @search.presence), class: classes do %>
-        <%= chip[:label] %> <span class="count"><%= count %></span>
-      <% end %>
-    <% end %>
+    <%= render 'shared/filter_chip',
+               label: chip[:label],
+               variant: chip[:variant],
+               count: @filter_counts.fetch(chip[:state] || 'all', 0),
+               path: mail_log_path(state: chip[:state], q: @search.presence),
+               active: mail_log_chip_active?(chip[:state]) %>
   <% end %>
 
   <%= form_with url: mail_log_path, method: :get, class: "d-flex gap-1 ms-auto" do |f| %>
@@ -120,7 +115,10 @@
   </div>
 
   <% if @pagy.pages > 1 %>
-    <div class="mt-3">
+    <div class="d-flex align-items-center justify-content-between mt-3">
+      <div class="text-12 text-secondary">
+        <%= @pagy.from %>–<%= @pagy.to %> of <%= @pagy.count %>
+      </div>
       <%== pagy_bootstrap_nav(@pagy) %>
     </div>
   <% end %>

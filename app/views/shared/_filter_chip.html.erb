@@ -1,0 +1,12 @@
+<%# One filter chip, as a link unless its bucket is empty — a chip showing 0 has nothing to open.
+    Locals: label, count, path, active, and an optional variant ('warning' / 'danger'). %>
+<% classes = filter_chip_class(active: active, count: count, variant: local_assigns[:variant]) %>
+<% if count.zero? %>
+  <span class="<%= classes %>" aria-disabled="true">
+    <%= label %> <span class="count"><%= count %></span>
+  </span>
+<% else %>
+  <%= link_to path, class: classes do %>
+    <%= label %> <span class="count"><%= count %></span>
+  <% end %>
+<% end %>

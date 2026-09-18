@@ -1,5 +1,6 @@
 class QueuedMailsController < AuthenticatedController
   FILTERS = %w[pending failed approved rejected all].freeze
+  PER_PAGE = 50
   HTML_BLOCK_TAGS = %w[p div h1 h2 h3 h4 h5 h6 li tr].freeze
   HTML_LINK_URL_TAGS = %w[p li].freeze
   HTML_SPACED_TAGS = %w[td th].freeze
@@ -17,9 +18,11 @@ class QueuedMailsController < AuthenticatedController
 
   def index
     @filter = params[:filter].presence_in(FILTERS) || 'pending'
-    @queued_mails = queued_mails_for_filter.newest_first.includes(:recipient, :email_template, :reviewed_by)
-    @pending_count = QueuedMail.pending.count
-    @failed_count = QueuedMail.failed.count
+    @filter_counts = queued_mail_filter_counts
+    @pending_count = @filter_counts.fetch('pending')
+    @failed_count = @filter_counts.fetch('failed')
+    scope = queued_mails_for_filter.newest_first.includes(:recipient, :email_template, :reviewed_by)
+    @pagy, @queued_mails = pagy(scope, limit: PER_PAGE)
   end
 
   def show
@@ -156,6 +159,19 @@ class QueuedMailsController < AuthenticatedController
   end
 
   private
+
+  # Failed cannot come from the status grouping: it is an approved message that has not gone out and
+  # has an error recorded, so it needs its own count.
+  def queued_mail_filter_counts
+    by_status = QueuedMail.group(:status).count
+    {
+      'pending' => by_status.fetch('pending', 0),
+      'failed' => QueuedMail.failed.count,
+      'approved' => by_status.fetch('approved', 0),
+      'rejected' => by_status.fetch('rejected', 0),
+      'all' => by_status.values.sum
+    }
+  end
 
   # Failed messages are also approved, so they would otherwise only surface mixed in with mail that
   # went out fine. They are the one thing on this page that needs an admin, so they get their own
