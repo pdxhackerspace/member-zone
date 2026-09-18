@@ -1,10 +1,24 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex align-items-end justify-content-between mb-3">
   <div>
-    <h1 class="h3 mb-1">Mail Queue</h1>
-    <p class="text-muted mb-0">Review and approve outgoing mail before it is sent.</p>
+    <h1 class="h-page-title mb-0">Mail Queue</h1>
+    <div class="text-13 text-secondary mt-1">
+      Review and approve outgoing mail before it is sent.
+      <% if @pending_count > 0 || @failed_count > 0 %>
+        ·
+        <% if @pending_count > 0 %>
+          <span class="text-body"><%= @pending_count %></span> awaiting review
+        <% end %>
+        <% if @failed_count > 0 %>
+          <%= ' · ' if @pending_count > 0 %>
+          <%= link_to queued_mails_path(filter: 'failed'), class: "text-danger text-decoration-none" do %>
+            <%= @failed_count %> failed to send
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
   </div>
   <div>
-    <%= link_to "Dashboard", root_path, class: "btn btn-secondary" %>
+    <%= link_to "Dashboard", root_path, class: "btn btn-outline-secondary btn-sm" %>
   </div>
 </div>
 
@@ -15,7 +29,15 @@
     <%= link_to queued_mails_path(filter: 'pending'), class: "nav-link #{'active' if @filter == 'pending'}" do %>
       Pending
       <% if @pending_count > 0 %>
-        <span class="badge text-bg-warning ms-1"><%= @pending_count %></span>
+        <span class="badge text-bg-warning-subtle ms-1"><%= @pending_count %></span>
+      <% end %>
+    <% end %>
+  </li>
+  <li class="nav-item">
+    <%= link_to queued_mails_path(filter: 'failed'), class: "nav-link #{'active' if @filter == 'failed'}" do %>
+      Failed
+      <% if @failed_count > 0 %>
+        <span class="badge text-bg-danger-subtle ms-1"><%= @failed_count %></span>
       <% end %>
     <% end %>
   </li>
@@ -84,17 +106,24 @@
               <td class="text-muted small"><%= qm.reason %></td>
               <td>
                 <% if qm.delivery_failed? %>
-                  <span class="badge text-bg-danger">Send Failed</span>
+                  <span class="badge text-bg-danger-subtle">Send failed</span>
+                  <% if qm.retries_exhausted? %>
+                    <div class="text-11 text-secondary mt-1">Gave up after <%= qm.send_attempts %> attempts</div>
+                  <% elsif qm.next_retry_at&.future? %>
+                    <div class="text-11 text-secondary mt-1">
+                      Retrying in <%= distance_of_time_in_words_to_now(qm.next_retry_at) %>
+                    </div>
+                  <% end %>
                 <% elsif qm.delivery_pending? %>
-                  <span class="badge text-bg-info">Sending...</span>
+                  <span class="badge text-bg-info-subtle">Sending</span>
                 <% elsif qm.sent? %>
-                  <span class="badge text-bg-success">Sent</span>
+                  <span class="status-dot status-success" title="Sent <%= qm.sent_at.strftime('%b %d, %Y %l:%M %p') %>"></span>
                 <% elsif qm.pending? %>
-                  <span class="badge text-bg-warning">Pending</span>
+                  <span class="badge text-bg-warning-subtle">Pending</span>
                 <% elsif qm.approved? %>
-                  <span class="badge text-bg-success">Approved</span>
+                  <span class="badge text-bg-success-subtle">Approved</span>
                 <% elsif qm.rejected? %>
-                  <span class="badge text-bg-secondary">Rejected</span>
+                  <span class="badge text-bg-secondary-subtle">Rejected</span>
                 <% end %>
               </td>
               <td class="text-muted small"><%= time_ago_in_words(qm.created_at) %> ago</td>
@@ -135,6 +164,8 @@
       <p class="text-muted mb-0">
         <% if @filter == 'pending' %>
           No pending messages. The queue is empty.
+        <% elsif @filter == 'failed' %>
+          Nothing has failed to send. Messages wait here when the mail server will not take them.
         <% else %>
           No <%= @filter %> messages found.
         <% end %>

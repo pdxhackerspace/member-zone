@@ -1,4 +1,5 @@
 class QueuedMailsController < AuthenticatedController
+  FILTERS = %w[pending failed approved rejected all].freeze
   HTML_BLOCK_TAGS = %w[p div h1 h2 h3 h4 h5 h6 li tr].freeze
   HTML_LINK_URL_TAGS = %w[p li].freeze
   HTML_SPACED_TAGS = %w[td th].freeze
@@ -15,15 +16,10 @@ class QueuedMailsController < AuthenticatedController
   before_action :set_queued_mail, only: %i[show edit update approve reject regenerate retry_delivery rewrite_with_ai]
 
   def index
-    @filter = params[:filter].presence || 'pending'
-    @queued_mails = case @filter
-                    when 'approved' then QueuedMail.approved
-                    when 'rejected' then QueuedMail.rejected
-                    when 'all'      then QueuedMail.all
-                    else QueuedMail.pending
-                    end
-    @queued_mails = @queued_mails.newest_first.includes(:recipient, :email_template, :reviewed_by)
+    @filter = params[:filter].presence_in(FILTERS) || 'pending'
+    @queued_mails = queued_mails_for_filter.newest_first.includes(:recipient, :email_template, :reviewed_by)
     @pending_count = QueuedMail.pending.count
+    @failed_count = QueuedMail.failed.count
   end
 
   def show
@@ -160,6 +156,19 @@ class QueuedMailsController < AuthenticatedController
   end
 
   private
+
+  # Failed messages are also approved, so they would otherwise only surface mixed in with mail that
+  # went out fine. They are the one thing on this page that needs an admin, so they get their own
+  # filter.
+  def queued_mails_for_filter
+    case @filter
+    when 'failed'   then QueuedMail.failed
+    when 'approved' then QueuedMail.approved
+    when 'rejected' then QueuedMail.rejected
+    when 'all'      then QueuedMail.all
+    else QueuedMail.pending
+    end
+  end
 
   def set_queued_mail
     @queued_mail = QueuedMail.find(params[:id])

@@ -4,6 +4,7 @@ class QueuedMail < ApplicationRecord
   include QueuedMailMailerArgs
   include QueuedMailApproval
   include QueuedMailRetries
+  include QueuedMailDelivery
 
   STATUSES = %w[pending approved rejected].freeze
 
@@ -208,38 +209,6 @@ class QueuedMail < ApplicationRecord
 
   def can_regenerate?
     recipient.present? && (email_template.present? || mailer_action.present?)
-  end
-
-  # Safe to call from anywhere that thinks the message is due: an already-sent message is left
-  # alone, and the claim keeps a retry sweep and an in-flight delivery job from both sending it.
-  def deliver_now!
-    return if sent?
-    return if MailRecipientGuard.block_delivery_to!(self)
-    return if Notifications::DeliveryGate.block_queued_delivery!(self)
-    return unless claim_for_delivery!
-
-    QueuedMailMailer.deliver_queued(self).deliver_now
-    sent_time = Time.current
-    update!(sent_at: sent_time, last_error: nil, last_error_at: nil)
-    MailLogEntry.log_queued_delivery!(self)
-    record_reminder_deliveries!(sent_time)
-  rescue StandardError => e
-    record_delivery_failure!(e) unless sent?
-    raise
-  end
-
-  # An admin asking for a retry also restores the automatic attempt budget, so a message that had
-  # given up starts being swept again if this attempt fails too.
-  def retry_delivery!
-    update!(last_error: nil, last_error_at: nil, send_attempts: 0)
-    QueuedMailDeliveryJob.perform_later(id)
-  end
-
-  def record_delivery_failure!(error)
-    MailerDeliveryMonitor.record_failure!(error, source: "QueuedMail##{id}")
-    error_message = "#{error.class}: #{error.message}"
-    update!(last_error: error_message, last_error_at: Time.current)
-    MailLogEntry.log_once!(self, 'send_failed', details: error_message)
   end
 
   def regenerate_from_email_template!
