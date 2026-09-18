@@ -32,7 +32,15 @@
                 pattern: "[0-9]{4}",
                 inputmode: "numeric",
                 autocomplete: "off" %>
-            <div class="form-text">Enter the 4-digit code from the device</div>
+            <%# A wrong code now costs something, so say so before the last one is spent rather %>
+            <%# than sending the member back to the reader with no explanation. %>
+            <% if @attempts_remaining && @attempts_remaining < RfidWebhookService::MAX_PIN_ATTEMPTS %>
+              <div class="form-text text-warning">
+                <%= pluralize(@attempts_remaining, 'attempt') %> left before you need to scan your keyfob again.
+              </div>
+            <% else %>
+              <div class="form-text">Enter the 4-digit code from the device</div>
+            <% end %>
           </div>
 
           <%= form.submit "Verify and Sign In", class: "btn btn-primary w-100" %>
