@@ -19,13 +19,19 @@ module QueuedMailDelivery
     # raise as before.
     #
     # It does not go back for review: nobody approved it in the first place.
+    #
+    # +recipient+ is whatever the mailer had to hand, which for applicant mail is a stand-in like
+    # +ApplicantMailRecipient+ rather than a +User+. Anything that is not a +User+ is dropped: the
+    # association would refuse it, and a refusal here would look like a failed capture and put the
+    # message back on the Sidekiq retry this exists to replace.
     # rubocop:disable-next Metrics/ParameterLists -- mirrors mail metadata fields
     def capture_failed_delivery(to:, subject:, body_html:, mailer_action:, error:, body_text: nil, recipient: nil)
       return nil if to.blank? || subject.blank? || body_html.blank?
 
       error_message = "#{error.class}: #{error.message}"
       record = create!(
-        **queued_mail_attrs(to, mailer_action.to_s.humanize, recipient, mailer_action.to_s, {}),
+        **queued_mail_attrs(to, mailer_action.to_s.humanize, recipient.is_a?(User) ? recipient : nil,
+                            mailer_action.to_s, {}),
         subject: subject.truncate(500),
         body_html: body_html,
         body_text: body_text || '',

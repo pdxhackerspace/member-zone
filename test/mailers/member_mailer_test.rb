@@ -119,6 +119,29 @@ class MemberMailerTest < ActionMailer::TestCase
     ActionMailer::Base.delivery_method = original_delivery_method if defined?(original_delivery_method)
   end
 
+  # Applicant-facing mailers set @user to an +ApplicantMailRecipient+ stand-in rather than a User,
+  # because no User record exists yet. Handing that to the association would refuse the record,
+  # which reads as a failed capture and puts the message back on the Sidekiq retry this replaces.
+  test 'a failed delivery is captured even when the mailer has no User to point at' do
+    ActionMailer::Base.add_delivery_method :member_zone_applicant_failure, FailingDelivery
+    original_delivery_method = ActionMailer::Base.delivery_method
+    ActionMailer::Base.delivery_method = :member_zone_applicant_failure
+    application = MembershipApplication.create!(email: 'applicant-standin@example.com', status: 'submitted')
+
+    assert_difference -> { QueuedMail.failed.count }, 1 do
+      MemberMailer.staff_new_application(application, 'director@example.com').deliver_now
+    end
+
+    queued = QueuedMail.failed.newest_first.first
+
+    assert_equal 'director@example.com', queued.to
+    assert_equal 'staff_new_application', queued.mailer_action
+    assert_nil queued.recipient, 'an applicant stand-in is not a User and must not be stored as one'
+    assert_match(/smtp down/, queued.last_error)
+  ensure
+    ActionMailer::Base.delivery_method = original_delivery_method if defined?(original_delivery_method)
+  end
+
   test 'slack signup template omits self-link copy when OIDC is unavailable' do
     template = EmailTemplate.create!(
       key: 'slack_signup_nag_test',
