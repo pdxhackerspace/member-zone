@@ -5,6 +5,13 @@ class ApplicationMailer < ActionMailer::Base
   after_action :set_member_zone_mail_trace_headers
   around_deliver :log_member_zone_mail_delivery
 
+  # Declares that a failed delivery from this mailer must not be parked in the mail queue, so
+  # +capture_failed_delivery!+ leaves it alone and the exception reaches the caller instead. For
+  # mailers whose caller already handles the failure, and for mail nobody is waiting on.
+  def self.skips_mail_queue_capture
+    after_action :mark_caller_owns_failed_delivery
+  end
+
   def mail(headers = {}, &)
     assign_email_banner
     assign_notification_footer_context
@@ -16,6 +23,10 @@ class ApplicationMailer < ActionMailer::Base
   def set_member_zone_mail_trace_headers
     headers['X-MemberZone-Mailer'] = self.class.name
     headers['X-MemberZone-Action'] = action_name.to_s
+  end
+
+  def mark_caller_owns_failed_delivery
+    headers['X-MemberZone-Skip-MailQueue'] = '1'
   end
 
   def log_member_zone_mail_delivery(&)
@@ -42,20 +53,29 @@ class ApplicationMailer < ActionMailer::Base
   # Only the handoff is inside the rescue. Logging the success used to sit there too, so a failed
   # log write reported a delivered message as failed — and on the immediate-send path that queued
   # an approved copy for the retry sweep to deliver a second time.
+  #
+  # A captured failure needs no +send_failed+ entry: the queue record it created carries the error,
+  # and the retry sweep would write one on every attempt. A failure that was not captured is the
+  # end of the line for this message, so it is logged here.
   def deliver_and_record_outcome
     yield
   rescue StandardError => e
     MailerDeliveryMonitor.record_failure!(e, source: "#{self.class.name}##{action_name}")
-    raise unless capture_failed_delivery!(e)
+    return if capture_failed_delivery!(e)
+
+    log_mail_outcome!('send_failed', details: "#{e.class}: #{e.message}")
+    raise
   else
-    log_delivered!
+    log_mail_outcome!('sent')
   end
 
-  def log_delivered!
-    log_direct_mail_delivery!('sent')
+  # Logging must never be the reason a delivery outcome changes, so a log write that fails is
+  # reported and dropped rather than raised in place of the real error.
+  def log_mail_outcome!(event, details: nil)
+    log_direct_mail_delivery!(event, details: details)
   rescue StandardError => e
     Rails.logger.error(
-      "[Mailer] delivery log entry failed for #{self.class.name}##{action_name} — #{e.class}: #{e.message}"
+      "[Mailer] #{event} log entry failed for #{self.class.name}##{action_name} — #{e.class}: #{e.message}"
     )
   end
 

@@ -1,19 +1,16 @@
 <div class="d-flex align-items-end justify-content-between mb-3">
   <div>
     <h1 class="h-page-title mb-0">Mail Queue</h1>
+    <%# Per-bucket counts live on the filter chips below; the header carries only the totals that
+        frame them. %>
     <div class="text-13 text-secondary mt-1">
-      Review and approve outgoing mail before it is sent.
-      <% if @pending_count > 0 || @failed_count > 0 %>
-        ·
-        <% if @pending_count > 0 %>
-          <span class="text-body"><%= @pending_count %></span> awaiting review
-        <% end %>
-        <% if @failed_count > 0 %>
-          <%= ' · ' if @pending_count > 0 %>
-          <%= link_to queued_mails_path(filter: 'failed'), class: "text-danger text-decoration-none" do %>
-            <%= @failed_count %> failed to send
-          <% end %>
-        <% end %>
+      <span class="text-body"><%= @filter_counts.fetch('all') %></span> messages
+      <% if @pending_count > 0 %>
+        · <span class="text-body"><%= @pending_count %></span> awaiting review
+      <% end %>
+      <% if @failed_count > 0 %>
+        · <%= link_to "#{@failed_count} failed to send", queued_mails_path(filter: 'failed'),
+                      class: "text-danger text-decoration-none" %>
       <% end %>
     </div>
   </div>
@@ -24,39 +21,16 @@
 
 <%= render 'shared/smtp_warning' %>
 
-<ul class="nav nav-tabs mb-4">
-  <li class="nav-item">
-    <%= link_to queued_mails_path(filter: 'pending'), class: "nav-link #{'active' if @filter == 'pending'}" do %>
-      Pending
-      <% if @pending_count > 0 %>
-        <span class="badge text-bg-warning-subtle ms-1"><%= @pending_count %></span>
-      <% end %>
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to queued_mails_path(filter: 'failed'), class: "nav-link #{'active' if @filter == 'failed'}" do %>
-      Failed
-      <% if @failed_count > 0 %>
-        <span class="badge text-bg-danger-subtle ms-1"><%= @failed_count %></span>
-      <% end %>
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to queued_mails_path(filter: 'approved'), class: "nav-link #{'active' if @filter == 'approved'}" do %>
-      Approved
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to queued_mails_path(filter: 'rejected'), class: "nav-link #{'active' if @filter == 'rejected'}" do %>
-      Rejected
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to queued_mails_path(filter: 'all'), class: "nav-link #{'active' if @filter == 'all'}" do %>
-      All
-    <% end %>
-  </li>
-</ul>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <% QueuedMailsHelper::FILTER_CHIPS.each do |chip| %>
+    <%= render 'shared/filter_chip',
+               label: chip[:label],
+               variant: chip[:variant],
+               count: @filter_counts.fetch(chip[:filter], 0),
+               path: queued_mails_path(filter: chip[:filter]),
+               active: queued_mail_chip_active?(chip[:filter]) %>
+  <% end %>
+</div>
 
 <%# Approving or rejecting the whole queue in one click is a different scale from reviewing
     a message, and no catalog key separates them — so it stays with administrators. %>
@@ -157,6 +131,15 @@
       </table>
     </div>
   </div>
+
+  <% if @pagy.pages > 1 %>
+    <div class="d-flex align-items-center justify-content-between mt-3">
+      <div class="text-12 text-secondary">
+        <%= @pagy.from %>–<%= @pagy.to %> of <%= @pagy.count %>
+      </div>
+      <%== pagy_bootstrap_nav(@pagy) %>
+    </div>
+  <% end %>
 <% else %>
   <div class="card shadow-sm border-0">
     <div class="card-body text-center py-5">

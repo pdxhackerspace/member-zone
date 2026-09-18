@@ -1,5 +1,12 @@
 # Mailer for sending test emails from email templates
 class TestMailer < ApplicationMailer
+  # A test send is a diagnostic an admin is watching for, not a message anyone is waiting on. If it
+  # fails it must not come back later by either route: not as an approved message in the mail queue
+  # that the retry sweep keeps sending for hours, and not through the queue adapter's own retries on
+  # the delivery job. By the time those land the admin has moved on and the template has changed.
+  skips_mail_queue_capture
+  self.delivery_job = SingleAttemptMailDeliveryJob
+
   def send_template(to:, subject:, body_html:, body_text:)
     @body_html = body_html
     @body_text = body_text
