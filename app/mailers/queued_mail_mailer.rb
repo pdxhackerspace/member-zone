@@ -1,6 +1,6 @@
 class QueuedMailMailer < ApplicationMailer
   skip_after_action :set_member_zone_mail_trace_headers
-  after_action :mark_skip_duplicate_mail_log
+  after_action :mark_queued_mail_owns_delivery
 
   def deliver_queued(queued_mail)
     @queued_mail = queued_mail
@@ -37,7 +37,11 @@ class QueuedMailMailer < ApplicationMailer
     )
   end
 
-  def mark_skip_duplicate_mail_log
+  # The message being delivered is already a queue record, so +QueuedMail#deliver_now!+ writes both
+  # the log entry and any failure against it. Letting +ApplicationMailer+ do either would duplicate
+  # the log entry and, on failure, queue a second copy of a message that is already in the queue.
+  def mark_queued_mail_owns_delivery
     headers['X-MemberZone-Skip-MailLog'] = '1'
+    headers['X-MemberZone-Skip-MailQueue'] = '1'
   end
 end

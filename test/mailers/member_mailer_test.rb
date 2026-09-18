@@ -78,7 +78,7 @@ class MemberMailerTest < ActionMailer::TestCase
     assert_includes html, 'laser-trainee'
   end
 
-  test 'application email verification logs failed delivery instead of sent when delivery raises' do
+  test 'a direct delivery the mail server refuses is parked in the mail queue for retry' do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache.lookup_store(:memory_store)
     Rails.cache.clear
@@ -89,26 +89,29 @@ class MemberMailerTest < ActionMailer::TestCase
     sent_verification_mail_count = lambda {
       MailLogEntry.where(event: 'sent', delivery_action: 'application_email_verification').count
     }
-    failed_verification_mail_count = lambda {
-      MailLogEntry.where(event: 'send_failed', delivery_action: 'application_email_verification').count
-    }
 
+    # Nothing raises: the message is durable in the queue, so letting the exception escape would
+    # only hand it to the mailer job's own retries, which would send it again on their own schedule.
     assert_no_difference sent_verification_mail_count do
-      assert_difference failed_verification_mail_count, 1 do
-        assert_raises RuntimeError do
-          MemberMailer.application_email_verification(
-            'applicant@example.com',
-            verification_url: 'https://example.com/verify',
-            expires_in: '24 hours'
-          ).deliver_now
-        end
+      assert_difference -> { QueuedMail.failed.count }, 1 do
+        MemberMailer.application_email_verification(
+          'applicant@example.com',
+          verification_url: 'https://example.com/verify',
+          expires_in: '24 hours'
+        ).deliver_now
       end
     end
 
-    entry = MailLogEntry.where(event: 'send_failed', delivery_action: 'application_email_verification').last
-    assert_equal 'applicant@example.com', entry.delivery_to
+    queued = QueuedMail.failed.newest_first.first
+    assert_equal 'applicant@example.com', queued.to
+    assert_equal 'application_email_verification', queued.mailer_action
+    assert_predicate queued, :approved?
+    assert_predicate queued, :delivery_failed?
+    assert_match(/smtp down/, queued.last_error)
+    assert_includes queued.body_html, 'https://example.com/verify'
+
+    entry = queued.mail_log_entries.find_by(event: 'created')
     assert_match(/smtp down/, entry.details)
-    assert_includes entry.delivery_body_html, 'https://example.com/verify'
     assert_equal 1, MailerDeliveryMonitor.recent_failures.size
     assert_match(/smtp down/, MailerDeliveryMonitor.recent_failures.last['message'])
   ensure

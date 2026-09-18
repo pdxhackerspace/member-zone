@@ -1,6 +1,19 @@
 class MailLogEntry < ApplicationRecord
   EVENTS = %w[created edited regenerated approved rejected sent send_failed suppressed].freeze
 
+  # The log stores events, but an admin reading it is asking about the state of outgoing mail —
+  # usually "what did not go out". These group the events into the questions worth asking, so
+  # finding failures is a click instead of a read of every row.
+  STATE_FILTERS = {
+    'sent' => %w[sent],
+    'failed' => %w[send_failed],
+    'suppressed' => %w[suppressed],
+    'rejected' => %w[rejected],
+    'queued' => %w[created],
+    'approved' => %w[approved],
+    'edited' => %w[edited regenerated]
+  }.freeze
+
   belongs_to :queued_mail, optional: true
   belongs_to :actor, class_name: 'User', optional: true
 
@@ -9,6 +22,27 @@ class MailLogEntry < ApplicationRecord
 
   scope :newest_first, -> { order(created_at: :desc) }
   scope :oldest_first, -> { order(created_at: :asc) }
+  scope :for_state, ->(state) { where(event: STATE_FILTERS.fetch(state, EVENTS)) }
+
+  # Recipients and subjects are snapshotted onto the entry, but entries written before that column
+  # existed only have the queued mail to go on, so both are searched. Neither column is encrypted,
+  # unlike +users.email+, so a substring match is possible here.
+  scope :matching, lambda { |term|
+    pattern = "%#{sanitize_sql_like(term)}%"
+    left_joins(:queued_mail).where(
+      'mail_log_entries.delivery_to ILIKE :pattern OR mail_log_entries.delivery_subject ILIKE :pattern ' \
+      'OR queued_mails.to ILIKE :pattern OR queued_mails.subject ILIKE :pattern',
+      pattern: pattern
+    )
+  }
+
+  # One grouped query behind every chip count, so the filter row costs the same as the page it
+  # sits on. Counts follow the search box, because a count that ignored it would be a lie.
+  def self.state_filter_counts(search: nil)
+    by_event = (search.present? ? matching(search) : all).group('mail_log_entries.event').count
+    STATE_FILTERS.transform_values { |events| events.sum { |event| by_event.fetch(event, 0) } }
+                 .merge('all' => by_event.values.sum)
+  end
 
   def self.log!(queued_mail, event, actor: nil, details: nil)
     create!(

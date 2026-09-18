@@ -18,7 +18,7 @@ class ApplicationMailer < ActionMailer::Base
     headers['X-MemberZone-Action'] = action_name.to_s
   end
 
-  def log_member_zone_mail_delivery
+  def log_member_zone_mail_delivery(&)
     if mail_recipient_blocked?
       log_direct_mail_delivery!(
         'rejected',
@@ -36,12 +36,51 @@ class ApplicationMailer < ActionMailer::Base
       return
     end
 
+    deliver_and_record_outcome(&)
+  end
+
+  # Only the handoff is inside the rescue. Logging the success used to sit there too, so a failed
+  # log write reported a delivered message as failed — and on the immediate-send path that queued
+  # an approved copy for the retry sweep to deliver a second time.
+  def deliver_and_record_outcome
     yield
-    log_direct_mail_delivery!('sent')
   rescue StandardError => e
     MailerDeliveryMonitor.record_failure!(e, source: "#{self.class.name}##{action_name}")
-    log_direct_mail_delivery!('send_failed', details: "#{e.class}: #{e.message}")
-    raise
+    raise unless capture_failed_delivery!(e)
+  else
+    log_delivered!
+  end
+
+  def log_delivered!
+    log_direct_mail_delivery!('sent')
+  rescue StandardError => e
+    Rails.logger.error(
+      "[Mailer] delivery log entry failed for #{self.class.name}##{action_name} — #{e.class}: #{e.message}"
+    )
+  end
+
+  # Parks a direct delivery the mail server would not take in the mail queue, so the message is
+  # still there to look at and retry and +QueuedMailRetrySweepJob+ is the only thing retrying it.
+  # Returns nil when the caller already holds a queue record for this message, or when there is no
+  # body to store — in both cases the exception is re-raised as before.
+  def capture_failed_delivery!(error)
+    return nil if message['X-MemberZone-Skip-MailQueue']&.decoded.to_s == '1'
+    return nil if message.to.blank? || message.subject.blank?
+
+    QueuedMail.capture_failed_delivery(
+      to: Array(message.to).compact.join(', '),
+      subject: message.subject.to_s,
+      body_html: mail_body_html,
+      body_text: mail_body_text,
+      mailer_action: effective_mailer_action,
+      recipient: notification_recipient_user,
+      error: error
+    )
+  rescue StandardError => e
+    Rails.logger.error(
+      "[Mailer] could not queue failed #{self.class.name}##{action_name} for retry — #{e.class}: #{e.message}"
+    )
+    nil
   end
 
   def log_direct_mail_delivery!(event, details: nil)

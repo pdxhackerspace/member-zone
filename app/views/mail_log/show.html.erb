@@ -2,9 +2,14 @@
   <div>
     <h1 class="h3 mb-1">Mail Log Entry</h1>
     <p class="text-muted mb-0">
-      <%= @log_entry.event.humanize %>
+      <span class="badge <%= mail_log_event_badge_class(@log_entry.event) %>">
+        <%= mail_log_event_label(@log_entry.event) %>
+      </span>
       <% if @log_entry.created_at %>
         · <%= @log_entry.created_at.strftime('%b %d, %Y %l:%M %p') %>
+      <% end %>
+      <% if (state = mail_log_queue_state(@log_entry.queued_mail)) %>
+        · now <%= state.downcase %>
       <% end %>
     </p>
   </div>
@@ -25,7 +30,7 @@
       <div class="card-body">
         <dl class="row mb-0">
           <dt class="col-sm-4 text-secondary">Event</dt>
-          <dd class="col-sm-8"><%= @log_entry.event.humanize %></dd>
+          <dd class="col-sm-8"><%= mail_log_event_label(@log_entry.event) %></dd>
 
           <dt class="col-sm-4 text-secondary">To</dt>
           <dd class="col-sm-8"><code><%= @log_entry.message_to %></code></dd>
