@@ -1,5 +1,19 @@
 class LoginLinksController < ApplicationController
+  include RateLimitedSignIn
+
   before_action :require_authenticated_user!, only: %i[show regenerate]
+
+  # Unauthenticated, and every call that names a real member sends them an email and replaces
+  # their login token. Left open it is a way to flood one member's inbox, and to invalidate the
+  # link they are in the middle of using by asking for another one.
+  #
+  # The identifier limit is the tighter of the two, since nobody legitimately needs a fourth
+  # login link within the hour, and it is keyed to the account rather than the caller.
+  rate_limit to: 15, within: 15.minutes, name: 'login-link-address',
+             store: RateLimiting.store, with: -> { sign_in_rate_limit_exceeded }, only: :request_link
+  rate_limit to: 3, within: 1.hour, name: 'login-link-identifier',
+             by: -> { params[:identifier].to_s.strip.downcase.presence || 'blank' },
+             store: RateLimiting.store, with: -> { sign_in_rate_limit_exceeded }, only: :request_link
 
   def show
     @user = current_user

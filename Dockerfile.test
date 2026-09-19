@@ -18,11 +18,17 @@ ENV RAILS_ENV="test" \
     BUNDLE_RETRY="3" \
     PATH="/usr/local/bundle/bin:${PATH}"
 
+# chromium and chromium-driver are here for the system tests. Debian ships the two as a
+# matched pair, which is the reason to take them from apt rather than let Selenium Manager
+# download a driver at test time: the test container has no network egress guarantee, and a
+# driver whose version drifts from the browser fails in a way that looks like a flaky test.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && \
     apt-get install --no-install-recommends -y \
       build-essential \
+      chromium \
+      chromium-driver \
       git \
       libpq-dev \
       libvips \
@@ -31,5 +37,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       postgresql-client \
       tzdata && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+ENV CHROME_BINARY="/usr/bin/chromium" \
+    CHROMEDRIVER_BINARY="/usr/bin/chromedriver"
 
 CMD ["bin/rails", "test"]

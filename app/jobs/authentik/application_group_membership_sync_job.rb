@@ -23,7 +23,12 @@ module Authentik
         result = sync.sync_members!
         Rails.logger.info("[ApplicationGroupMembershipSyncJob] Synced #{group.name}: #{result[:status]}")
       rescue StandardError => e
+        # Swallowed so one bad group does not strand the rest, which also means the job reports
+        # success and Sidekiq never hears about it. A group left unsynced is a member holding
+        # access they should not have, or missing access they should.
         Rails.logger.error("[ApplicationGroupMembershipSyncJob] Failed to sync #{group.name}: #{e.message}")
+        ErrorReporting.report(e, context: { job: 'application_group_membership_sync',
+                                            application_group_id: group.id })
       end
     end
 

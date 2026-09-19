@@ -17,6 +17,10 @@ class AccessControllerProbeJob < ApplicationJob
     actions = actions.reject { |action| action.casecmp('actions').zero? }.sort
     access_controller_type.update!(actions: actions)
   rescue StandardError => e
+    # Nothing re-raises and nothing is written to the record, so a probe that stops working leaves
+    # the stored action list silently frozen at whatever it last managed to read.
     Rails.logger.error("AccessControllerProbeJob failed for type #{access_controller_type_id}: #{e.message}")
+    ErrorReporting.report(e, context: { job: 'access_controller_probe',
+                                        access_controller_type_id: access_controller_type_id })
   end
 end
