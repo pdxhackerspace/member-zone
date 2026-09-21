@@ -203,6 +203,33 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'td.num', text: '2 of 4', count: 0
   end
 
+  # The count restarts with the sequence, but "Last reminder" is a fact about what we sent and
+  # survives it. Lapsed access is where this bites: every new batch of visits is a new anchor,
+  # so restart-filtering the timestamp would report Never for a member emailed yesterday.
+  test 'show keeps the last reminder date across a restarted sequence' do
+    now = Time.zone.local(2026, 8, 6, 8, 5, 0)
+    ReminderSetting.find_by!(key: 'lapsed_access').update!(enabled: true, lookback_days: 1)
+    user = User.create!(
+      email: 'restarted-lapsed@example.com', full_name: 'Restarted Lapsed User', service_account: false,
+      membership_state: 'inactive_member', payment_type: 'unknown', last_payment_date: (now - 30.days).to_date
+    )
+    user.update_columns(membership_state_entered_at: now - 45.days)
+    # An earlier batch, already described and stamped, then a new visit that has not been.
+    AccessLog.create!(user: user, logged_at: now - 40.hours, name: user.display_name,
+                      lapsed_access_reminder_sent_at: now - 30.hours)
+    AccessLog.create!(user: user, logged_at: now - 2.hours, name: user.display_name)
+    record_reminder_sent('lapsed_access', user, at: now - 30.hours, anchor: now - 40.hours)
+
+    travel_to now do
+      get reminder_setting_url('lapsed_access')
+    end
+
+    assert_response :success
+    assert_match user.display_name, response.body
+    assert_select 'td span.profile-field-value.empty', text: 'Never', count: 0
+    assert_select 'td span.profile-field-value', text: 'Yesterday'
+  end
+
   test 'show lists due inactive members for lapsed access' do
     now = Time.zone.local(2026, 8, 6, 8, 5, 0)
     user = User.create!(
