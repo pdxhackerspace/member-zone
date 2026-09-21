@@ -32,6 +32,7 @@ class MembershipSettingsController < AuthenticatedController
                                          slack_signup_reminder_max_account_age_months
                                          new_member_grace_period_days
                                          new_member_expiry_days
+                                         payment_grace_period_days
                                          overdue_grace_period_days
                                          planless_payment_window_days
                                          payment_currency_buffer_days

@@ -50,8 +50,16 @@ class MembershipSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select 'input[name=?]', 'membership_setting[payment_overdue_reminder_grace_days]', count: 0
-    assert_select 'input[name=?]', 'membership_setting[payment_grace_period_days]', count: 0
     assert_match 'Reminders', response.body
+  end
+
+  test 'update saves the payment grace period' do
+    patch membership_settings_url, params: {
+      membership_setting: membership_setting_params.merge(payment_grace_period_days: 7)
+    }
+
+    assert_redirected_to membership_settings_url
+    assert_equal 7, @membership_setting.reload.payment_grace_period_days
   end
 
   private

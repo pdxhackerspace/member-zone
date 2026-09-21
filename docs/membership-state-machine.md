@@ -37,7 +37,7 @@ displays it.
 | `unknown` | No | An admin reconciles the import against a real membership |
 | `new_member` | **Yes** | Building access training is granted, or `new_member_expiry_days` passes |
 | `provisional_member` | **Yes** | They pay, or `new_member_grace_period_days` passes |
-| `current_member` | **Yes** | `dues_paid_through_at` passes |
+| `current_member` | **Yes** | `dues_paid_through_at` plus `payment_grace_period_days` passes |
 | `overdue_member` | **Yes** | They pay, or `overdue_grace_period_days` passes |
 | `cancelled_member` | **Yes** | `dues_paid_through_at` passes |
 | `inactive_member` | No | A payment lands |
@@ -83,7 +83,7 @@ stateDiagram-v2
     provisional_member --> current_member: payment
     provisional_member --> overdue_member: grace expired
     current_member --> current_member: payment
-    current_member --> overdue_member: paid-through date passed
+    current_member --> overdue_member: payment grace expired
     overdue_member --> current_member: payment
     overdue_member --> inactive_member: overdue grace expired
     current_member --> cancelled_member: cancellation received
@@ -155,13 +155,63 @@ whenever the state changes. The rest run off `dues_paid_through_at`.
 | --- | --- |
 | `new_member` | entered_at + `new_member_expiry_days` (default 90) |
 | `provisional_member` | entered_at + `new_member_grace_period_days` (default 14) |
-| `overdue_member` | entered_at + `overdue_grace_period_days` (default 30) |
-| `current_member`, `cancelled_member`, `guest_member` | `dues_paid_through_at` |
+| `overdue_member` | entered_at + `overdue_grace_period_days` (default 30) — entered_at is the dues date, see below |
+| `current_member` | `dues_grace_ends_at` — `dues_paid_through_at` + `payment_grace_period_days` (default 5) |
+| `cancelled_member`, `guest_member` | `dues_paid_through_at` |
 
 `dues_paid_through_at` prefers `dues_due_at` when it is set. Members with no membership
 plan never got one, so it falls back to their last payment plus the plan's billing window
 (32 days by default). Nil means nothing is counting down: a one-time plan, or no payment
 history to measure from.
+
+### Why a current member gets a grace period and nobody else does
+
+The dues date is when we expect the money, not when we can see it. A card is retried, a
+bank transfer settles overnight, and either way the payment only reaches MemberZone when
+the next Recharge or PayPal sync runs — which is *after* `Membership::TickJob`, by design,
+so the syncs see today's states. Ending `current_member` on the dues date itself therefore
+files a member as late for a payment nobody could have observed yet, and starts the
+overdue reminder sequence counting from it.
+
+`dues_grace_ends_at` is that wait, and `payment_grace_period_days` is how long it lasts. It
+applies to `current_member` alone. A cancelled member's paid-through date is the end of
+what they bought and a guest's is the end of a window somebody granted them; no payment is
+on its way in either case, so there is nothing to wait for. `state_from_payment_history`
+reads the same deadline, so lifting a ban on someone's dues date does not file them as
+lapsed on the spot either.
+
+### Every offset counts from the dues date
+
+The three things that happen to a member who stops paying — they stop being current, they
+start hearing about it, they lose access — are three separate decisions, and each one is an
+offset from the dues date rather than from the stage before it:
+
+| Day, on the defaults | What happens | Setting |
+| --- | --- | --- |
+| 0 | Dues fall due. Still `current_member` | — |
+| 5 | `current_member` → `overdue_member` | `payment_grace_period_days` |
+| 5 | First `payment_past_due` email | the reminder's `start_offset_days` |
+| 30 | `overdue_member` → `inactive_member`, `membership_lapsed` email | `overdue_grace_period_days` |
+
+Nothing here stacks. Turning the payment grace up to 10 delays only the move to
+`overdue_member`; the reminders still start on day 5 and the member still lapses on day 30.
+That is what `expiry_entry_anchor` is for: when a member leaves `current_member`, the clock
+on `overdue_member` — `membership_state_entered_at` — is stamped at the dues date rather
+than at the deadline that fired, which is the one place in resolution where the anchor is
+not the deadline. `PaymentOverdueEligibility.overdue_since` reads the same dues date, for
+members the tick job has already moved and for those it has not.
+
+Two consequences worth knowing. A payment grace longer than the overdue grace puts a member
+in `overdue_member` and `inactive_member` on the same day — the settings page says the two
+are counted from the same date, and nothing stops an admin setting them that way. And an
+admin who puts a member in `overdue_member` by hand is materializing the clock if they had
+a dues date that had passed, so it stays the anchor; a member with nothing paying for them
+has no dues date at all, and their overdue grace starts at the move.
+
+Because the anchor is the dues date either way, this changed nothing for members already
+sitting in `overdue_member`: their `membership_state_entered_at` was stamped at the dues
+date before this existed too, so they lapse on exactly the day they always would have. The
+only member the payment grace moves is one still in `current_member`.
 
 ### Resolved on read, materialized nightly
 
@@ -257,6 +307,12 @@ member actually fell behind, not the day `Membership::TickJob` noticed, so a lat
 transfer or a retried card has the same window however the state was materialized. It is
 also the reminder's anchor, so a member who pays up and falls behind again starts the
 sequence over rather than resuming where they left off.
+
+Falling behind means the dues date, not the end of `payment_grace_period_days`. The payment
+grace keeps the *state machine* from calling a member late while their money may still be
+clearing; it is not a decision about when to start writing to them, which is what the start
+offset is. Both are offsets from the dues date, so changing either leaves the other where
+it was.
 
 `payment_past_due` and `membership_lapsed` chase two different populations and are often
 confused for each other. `payment_past_due` repeats while a member is `overdue_member` and
@@ -448,7 +504,8 @@ Settings → Membership settings, stored on the `MembershipSetting` singleton:
 | --- | --- | --- |
 | `new_member_grace_period_days` | 14 | How long a trained member has before their first payment is expected |
 | `new_member_expiry_days` | 90 | How long an approved member who never trains stays active |
-| `overdue_grace_period_days` | 30 | How long an overdue member keeps access |
+| `payment_grace_period_days` | 5 | How long past their dues date a member stays `current_member`, so a payment has time to process and sync |
+| `overdue_grace_period_days` | 30 | How long past the same dues date a member keeps access |
 | `reactivation_grace_period_months` | 12 | How long a lapsed member can resubscribe without reapplying |
 | `building_access_training_topic_id` | — | Which training topic triggers `grant_building_access!` |
 

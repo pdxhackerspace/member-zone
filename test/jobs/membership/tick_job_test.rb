@@ -6,6 +6,7 @@ module Membership
       MembershipSetting.instance.update!(
         new_member_grace_period_days: 14,
         new_member_expiry_days: 90,
+        payment_grace_period_days: 5,
         overdue_grace_period_days: 30
       )
     end
@@ -67,13 +68,24 @@ module Membership
 
     test 'a current member past their paid-through date becomes overdue' do
       user = member(state: 'current_member')
-      user.update_columns(dues_due_at: 1.day.ago, last_payment_date: 35.days.ago.to_date)
+      user.update_columns(dues_due_at: 6.days.ago, last_payment_date: 40.days.ago.to_date)
 
       assert_equal({ expired: 1, reconciled: 0 }, TickJob.new.perform)
 
       user.reload
       assert_equal 'overdue_member', user.membership_state
       assert user.active?
+    end
+
+    # The tick runs at 4 AM, hours before the payment syncs it is scheduled ahead of. On the
+    # dues date itself it cannot tell a member whose payment is still clearing from one who
+    # has not paid, so it leaves them alone until the payment grace period is up.
+    test 'a current member inside the payment grace period is left alone' do
+      user = member(state: 'current_member')
+      user.update_columns(dues_due_at: 1.day.ago, last_payment_date: 35.days.ago.to_date)
+
+      assert_equal({ expired: 0, reconciled: 0 }, TickJob.new.perform)
+      assert_equal 'current_member', user.reload.membership_state
     end
 
     test 'active reflects resolved state before the nightly tick materializes it' do

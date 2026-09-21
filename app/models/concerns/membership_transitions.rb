@@ -184,10 +184,14 @@ module MembershipTransitions
   # Where a member belongs when a ban or sponsorship is lifted and only their payment
   # history is left to go on. Never 'unknown': we know perfectly well what happened to
   # them, and a member with nothing paying for them is inactive.
+  #
+  # Reads the grace-adjusted deadline rather than the paid-through date so that lifting a
+  # ban on the day someone's dues fall due gives them the same benefit of the doubt the
+  # clock would have given them, instead of filing them as lapsed on the spot.
   def state_from_payment_history
     return 'inactive_member' if last_payment_on.blank?
 
-    paid_through = dues_paid_through_at
-    paid_through.nil? || paid_through > Time.current ? 'current_member' : 'inactive_member'
+    grace_ends_at = dues_grace_ends_at
+    grace_ends_at.nil? || grace_ends_at > Time.current ? 'current_member' : 'inactive_member'
   end
 end
