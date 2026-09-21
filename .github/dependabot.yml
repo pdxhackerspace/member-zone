@@ -6,6 +6,11 @@ updates:
     schedule:
       interval: weekly
     target-branch: staging
+    # The Gemfile pins json to 2.x because json 3.0 breaks every
+    # ActiveSupport::JSON.decode call. Remove this once the pin goes away.
+    ignore:
+      - dependency-name: json
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /
