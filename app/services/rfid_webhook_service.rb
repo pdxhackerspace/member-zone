@@ -7,19 +7,29 @@
 # login page is waiting for a scan, claims it, and asks for the PIN again to prove the person
 # at the keyboard is the person who badged in.
 #
-# Two properties matter and neither is obvious from the happy path:
+# Three properties matter and none is obvious from the happy path:
 #
 #   * A scan may be claimed by exactly one browser session. Otherwise any browser sitting on
 #     the login page picks up the next scan anyone makes at the door and gets to guess at that
 #     member's PIN.
+#   * A session may claim exactly one fob. The claim on a scan dies with the scan, but nothing
+#     retires the browser holding it, so without this a page left open on the keyfob flow comes
+#     back after five minutes and attaches itself to whoever badges in next.
 #   * A PIN gets a small, fixed number of guesses. A four-digit code with unlimited attempts
 #     inside the five-minute window is 10,000 possibilities and no obstacle at all.
 class RfidWebhookService
   REDIS_KEY_PREFIX = 'rfid_webhook:'.freeze
   CLAIM_KEY_PREFIX = 'rfid_webhook_claim:'.freeze
   ATTEMPTS_KEY_PREFIX = 'rfid_webhook_attempts:'.freeze
+  BINDING_KEY_PREFIX = 'rfid_webhook_binding:'.freeze
   EXPIRATION_TIME = 5.minutes
   MAX_PIN_ATTEMPTS = 5
+
+  # How long a session stays bound to the fob it claimed. This has to outlive the scan itself,
+  # because its whole purpose is to still be there once the scan has expired — the moment an
+  # abandoned browser would otherwise go looking for somebody else's. A new sign-in mints a new
+  # claim token, so an old binding never stands in the way of a fresh attempt.
+  BINDING_TIME = 1.hour
 
   # Keys are read with SCAN rather than KEYS. The login page polls every two seconds, and KEYS
   # walks the whole keyspace while blocking every other client — including Sidekiq, which
@@ -73,13 +83,23 @@ class RfidWebhookService
 
       scans = recent_scans(since_time)
 
-      # A session that already holds a claim gets that same scan back and is offered nothing
-      # else. This has to be checked before taking anything new: scans are walked newest first,
-      # so a session that polls again after claiming — a second tab, or a back-navigation from
-      # the PIN page, both of which keep the token and the wait window — would otherwise take a
-      # newer unclaimed scan on top of the one it holds. That binds the browser to a fob that
-      # badged in after it, offering a PIN box for somebody else's membership, and strands the
-      # first claim so the member who made it can never claim their own scan.
+      # Once a session has claimed a fob it is bound to that fob and will never be offered a
+      # different one. Holding the live claim is not enough on its own: claims expire with the
+      # scan, and nothing sends the browser home when they do — rfid_verify bounces it back to
+      # the wait page, and the wait page polls on every two seconds with the same token. A
+      # session whose scan has aged out would otherwise take the next unclaimed scan at the
+      # door, which is a PIN box for whoever badged in next.
+      #
+      # Restricting rather than refusing outright is what keeps the honest case working: a
+      # member who waited too long and badges the same fob again gets a fresh scan, which
+      # `store` leaves unclaimed, and their browser picks it up where it left off.
+      bound = bound_rfid(claim_token)
+      scans = scans.select { |scan| normalized(scan[:rfid]) == bound } if bound.present?
+
+      # Of the scans still on offer, one already claimed by this session comes first, so a
+      # polling browser keeps its own claim instead of taking a newer scan on top of it —
+      # which would stand the first claim up, leaving it held by a session that had moved on
+      # and locking out the member who actually badged.
       held = scans.find { |scan| claimed_by?(scan[:rfid], claim_token) }
       return held if held
 
@@ -175,12 +195,32 @@ class RfidWebhookService
     end
 
     # True when this token now holds the claim — either because it just took it, or because it
-    # already held it and is polling again.
+    # already held it and is polling again. Either way the session is bound to this fob from
+    # here on; see claim_recent.
     def claim(rfid_code, claim_token)
       key = claim_key(rfid_code)
-      return true if redis.set(key, claim_token, nx: true, ex: EXPIRATION_TIME.to_i)
+      held = redis.set(key, claim_token, nx: true, ex: EXPIRATION_TIME.to_i) ||
+             claimed_by?(rfid_code, claim_token)
+      bind_session(claim_token, rfid_code) if held
+      held
+    end
 
-      claimed_by?(rfid_code, claim_token)
+    # Re-stamped on every claim, so a browser still working its way through a sign-in does not
+    # have its binding age out from under it.
+    def bind_session(claim_token, rfid_code)
+      redis.setex(binding_key(claim_token), BINDING_TIME.to_i, normalized(rfid_code))
+    end
+
+    # The fob this session has committed to, or nil if it has not claimed one yet.
+    def bound_rfid(claim_token)
+      redis.get(binding_key(claim_token)).presence
+    end
+
+    # Keyed by a digest of the token rather than the token itself: this is the one key whose name
+    # would otherwise carry a live session secret, and key names show up in SCAN output and in
+    # anything that dumps the keyspace.
+    def binding_key(claim_token)
+      "#{BINDING_KEY_PREFIX}#{OpenSSL::Digest::SHA256.hexdigest(claim_token.to_s)}"
     end
 
     def record_failed_attempt(rfid_code)
