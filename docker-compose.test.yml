@@ -41,7 +41,10 @@ services:
   redis:
     image: redis:8-alpine
     container_name: memberzone-test-redis
-    command: redis-server --save "" --appendonly no
+    # One database per test worker, and the suite runs one worker per core. The stock 16 is not
+    # enough on a machine with more cores than that: workers wrap around, share a database, and
+    # the RFID tests start seeing each other's scans.
+    command: redis-server --save "" --appendonly no --databases 64
 #    ports:
 #      - "6380:6379"
     tmpfs:

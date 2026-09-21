@@ -101,6 +101,76 @@ class RfidWebhookServiceTest < ActiveSupport::TestCase
     end
   end
 
+  # The same bug once the five-minute window has closed. Nothing sends an abandoned browser home
+  # when its scan expires: rfid_verify bounces it back to the wait page and the wait page polls
+  # on with the same token, so a phone left on the keyfob flow would attach itself to the next
+  # member who badged in and offer a PIN box for their membership.
+  test 'a session whose claimed scan has expired does not take a later fob' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+
+    assert_equal @rfid, RfidWebhookService.claim_recent(started, 'token-a')[:rfid]
+
+    expire_scan(@rfid)
+    someone_else = unique_rfid
+    RfidWebhookService.store(someone_else, '1111')
+
+    assert_nil RfidWebhookService.claim_recent(started, 'token-a')
+    assert_not RfidWebhookService.claimed_by?(someone_else, 'token-a')
+  end
+
+  # The scan the stale session was refused is still nobody's, so the member who actually badged
+  # can sign in on their own browser.
+  test 'a later fob passed over by an expired session is claimable by its own member' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    expire_scan(@rfid)
+    someone_else = unique_rfid
+    RfidWebhookService.store(someone_else, '1111')
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    assert_equal someone_else, RfidWebhookService.claim_recent(started, 'token-b')[:rfid]
+  end
+
+  # Being bound to a fob must not strand the member it belongs to. Waiting past the window and
+  # badging the same fob again is the ordinary way out of an expired scan, so the browser that
+  # was waiting has to be able to pick the new scan up.
+  test 'a session whose scan expired still claims a fresh scan of the same fob' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    expire_scan(@rfid)
+    RfidWebhookService.store(@rfid, @pin)
+
+    assert_equal @rfid, RfidWebhookService.claim_recent(started, 'token-a')[:rfid]
+    assert RfidWebhookService.claimed_by?(@rfid, 'token-a')
+  end
+
+  # A binding belongs to one claim token, and starting over mints a new one, so the member who
+  # gave up on a fob is not locked out of the reader for the hour it lives.
+  test 'a new sign-in attempt is not held to the previous attempt fob' do
+    started = 1.hour.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+
+    other_fob = unique_rfid
+    travel 30.seconds do
+      RfidWebhookService.store(other_fob, '1111')
+
+      assert_equal other_fob, RfidWebhookService.claim_recent(Time.current, 'token-fresh')[:rfid]
+    end
+  end
+
+  # Redis expires keys on the wall clock, which `travel` does not move, so the five-minute window
+  # is closed by hand. Expiry takes the scan and the claim on it and leaves the binding, which
+  # outlives both on purpose — that gap is where the bug lived.
+  def expire_scan(rfid_code)
+    RfidWebhookService.discard(rfid_code)
+  end
+
   test 'a scan made before the browser started waiting is ignored' do
     RfidWebhookService.store(@rfid, @pin)
 
