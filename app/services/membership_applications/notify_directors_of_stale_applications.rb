@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 module MembershipApplications
-  # Reminds executive application reviewers when pending applications are older than one week.
+  # Reminds executive application reviewers about applications that have been waiting.
+  #
+  # How long an application may sit before the first reminder, and the gap between reminders
+  # after that, come from the staff_application reminder's settings row like every other
+  # reminder's cadence. It ships enabled: a review queue nobody is told about is the problem it
+  # exists to prevent.
   class NotifyDirectorsOfStaleApplications
-    INITIAL_DELAY = 1.week
-    REPEAT_DELAY = 3.days
-
     def self.call(now: Time.current)
       new(now: now).call
     end
@@ -15,8 +17,9 @@ module MembershipApplications
     end
 
     def call
-      MembershipApplication.awaiting_admin_reminder(@now - INITIAL_DELAY, @now - REPEAT_DELAY)
-                           .find_each do |application|
+      return unless Reminders::StaleApplicationEligibility.reminder_enabled?
+
+      Reminders::StaleApplicationEligibility.due(now: @now).find_each do |application|
         notify_application(application)
       end
     end
@@ -25,7 +28,7 @@ module MembershipApplications
 
     def notify_application(application)
       application.with_lock do
-        return unless reminderable?(application)
+        return unless Reminders::StaleApplicationEligibility.due?(application, now: @now)
 
         recipients = director_recipients
         return if recipients.empty?
@@ -33,27 +36,12 @@ module MembershipApplications
         recipients.each do |staff|
           MemberMailer.staff_application_reminder(application, staff.email.to_s.strip).deliver_later
         end
-        application.update!(application_reminder_sent_at: @now)
+        Reminders::StaleApplicationEligibility.record_delivery!(application, at: @now)
       end
     rescue StandardError => e
       Rails.logger.error(
         "[NotifyDirectorsOfStaleApplications] application_id=#{application&.id} #{e.class}: #{e.message}"
       )
-    end
-
-    def reminderable?(application)
-      application.status.in?(MembershipApplication::NAGGABLE_PENDING_STATUSES) &&
-        application_age_start(application) <= @now - INITIAL_DELAY &&
-        next_reminder_due?(application)
-    end
-
-    def application_age_start(application)
-      application.submitted_at || application.created_at
-    end
-
-    def next_reminder_due?(application)
-      application.application_reminder_sent_at.nil? ||
-        application.application_reminder_sent_at <= @now - REPEAT_DELAY
     end
 
     def director_recipients

@@ -24,12 +24,6 @@
 
       <%= render "setting_group", title: "Payments", form: true do %>
         <div class="mb-3">
-          <%= f.label :payment_grace_period_days, "Payment grace period (days)", class: "form-label" %>
-          <%= f.number_field :payment_grace_period_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
-          <div class="form-text">Days after payment due date before membership is marked as lapsed.</div>
-        </div>
-
-        <div class="mb-3">
           <%= f.label :planless_payment_window_days, "Planless payment window (days)", class: "form-label" %>
           <%= f.number_field :planless_payment_window_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
           <div class="form-text">How long a linked payment counts as current when the member has no membership plan assigned.</div>
@@ -155,72 +149,14 @@
 
       <%= render "setting_group", title: "Reminders", context: link_to("Reminders settings", reminder_settings_path, class: "text-secondary"), form: true do %>
         <div class="mb-3">
-          <%= f.label :slack_signup_reminder_initial_delay_days, "Slack signup reminder — initial delay after approval (days)", class: "form-label" %>
-          <%= f.number_field :slack_signup_reminder_initial_delay_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Days after application approval before the first Slack signup reminder is sent.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :slack_signup_reminder_repeat_delay_days, "Slack signup reminder — repeat interval (days)", class: "form-label" %>
-          <%= f.number_field :slack_signup_reminder_repeat_delay_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Minimum days between Slack signup reminders for the same member.</div>
-        </div>
-
-        <div class="mb-3">
           <%= f.label :slack_signup_reminder_max_account_age_months, "Slack signup reminder — only remind members who joined within (months)", class: "form-label" %>
           <%= f.number_field :slack_signup_reminder_max_account_age_months, class: "form-control", min: 1, style: "max-width: 150px;" %>
           <div class="form-text">Members who joined longer ago are excluded from Slack signup reminders and the “no Slack account” report.</div>
         </div>
 
-        <div class="mb-3">
-          <%= f.label :application_link_reminder_delay_days, "Application link reminder — delay after sending (days)", class: "form-label" %>
-          <%= f.number_field :application_link_reminder_delay_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Days after the application link email before the first reminder is sent, and between subsequent reminders.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :application_link_reminder_max_count, "Application link reminder — maximum count", class: "form-label" %>
-          <%= f.number_field :application_link_reminder_max_count, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Stop reminding after this many emails or when the link expires, whichever comes first.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :payment_overdue_reminder_grace_days, "Overdue payment reminder — grace period (days)", class: "form-label" %>
-          <%= f.number_field :payment_overdue_reminder_grace_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
-          <div class="form-text">
-            Days to wait after the dues date passes before the first overdue reminder, so a late transfer or a retried card can land first.
-            Use <strong>0</strong> to remind on the day payment was due.
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :payment_overdue_reminder_repeat_days, "Overdue payment reminder — repeat interval (days)", class: "form-label" %>
-          <%= f.number_field :payment_overdue_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Minimum days between overdue payment reminders for the same member.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :orientation_reminder_repeat_days, "Orientation reminder — interval (days)", class: "form-label" %>
-          <%= f.number_field :orientation_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">How long after approval the first orientation reminder goes out, and the gap between them after that.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :parking_notice_reminder_days_before_expiration, "Parking notice — days before expiration", class: "form-label" %>
-          <%= f.number_field :parking_notice_reminder_days_before_expiration, class: "form-control", min: 0, style: "max-width: 150px;" %>
-          <div class="form-text">Send the pre-expiration reminder this many days before a permit or ticket expires. Set to 0 to skip pre-expiration reminders.</div>
-        </div>
-
-        <div class="mb-3">
-          <%= f.label :parking_notice_expired_reminder_repeat_days, "Parking notice — repeat after expiration (days)", class: "form-label" %>
-          <%= f.number_field :parking_notice_expired_reminder_repeat_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Minimum days between follow-up reminders after a notice expires, until the final reminder.</div>
-        </div>
-
-        <div class="mb-0">
-          <%= f.label :parking_notice_final_reminder_days_after_expiration, "Parking notice — final reminder after expiration (days)", class: "form-label" %>
-          <%= f.number_field :parking_notice_final_reminder_days_after_expiration, class: "form-control", min: 1, style: "max-width: 150px;" %>
-          <div class="form-text">Send one final warning this many days after expiration. Timing is configured here; enable sending in Reminders.</div>
+        <div class="mb-0 text-13 text-secondary">
+          How long after an event each reminder goes out, how often it repeats, and how many are sent in total are set
+          per reminder on the <%= link_to "Reminders page", reminder_settings_path, class: "text-secondary" %>.
         </div>
       <% end %>
 

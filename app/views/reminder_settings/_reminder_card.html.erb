@@ -8,6 +8,7 @@
   <div class="card-body reminder-setting-card-body py-3">
     <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
     <%= yield %>
+    <div class="text-12 text-secondary mt-1">Cadence: <%= reminder.schedule.description %></div>
     <% opted_out_count = NotificationOptOut.count_for_reminder(reminder.key) %>
     <% if opted_out_count.positive? %>
       <div class="text-12 text-secondary mt-1">
@@ -40,13 +41,15 @@
                   for: "reminder_enabled_#{reminder.key}",
                   data: { reminder_setting_form_target: 'enabledLabel' } %>
           </div>
-          <div class="form-check form-switch mb-0">
-            <%= f.check_box :allow_opt_out,
-                  class: 'form-check-input',
-                  role: 'switch',
-                  id: "reminder_allow_opt_out_#{reminder.key}" %>
-            <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
-          </div>
+          <% if reminder.member_facing? %>
+            <div class="form-check form-switch mb-0">
+              <%= f.check_box :allow_opt_out,
+                    class: 'form-check-input',
+                    role: 'switch',
+                    id: "reminder_allow_opt_out_#{reminder.key}" %>
+              <%= f.label :allow_opt_out, 'Members can opt out', class: 'form-check-label text-13 text-nowrap', for: "reminder_allow_opt_out_#{reminder.key}" %>
+            </div>
+          <% end %>
           <% if reminder.configurable_lookback? %>
             <div class="d-flex align-items-center gap-2">
               <%= f.label :lookback_days, 'Scan back', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_lookback_days_#{reminder.key}" %>
@@ -59,6 +62,48 @@
             </div>
           <% end %>
         </div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+          <div class="d-flex align-items-center gap-2">
+            <%= f.label :start_offset_days, 'First', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_start_offset_days_#{reminder.key}" %>
+            <%= f.number_field :start_offset_days,
+                  in: -ReminderSetting::MAX_START_OFFSET_DAYS..ReminderSetting::MAX_START_OFFSET_DAYS,
+                  class: 'form-control form-control-sm num',
+                  style: 'width: 5rem;',
+                  id: "reminder_start_offset_days_#{reminder.key}" %>
+            <span class="text-13 text-secondary text-nowrap">days from <%= reminder.anchor_description %></span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <%= f.label :interval_days, 'then every', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_interval_days_#{reminder.key}" %>
+            <%= f.number_field :interval_days,
+                  in: 1..ReminderSetting::MAX_INTERVAL_DAYS,
+                  class: 'form-control form-control-sm num',
+                  style: 'width: 5rem;',
+                  id: "reminder_interval_days_#{reminder.key}" %>
+            <span class="text-13 text-secondary text-nowrap"><%= 'day'.pluralize(reminder.interval_days) %></span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <%= f.label :max_reminders, 'up to', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_max_reminders_#{reminder.key}" %>
+            <%= f.number_field :max_reminders,
+                  in: 1..ReminderSetting::MAX_REMINDER_COUNT,
+                  placeholder: '∞',
+                  class: 'form-control form-control-sm num',
+                  style: 'width: 5rem;',
+                  id: "reminder_max_reminders_#{reminder.key}" %>
+            <span class="text-13 text-secondary text-nowrap">
+              <% if reminder.unlimited_reminders? %>
+                reminders — blank for no limit
+              <% else %>
+                <%= 'reminder'.pluralize(reminder.max_reminders) %>
+              <% end %>
+            </span>
+          </div>
+        </div>
+        <% if reminder.key == 'parking_notices' && reminder.unlimited_reminders? %>
+          <div class="text-12 text-warning mt-2">
+            Parking picks its email from where a send falls in the sequence, so the final notice is the last one sent.
+            With no limit there is no last one and the final notice never goes out.
+          </div>
+        <% end %>
       <% end %>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <%= button_to "Send now",

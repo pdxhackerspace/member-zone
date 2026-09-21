@@ -121,7 +121,7 @@ module Reminders
     test 'due includes a reminded member again once a new visit appears' do
       user = inactive_user(email: 'badged-in-again@example.com')
       AccessLog.where(user_id: user.id).update_all(lapsed_access_reminder_sent_at: @now - 1.day)
-      user.update_columns(lapsed_access_reminder_sent_at: @now - 1.day)
+      record_reminder_sent('lapsed_access', user, at: @now - 1.day, anchor: @now - 1.day)
 
       travel_to @now do
         assert_not LapsedAccessEligibility.due?(user.reload, now: @now)

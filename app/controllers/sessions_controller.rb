@@ -1,9 +1,34 @@
 class SessionsController < ApplicationController
+  include RateLimitedSignIn
+
   # OmniAuth callback: the browser POSTs to /auth/:provider/callback after the
   # OAuth redirect. Rails CSRF tokens do not apply here; OmniAuth validates its
   # own state parameter to prevent CSRF on the OAuth flow.
   # codeql[rb/csrf-protection-disabled]: OmniAuth OIDC callback; CSRF covered by OmniAuth state.
   skip_before_action :verify_authenticity_token, only: :create
+
+  WAITING_FOR_SCAN = 'Waiting for keyfob scan. Please try again.'.freeze
+  SCAN_UNAVAILABLE = 'That keyfob scan is no longer available. Please scan your keyfob again.'.freeze
+
+  # Password sign-in, limited twice. The address limit is the blunt one; the account limit is
+  # what a botnet spreading itself over many addresses cannot avoid, because every attempt it
+  # makes against one member lands on the same counter.
+  rate_limit to: 20, within: 5.minutes, name: 'local-login-address',
+             store: RateLimiting.store, with: -> { sign_in_rate_limit_exceeded }, only: :create_local
+  rate_limit to: 10, within: 5.minutes, name: 'local-login-account',
+             by: -> { submitted_email_for_rate_limit }, store: RateLimiting.store,
+             with: -> { sign_in_rate_limit_exceeded }, only: :create_local
+
+  # PIN entry. The per-scan attempt counter in RfidWebhookService is the real limit — five wrong
+  # codes and the scan is gone. This is only a ceiling on how fast a script can cycle through
+  # scans, set high enough that a queue of members mistyping at a kiosk never reaches it.
+  rate_limit to: 60, within: 5.minutes, name: 'rfid-pin',
+             store: RateLimiting.store, with: -> { sign_in_rate_limit_exceeded }, only: :rfid_submit_pin
+
+  # The wait page polls this every two seconds, so a single member accounts for 30 requests a
+  # minute and a shared address multiplies that. Ten simultaneous waiters fit under this.
+  rate_limit to: 300, within: 1.minute, name: 'rfid-poll',
+             store: RateLimiting.store, with: -> { json_rate_limit_exceeded }, only: :rfid_check_webhook
 
   def new
     return if authentik_enabled? || local_auth_enabled?
@@ -20,6 +45,9 @@ class SessionsController < ApplicationController
     redirect_to root_path, notice: "Welcome back, #{user.display_name}!"
   rescue StandardError => e
     Rails.logger.error("Authentik sign-in failed: #{e.class} #{e.message}")
+    # A member who cannot get in sees "please try again" and usually does not report it, so
+    # without this an outage in the identity provider is invisible until someone complains.
+    ErrorReporting.report(e, context: { stage: 'authentik_oidc_callback' })
     redirect_to root_path, alert: 'Unable to sign you in. Please try again.'
   end
 
@@ -53,6 +81,10 @@ class SessionsController < ApplicationController
   def create_rfid
     # Store session timestamp to match with webhook data
     session[:waiting_for_keyfob] = Time.current.to_i
+    # Names this browser so that the scan it picks up belongs to it alone. Without this, every
+    # browser sitting on the login page saw the next scan made at the door, and whichever one
+    # polled first got to guess at that member's PIN.
+    session[:rfid_claim_token] = SecureRandom.urlsafe_base64(24)
     redirect_to rfid_wait_path
   end
 
@@ -62,33 +94,36 @@ class SessionsController < ApplicationController
       return
     end
 
-    # Check if any webhook data is available (created after session started)
-    session_start = Time.zone.at(session[:waiting_for_keyfob])
-    webhook_data = RfidWebhookService.find_recent(session_start)
+    scan = claim_pending_scan
+    return if scan.blank?
 
-    return if webhook_data.blank?
-
-    # Store the RFID from webhook in session for verification
-    session[:pending_rfid] = webhook_data[:rfid]
+    session[:pending_rfid] = scan[:rfid]
     redirect_to rfid_verify_path
-    nil
   end
 
   def rfid_verify
     rfid = session[:pending_rfid]
     if rfid.blank?
-      redirect_to rfid_wait_path, alert: 'Waiting for keyfob scan. Please try again.'
+      redirect_to rfid_wait_path, alert: WAITING_FOR_SCAN
       return
     end
 
-    # Verify webhook data is still available
+    # The claim is checked against Redis rather than taken on the session's word, so a scan that
+    # has since expired does not present a PIN box that cannot succeed.
+    unless RfidWebhookService.claimed_by?(rfid, session[:rfid_claim_token])
+      session.delete(:pending_rfid)
+      redirect_to rfid_wait_path, alert: WAITING_FOR_SCAN
+      return
+    end
+
     @webhook_data = RfidWebhookService.retrieve(rfid)
     if @webhook_data.blank?
-      redirect_to rfid_wait_path, alert: 'Waiting for keyfob scan. Please try again.'
+      redirect_to rfid_wait_path, alert: WAITING_FOR_SCAN
       return
     end
 
     @reader_name = @webhook_data[:reader_name]
+    @attempts_remaining = RfidWebhookService::MAX_PIN_ATTEMPTS - RfidWebhookService.failed_attempts(rfid)
   end
 
   def rfid_check_webhook
@@ -97,12 +132,10 @@ class SessionsController < ApplicationController
       return
     end
 
-    session_start = Time.zone.at(session[:waiting_for_keyfob])
-    webhook_data = RfidWebhookService.find_recent(session_start)
+    scan = claim_pending_scan
 
-    if webhook_data.present?
-      # Store the RFID from webhook in session
-      session[:pending_rfid] = webhook_data[:rfid]
+    if scan.present?
+      session[:pending_rfid] = scan[:rfid]
       render json: { status: 'ready' }, status: :ok
     else
       render json: { status: 'waiting' }, status: :ok
@@ -123,22 +156,15 @@ class SessionsController < ApplicationController
       return
     end
 
-    # Verify the pin
-    if RfidWebhookService.verify_and_consume(rfid, pin)
-      # Pin is correct, log in the user
-      user = find_user_by_rfid(rfid)
-      if user
-        session.delete(:pending_rfid)
-        session.delete(:waiting_for_keyfob)
-        user.update!(last_login_at: Time.current)
-        session[:user_id] = user.id
-        redirect_to root_path, notice: "Signed in via keyfob as #{user.display_name}."
-      else
-        redirect_to login_path, alert: 'Member not found. Please try again.'
-      end
-    else
-      redirect_to rfid_verify_path, alert: 'Invalid code. Please try again.'
+    # Re-checked on submit as well as on render: the scan may have expired, or been discarded
+    # after someone else exhausted its attempts, between the page loading and the PIN arriving.
+    unless RfidWebhookService.claimed_by?(rfid, session[:rfid_claim_token])
+      reset_rfid_sign_in
+      redirect_to login_path, alert: SCAN_UNAVAILABLE
+      return
     end
+
+    resolve_pin_submission(rfid, pin)
   end
 
   def failure
@@ -146,6 +172,53 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # Claims the newest scan made since this browser started waiting, if any is still going spare.
+  def claim_pending_scan
+    RfidWebhookService.claim_recent(
+      Time.zone.at(session[:waiting_for_keyfob]),
+      session[:rfid_claim_token]
+    )
+  end
+
+  def resolve_pin_submission(rfid, pin)
+    case RfidWebhookService.verify_and_consume(rfid, pin)
+    when :verified
+      complete_rfid_sign_in(rfid)
+    when :invalid_pin
+      redirect_to rfid_verify_path, alert: 'Invalid code. Please try again.'
+    when :too_many_attempts
+      # The scan is gone now, so there is nothing to return to; say so plainly rather than
+      # bouncing back to a PIN box that would refuse every code.
+      Rails.logger.warn("RFID sign-in refused after #{RfidWebhookService::MAX_PIN_ATTEMPTS} wrong codes " \
+                        "from #{request.remote_ip}")
+      reset_rfid_sign_in
+      redirect_to login_path, alert: 'Too many incorrect codes. Please scan your keyfob again.'
+    else
+      reset_rfid_sign_in
+      redirect_to login_path, alert: SCAN_UNAVAILABLE
+    end
+  end
+
+  def complete_rfid_sign_in(rfid)
+    user = find_user_by_rfid(rfid)
+    reset_rfid_sign_in
+
+    unless user
+      redirect_to login_path, alert: 'Member not found. Please try again.'
+      return
+    end
+
+    user.update!(last_login_at: Time.current)
+    session[:user_id] = user.id
+    redirect_to root_path, notice: "Signed in via keyfob as #{user.display_name}."
+  end
+
+  def reset_rfid_sign_in
+    session.delete(:pending_rfid)
+    session.delete(:waiting_for_keyfob)
+    session.delete(:rfid_claim_token)
+  end
 
   def upsert_user_from_auth(auth)
     payload = auth.respond_to?(:deep_symbolize_keys) ? auth.deep_symbolize_keys : auth.to_h.deep_symbolize_keys

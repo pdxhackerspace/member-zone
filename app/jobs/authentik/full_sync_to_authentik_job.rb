@@ -121,11 +121,16 @@ module Authentik
         "#{authentik_id} for user #{user.id} (#{user.display_name})"
       )
     rescue StandardError => e
+      # The job carries on to the next member, so nothing raises and Sidekiq never sees this.
+      # The tally in results says how many failed but never which, and the run is reported as a
+      # success either way — so without this a member who never got an Authentik account stays
+      # that way until somebody notices they cannot sign in.
       results[:users_errored] += 1
       Rails.logger.error(
         '[Authentik::FullSyncToAuthentik] Failed to create Authentik user ' \
         "for #{user.id} (#{user.display_name}): #{e.message}"
       )
+      ErrorReporting.report(e, context: { job: 'full_sync_to_authentik', stage: 'create_user', user_id: user.id })
     end
 
     def sync_user_to_authentik(user, client, results)
@@ -147,6 +152,7 @@ module Authentik
     rescue StandardError => e
       results[:users_errored] += 1
       Rails.logger.error("[Authentik::FullSyncToAuthentik] Failed to sync user #{user.id}: #{e.message}")
+      ErrorReporting.report(e, context: { job: 'full_sync_to_authentik', stage: 'sync_user', user_id: user.id })
     end
 
     def sync_supplemental_attributes_to_authentik(user, client, results)
@@ -164,6 +170,8 @@ module Authentik
         '[Authentik::FullSyncToAuthentik] Failed to sync supplemental attributes ' \
         "for user #{user.id}: #{e.message}"
       )
+      ErrorReporting.report(e, context: { job: 'full_sync_to_authentik', stage: 'supplemental_attributes',
+                                          user_id: user.id })
     end
 
     def sync_application_group(app_group, client, results)
@@ -183,6 +191,8 @@ module Authentik
     rescue StandardError => e
       results[:groups_errored] += 1
       Rails.logger.error("[Authentik::FullSyncToAuthentik] Failed to sync group '#{app_group.name}': #{e.message}")
+      ErrorReporting.report(e, context: { job: 'full_sync_to_authentik', stage: 'sync_application_group',
+                                          application_group_id: app_group.id })
     end
 
     def sync_active_members_group(client, results)

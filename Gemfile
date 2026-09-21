@@ -40,8 +40,9 @@ gem 'omniauth-rails_csrf_protection'
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem 'jbuilder'
 
-# json 3.0 dropped the positional options argument to JSON.parse, which
-# ActiveSupport::JSON.decode still passes. Unpin once Rails supports json 3.
+# json 3.0 made JSON.parse's options keyword-only, so ActiveSupport::JSON.decode,
+# which passes them positionally, raises ArgumentError on every call. rails/rails#58601
+# fixes it on 8-1-stable but has not shipped as of Rails 8.1.3.1. Unpin once it does.
 gem 'json', '~> 2.21'
 
 # Use Redis adapter to run Action Cable in production

@@ -16,8 +16,8 @@ class OrientationReminderJobTest < ActiveJob::TestCase
   test 'perform sends when reminder is enabled and members are due' do
     now = Time.zone.local(2026, 8, 5, 7, 0, 0)
     ReminderSetting.find_by!(key: 'orientation').update!(enabled: true)
+    set_reminder_cadence('orientation', start_offset_days: 14, interval_days: 14)
     MembershipSetting.instance.update!(
-      orientation_reminder_repeat_days: 14,
       new_member_expiry_days: 90,
       building_access_training_topic: training_topics(:building_access)
     )

@@ -1,113 +1,45 @@
+# Records a reminder against its sequence once the mail has actually gone out.
+#
+# A reminder can leave by two routes. The daily run enqueues mail and, when that mail goes
+# straight to the mail server, records the send itself. Mail held for review leaves days later
+# from the mail queue, and that send has to land against the same sequence — otherwise a member
+# whose reminder sat in the queue would be due again the next morning.
 module QueuedMailReminderDeliveries
   extend ActiveSupport::Concern
 
-  SLACK_SIGNUP_REMINDER_ACTIONS = %w[slack_signup_reminder slack_signup_nag].freeze
-
-  PARKING_REMINDER_ACTIONS = %w[
-    parking_permit_expiring_soon parking_ticket_expiring_soon
-    parking_permit_expired parking_ticket_expired
-    parking_permit_overdue_reminder parking_ticket_overdue_reminder
-    parking_permit_final_reminder parking_ticket_final_reminder
-  ].freeze
-
   def record_reminder_deliveries!(sent_time)
-    record_slack_signup_reminder_delivery!(sent_time) if slack_signup_reminder_delivery?
-    record_application_link_reminder_delivery!(sent_time) if application_link_reminder_delivery?
-    record_orientation_reminder_delivery!(sent_time) if orientation_reminder_delivery?
-    record_lapsed_access_reminder_delivery!(sent_time) if lapsed_access_reminder_delivery?
-    record_parking_notice_reminder_delivery!(sent_time) if parking_notice_reminder_delivery?
+    reminder_key = ReminderSetting.key_for_mailer_action(mailer_action)
+    return if reminder_key.blank?
+
+    subject = Reminders::Registry.subject_for(reminder_key, recipient: recipient, mailer_args: mailer_args)
+    return if subject.blank?
+
+    record_reminder_delivery!(reminder_key, subject, sent_time)
   end
 
   private
 
-  def slack_signup_reminder_delivery?
-    SLACK_SIGNUP_REMINDER_ACTIONS.include?(mailer_action) && recipient.present?
-  end
+  def record_reminder_delivery!(reminder_key, subject, sent_time)
+    eligibility = Reminders::Registry.eligibility_for(reminder_key)
+    return if eligibility.nil?
 
-  def record_slack_signup_reminder_delivery!(sent_time)
-    Reminders::NotifySlackSignup.record_delivery!(recipient, at: sent_time)
-  rescue StandardError => e
-    Rails.logger.error(
-      "[QueuedMail] slack_signup_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
-      "#{e.class}: #{e.message}"
-    )
-    raise
-  end
-
-  def orientation_reminder_delivery?
-    mailer_action == 'orientation_reminder' && recipient.present?
-  end
-
-  def lapsed_access_reminder_delivery?
-    mailer_action == 'lapsed_access_reminder' && recipient.present?
-  end
-
-  def record_lapsed_access_reminder_delivery!(sent_time)
-    access_log_ids = mailer_args.is_a?(Hash) ? mailer_args['access_log_ids'] : nil
-    Reminders::NotifyLapsedAccess.record_delivery!(recipient, at: sent_time, access_log_ids: access_log_ids)
-  rescue StandardError => e
-    Rails.logger.error(
-      "[QueuedMail] lapsed_access_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
-      "#{e.class}: #{e.message}"
-    )
-    raise
-  end
-
-  def record_orientation_reminder_delivery!(sent_time)
-    Reminders::NotifyOrientation.record_delivery!(recipient, at: sent_time)
-  rescue StandardError => e
-    Rails.logger.error(
-      "[QueuedMail] orientation_reminder stamp failed queued_mail_id=#{id} user_id=#{recipient&.id} " \
-      "#{e.class}: #{e.message}"
-    )
-    raise
-  end
-
-  def application_link_reminder_delivery?
-    mailer_action == 'application_link_reminder'
-  end
-
-  def parking_notice_reminder_delivery?
-    PARKING_REMINDER_ACTIONS.include?(mailer_action)
-  end
-
-  def record_parking_notice_reminder_delivery!(sent_time)
-    notice_id = mailer_args.is_a?(Hash) && mailer_args['parking_notice_id']
-    notice = ParkingNotice.find_by(id: notice_id) if notice_id.present?
-    return unless notice
-
-    phase = parking_reminder_phase_for_action(mailer_action)
-    return unless phase
-
-    Reminders::NotifyParkingNotices.record_delivery!(notice, phase, at: sent_time)
-  rescue StandardError => e
-    Rails.logger.error(
-      "[QueuedMail] parking reminder stamp failed queued_mail_id=#{id} notice_id=#{notice_id} " \
-      "#{e.class}: #{e.message}"
-    )
-    raise
-  end
-
-  def parking_reminder_phase_for_action(action)
-    case action
-    when 'parking_permit_expiring_soon', 'parking_ticket_expiring_soon' then :pre_expiration
-    when 'parking_permit_expired', 'parking_ticket_expired' then :expiration
-    when 'parking_permit_overdue_reminder', 'parking_ticket_overdue_reminder' then :overdue
-    when 'parking_permit_final_reminder', 'parking_ticket_final_reminder' then :final
+    # Lapsed access stamps the visits its email described as well as its own cadence, and only
+    # the queued mail knows which visits those were.
+    if reminder_key == 'lapsed_access'
+      Reminders::NotifyLapsedAccess.record_delivery!(subject, at: sent_time,
+                                                              access_log_ids: recorded_access_log_ids)
+    else
+      eligibility.record_delivery!(subject, at: sent_time)
     end
-  end
-
-  def record_application_link_reminder_delivery!(sent_time)
-    verification_id = mailer_args.is_a?(Hash) && mailer_args['application_verification_id']
-    verification = ApplicationVerification.find_by(id: verification_id) if verification_id.present?
-    return unless verification
-
-    Reminders::NotifyApplicationLink.record_delivery!(verification, at: sent_time)
   rescue StandardError => e
     Rails.logger.error(
-      "[QueuedMail] application_link_reminder stamp failed queued_mail_id=#{id} " \
-      "verification_id=#{verification_id} #{e.class}: #{e.message}"
+      "[QueuedMail] #{reminder_key} reminder stamp failed queued_mail_id=#{id} " \
+      "subject=#{subject.class}##{subject.id} #{e.class}: #{e.message}"
     )
     raise
+  end
+
+  def recorded_access_log_ids
+    mailer_args.is_a?(Hash) ? mailer_args['access_log_ids'] : nil
   end
 end

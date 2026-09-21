@@ -8,7 +8,15 @@ module Reminders
   # The training check is a backstop for members who reached new_member the long way round —
   # trained first and approved afterwards, say — where the training exists but never
   # triggered the transition.
+  #
+  # The cadence is counted from the day the membership was approved. Nothing here enforces a
+  # stop: leaving new_member is what ends the reminders, whether by being oriented or by the
+  # new-member window running out.
   class OrientationEligibility
+    extend Cadence
+
+    REMINDER_KEY = 'orientation'.freeze
+
     APPROVAL_ANCHOR_SQL = <<~SQL.squish
       COALESCE(
         (SELECT MAX(membership_applications.reviewed_at)
@@ -37,6 +45,14 @@ module Reminders
     # someone chose deliberately are left out — nobody books an orientation for a membership
     # that has already ended.
     AWAITING_ORIENTATION_STATES = %w[new_member provisional_member current_member overdue_member].freeze
+
+    def self.reminder_key
+      REMINDER_KEY
+    end
+
+    def self.anchor(user)
+      user.membership_approved_at
+    end
 
     # Approved and not oriented, whatever their dues are doing. This is the list the report
     # shows, and it is deliberately wider than the population the reminder writes to: paying
@@ -84,15 +100,13 @@ module Reminders
     # in Ruby — otherwise a member whose new-member window ran out yesterday would count
     # towards every "due today" figure until Membership::TickJob got round to them.
     def self.candidates(now: Time.current)
-      cutoff = repeat_cutoff(now: now)
+      scope = reminder_scope
+              .where(DELIVERABLE_EMAIL_SQL)
+              .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+              .then { |relation| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(relation, REMINDER_KEY) }
 
-      reminder_scope
-        .where(DELIVERABLE_EMAIL_SQL)
-        .where("#{APPROVAL_ANCHOR_SQL} <= ?", cutoff)
-        .where('orientation_reminder_sent_at IS NULL OR orientation_reminder_sent_at <= ?', cutoff)
-        .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-        .then { |scope| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(scope, 'orientation') }
-        .order(:full_name)
+      DeliveryScope.candidates(scope, key: REMINDER_KEY, anchor_sql: APPROVAL_ANCHOR_SQL, now: now)
+                   .order(:full_name)
     end
 
     def self.count_due(now: Time.current)
@@ -103,20 +117,12 @@ module Reminders
       return false unless base_user?(user)
       return false if pending_reminder_mail?(user)
 
-      cutoff = repeat_cutoff(now: now)
-      user.membership_approved_at <= cutoff &&
-        (user.orientation_reminder_sent_at.nil? || user.orientation_reminder_sent_at <= cutoff)
+      cadence_due?(user, now: now)
     end
 
     def self.pending_reminder_mail?(user)
       QueuedMail.exists?(recipient: user, mailer_action: 'orientation_reminder',
                          status: %w[pending approved], sent_at: nil)
-    end
-
-    # One setting covers both halves of the cadence: how long after approval the first
-    # reminder goes out, and how long between reminders after that.
-    def self.repeat_cutoff(now: Time.current)
-      now - MembershipSetting.orientation_reminder_repeat_days.days
     end
 
     # Reads the resolved state rather than the column: a member whose new-member window has

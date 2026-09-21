@@ -86,3 +86,19 @@ jobs:
 
       - name: Run tests
         run: bin/rails test
+
+      # A separate step because `bin/rails test` does not include test/system — which is how the
+      # suite came to have a system test case, Capybara, and selenium-webdriver but no system
+      # tests. The runner image ships Chrome and a matching chromedriver, so Selenium Manager
+      # resolves both without help; the tests run headless unless SYSTEM_TEST_HEADFUL is set.
+      - name: Run system tests
+        run: bin/rails test:system
+
+      - name: Upload system test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-test-screenshots
+          path: tmp/screenshots
+          if-no-files-found: ignore
+          retention-days: 7

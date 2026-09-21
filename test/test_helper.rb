@@ -7,8 +7,55 @@ module ActiveSupport
     # Run tests in parallel with specified workers
     parallelize(workers: :number_of_processors)
 
+    # Postgres gets one database per worker for free; Redis does not, and the RFID sign-in handoff
+    # is entirely Redis. Two workers sharing a database is not a theoretical problem: scans are
+    # stamped in whole seconds and RfidWebhookService.claim_recent takes the newest one it can
+    # find, so a scan stored by worker 2 is a perfectly good candidate for a claim made by worker
+    # 1 in the same second. Pointing each worker at its own database removes the question.
+    #
+    # Redis ships with 16 databases and leaves 0 for anything run outside the suite. A machine
+    # with more than 15 cores wraps around and two workers share again, which is why the tests
+    # also use RFID values unique to each example.
+    parallelize_setup do |worker|
+      ENV['REDIS_URL'] = redis_url_for_test_worker(worker)
+      # The connection is memoized, and reading ENV again is the only way to pick up the new
+      # database. Nothing has touched Redis this early, so there is no live connection to lose.
+      RfidWebhookService.remove_instance_variable(:@redis) if RfidWebhookService.instance_variable_defined?(:@redis)
+    end
+
+    def self.redis_url_for_test_worker(worker)
+      base = ENV.fetch('REDIS_URL', 'redis://localhost:6379/0')
+      uri = URI.parse(base)
+      uri.path = "/#{(worker % 15) + 1}"
+      uri.to_s
+    end
+
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
+
+    # Rate limit counters are not rolled back the way the database is: the store belongs to the
+    # process, and most of the limits are keyed by IP — which is 127.0.0.1 for every request the
+    # suite makes. Hundreds of tests sign in through sign_in_as_admin, so without this the
+    # twenty-first of them is rate limited and fails for a reason that has nothing to do with what
+    # it was testing. Tests that assert on a limit build their own count from this clean slate.
+    setup { RateLimiting.reset! }
+
+    # Redis is not rolled back between tests the way the database is, so anything that leaves a
+    # pending scan, a claim, or a count of failed guesses behind has to clear up after itself.
+    def reset_rfid_webhook_state!
+      redis = RfidWebhookService.redis
+      patterns = [RfidWebhookService::REDIS_KEY_PREFIX,
+                  RfidWebhookService::CLAIM_KEY_PREFIX,
+                  RfidWebhookService::ATTEMPTS_KEY_PREFIX]
+      keys = patterns.flat_map { |prefix| redis.scan_each(match: "#{prefix}*").to_a }
+      redis.del(*keys) if keys.any?
+    end
+
+    # An RFID value no other example is using, so that a scan stored here cannot be picked up by a
+    # test running beside it.
+    def unique_rfid
+      "test-#{SecureRandom.hex(8)}"
+    end
 
     # Privileges only ever reach a member through a role attached to a topic they hold, so tests
     # that need one have to build that chain. Returns the conferring topic.
@@ -34,6 +81,22 @@ module ActiveSupport
     def enable_payment_overdue_reminder!
       ReminderSetting.seed_defaults!
       ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
+    end
+
+    # Reminder cadence lives on the reminder's own settings row, which is seeded from the
+    # catalog rather than from a fixture. Pass only what the test cares about.
+    def set_reminder_cadence(key, **attributes)
+      ReminderSetting.seed_defaults!
+      setting = ReminderSetting.find_by!(key: key)
+      setting.update!(attributes)
+      setting
+    end
+
+    # Puts a subject partway through its sequence, the way a run that already sent would.
+    def record_reminder_sent(key, subject, at: Time.current, anchor: nil, times: 1)
+      anchor ||= Reminders::Registry.eligibility_for(key)&.anchor(subject)
+      times.times { ReminderDelivery.record!(key, subject, anchor: anchor, at: at) }
+      ReminderDelivery.state_for(key, subject)
     end
 
     # Fails delivery the way an unreachable mail server does in production: the exception comes back
