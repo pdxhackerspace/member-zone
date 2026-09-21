@@ -36,6 +36,13 @@ module Reminders
       schedule.sent_count(subject, anchor: anchor(subject))
     end
 
+    # Anchors for a page of subjects, keyed by id. Most reminders read theirs straight off a
+    # column, so gathering them costs nothing; a reminder whose anchor needs a query of its
+    # own overrides this to make one query instead of one per row.
+    def anchors_for(subjects)
+      Array(subjects).to_h { |subject| [subject.id, anchor(subject)] }
+    end
+
     # Counts one reminder as sent against this subject's sequence. Called once the mail has
     # actually left: mail held for review has not reached anyone, so it must not move the clock.
     def record_delivery!(subject, at: Time.current)

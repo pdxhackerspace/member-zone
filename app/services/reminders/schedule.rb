@@ -62,7 +62,13 @@ module Reminders
     # one being asked about means the sequence has restarted, so the old count does not apply:
     # a member who paid up and fell behind again is at reminder one.
     def progress_for(subject, anchor: nil)
-      delivery = ReminderDelivery.state_for(key, subject)
+      progress_from(ReminderDelivery.state_for(key, subject), anchor: anchor)
+    end
+
+    # The same reading from a row the caller already has. Admin pages load a page of
+    # deliveries in one query, and they have to apply the restart rule too or the due list
+    # credits somebody with the sends from a sequence that is over.
+    def progress_from(delivery, anchor: nil)
       return NOTHING_SENT if delivery.nil? || delivery.restarted_by?(anchor)
 
       Progress.new(sent_count: delivery.sent_count, first_sent_at: delivery.first_sent_at,

@@ -250,7 +250,10 @@ class ReminderSettingsController < AdminController
   end
 
   # How many reminders each row on the page has already had, in one query rather than per row.
+  # The anchors come along because a delivery only counts against the sequence it was recorded
+  # under — see ReminderSettingsHelper#reminder_progress_for.
   def load_delivery_index(subjects)
     @reminder_deliveries = ReminderDelivery.index_for(@reminder_setting.key, subjects)
+    @reminder_anchors = Reminders::Registry.eligibility_for(@reminder_setting.key)&.anchors_for(subjects) || {}
   end
 end

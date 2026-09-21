@@ -40,6 +40,18 @@ module Reminders
       unnotified_access_logs(user, now: now).minimum(:logged_at)
     end
 
+    # anchor for a page of members in one grouped query. This is the one reminder whose anchor
+    # is not a column on its subject, so the due list would otherwise run a MIN per row.
+    def self.anchors_for(users, now: Time.current)
+      user_ids = Array(users).map(&:id)
+      return {} if user_ids.empty?
+
+      AccessLog.where(user_id: user_ids, logged_at: window(now: now))
+               .lapsed_access_unnotified
+               .group(:user_id)
+               .minimum(:logged_at)
+    end
+
     # The anchor for a reminder that named specific visits. Mail held for review describes the
     # visits it was written about, not whatever the window covers on the day it finally sends.
     def self.anchor_for_access_logs(access_log_ids)

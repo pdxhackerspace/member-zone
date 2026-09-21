@@ -178,6 +178,31 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, ReminderSetting.find_by!(key: 'payment_overdue').lookback_days
   end
 
+  # A notice whose expiration moved is at reminder one, so the due list must not credit it
+  # with the sends from the sequence that ended. Showing "4 of 4" beside somebody about to be
+  # mailed again reads as a bug in the reminder.
+  test 'show counts a restarted sequence from the start' do
+    now = Time.zone.local(2026, 8, 6, 9, 0, 0)
+    set_reminder_cadence('parking_notices', start_offset_days: -3, interval_days: 7, max_reminders: 4)
+    ReminderSetting.find_by!(key: 'parking_notices').update!(enabled: true)
+    owner = users(:one)
+    notice = ParkingNotice.create!(
+      user: owner, issued_by: owner, notice_type: 'permit', status: 'active',
+      expires_at: now - 20.days, description: 'Restarted permit', location: 'Main Area'
+    )
+    ReminderDelivery.record!('parking_notices', notice, anchor: notice.expires_at, at: now - 8.days)
+    ReminderDelivery.record!('parking_notices', notice, anchor: notice.expires_at, at: now - 1.day)
+    notice.update!(expires_at: now + 1.day)
+
+    travel_to now do
+      get reminder_setting_url('parking_notices')
+    end
+
+    assert_response :success
+    assert_select 'td.num', text: '0 of 4'
+    assert_select 'td.num', text: '2 of 4', count: 0
+  end
+
   test 'show lists due inactive members for lapsed access' do
     now = Time.zone.local(2026, 8, 6, 8, 5, 0)
     user = User.create!(
