@@ -5,6 +5,7 @@ class MembershipStateTest < ActiveSupport::TestCase
     MembershipSetting.instance.update!(
       new_member_grace_period_days: 14,
       new_member_expiry_days: 90,
+      payment_grace_period_days: 5,
       overdue_grace_period_days: 30
     )
   end
@@ -267,10 +268,44 @@ class MembershipStateTest < ActiveSupport::TestCase
   end
 
   test 'a member with no plan is measured against the payment currency window' do
-    user = create_member(state: 'current_member', last_payment_date: 40.days.ago.to_date)
+    user = create_member(state: 'current_member', last_payment_date: 45.days.ago.to_date)
     user.update_columns(dues_due_at: nil)
 
     assert_equal 'overdue_member', user.reload.effective_membership_state
+  end
+
+  # The dues date is when we expect the money, not when we can see it: the payment has to
+  # clear its processor and then be picked up by a sync. Calling the member overdue on the
+  # day itself is calling them late for something we could not have observed yet.
+  test 'a current member stays current while the payment grace period runs' do
+    user = create_member(state: 'current_member', dues_due_at: 2.days.ago)
+
+    assert_equal 'current_member', user.reload.effective_membership_state
+    assert_not user.membership_state_expired?
+    assert user.active?
+  end
+
+  test 'a current member becomes overdue once the payment grace period runs out' do
+    user = create_member(state: 'current_member', dues_due_at: 6.days.ago)
+
+    assert_equal 'overdue_member', user.reload.effective_membership_state
+  end
+
+  test 'the payment grace period is a setting, not a constant' do
+    user = create_member(state: 'current_member', dues_due_at: 2.days.ago)
+    MembershipSetting.instance.update!(payment_grace_period_days: 0)
+
+    assert_equal 'overdue_member', user.reload.effective_membership_state
+  end
+
+  # Only current_member waits: a cancelled member bought a period that has now ended and a
+  # guest's window was granted rather than paid for, so in neither case is a payment coming.
+  test 'the payment grace period does not extend a cancelled or guest member' do
+    %w[cancelled_member guest_member].each do |state|
+      user = create_member(state: state, dues_due_at: 1.day.ago)
+
+      assert_equal 'inactive_member', user.reload.effective_membership_state, "#{state} should not get the grace"
+    end
   end
 
   test 'expire_membership_state advances one hop at a time' do
@@ -304,8 +339,11 @@ class MembershipStateTest < ActiveSupport::TestCase
     assert_not user.expire_membership_state!
   end
 
+  # The overdue clock starts at the dues date, not when the payment grace ran out and not
+  # when a save noticed. Anchoring it at the end of the payment grace would stack the two,
+  # so lengthening the grace would also push back the day the member lapses.
   test 'materializing overdue from a past-due current member anchors grace at paid-through' do
-    paid_through = 5.days.ago.beginning_of_day
+    paid_through = 8.days.ago.beginning_of_day
     user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
     user.update_columns(
       membership_state: 'current_member',
@@ -317,6 +355,33 @@ class MembershipStateTest < ActiveSupport::TestCase
 
     assert_equal 'overdue_member', user.membership_state
     assert_equal paid_through.to_i, user.membership_state_entered_at.to_i
+  end
+
+  test 'lengthening the payment grace period does not move the day a member lapses' do
+    user = create_member(state: 'current_member', dues_due_at: 1.month.from_now)
+    user.update_columns(
+      membership_state: 'current_member',
+      dues_due_at: 31.days.ago,
+      membership_state_entered_at: 60.days.ago
+    )
+
+    assert_equal 'inactive_member', user.reload.effective_membership_state
+
+    MembershipSetting.instance.update!(payment_grace_period_days: 20)
+
+    assert_equal 'inactive_member', user.reload.effective_membership_state,
+                 'the overdue grace period runs from the dues date, not from the end of the payment grace'
+  end
+
+  # An admin putting somebody in Overdue who has nothing paying for them has no elapsed dues
+  # date to anchor on, so the overdue grace period runs from the move.
+  test 'an overdue member placed by hand with no dues date counts their grace from the move' do
+    user = create_member(state: 'current_member')
+
+    user.update!(membership_state: 'overdue_member')
+
+    assert_equal 'overdue_member', user.reload.effective_membership_state
+    assert_in_delta Time.current.to_i, user.membership_state_entered_at.to_i, 5
   end
 
   test 'record_payment stamps entered_at now even when leaving an expired state' do

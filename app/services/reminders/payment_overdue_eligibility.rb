@@ -90,12 +90,24 @@ module Reminders
       cadence_due?(user, now: now)
     end
 
-    # The moment the member actually fell behind, which is not the moment we noticed. A
-    # member whose stored state still reads current is overdue as of the deadline that has
-    # already passed; one the tick job has already moved is overdue as of when it moved them.
+    # The moment the member actually fell behind, which is not the moment we noticed.
+    #
+    # For anyone with dues that is the dues date itself, not the end of the payment grace
+    # period that follows it. The grace is there so the state machine does not call a member
+    # late while their payment is still clearing; it is not a decision about when to start
+    # writing to them, which is what this reminder's start offset is for. Both count from
+    # the dues date so that either can be changed without moving the other.
+    #
+    # A member the tick job has already moved reads it off membership_state_entered_at,
+    # which materialization anchors at the same dues date. Members with no dues at all — a
+    # provisional member whose pre-payment window ran out — fall back to the deadline that
+    # moved them.
     def self.overdue_since(user)
-      if user.membership_state == 'overdue_member'
+      case user.membership_state
+      when 'overdue_member'
         user.membership_state_entered_at || user.created_at
+      when 'current_member'
+        user.dues_paid_through_at || user.membership_state_expires_at || user.created_at
       else
         user.membership_state_expires_at || user.membership_state_entered_at || user.created_at
       end

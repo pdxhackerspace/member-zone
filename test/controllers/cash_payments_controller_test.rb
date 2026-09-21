@@ -184,16 +184,18 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
       dues_due_at: 1.month.from_now
     )
 
+    # Far enough back that the overdue grace period has run out too, so the member lands in
+    # inactive rather than part-way along.
     patch cash_payment_path(payment), params: {
       cash_payment: {
-        paid_on: 2.months.ago.to_date
+        paid_on: 4.months.ago.to_date
       }
     }
 
     assert_redirected_to cash_payment_path(payment)
     @user.reload
-    assert_equal 2.months.ago.to_date, @user.last_payment_date
-    assert_equal 2.months.ago.to_date + @plan.billing_period_days.days, @user.dues_due_at.to_date
+    assert_equal 4.months.ago.to_date, @user.last_payment_date
+    assert_equal 4.months.ago.to_date + @plan.billing_period_days.days, @user.dues_due_at.to_date
     assert_equal 'lapsed', @user.dues_status
     assert_not @user.active?
   end

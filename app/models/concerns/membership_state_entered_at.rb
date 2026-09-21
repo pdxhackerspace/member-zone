@@ -50,8 +50,8 @@ module MembershipStateEnteredAt
       target = MembershipStateResolution::EXPIRY_TARGETS[state]
       break if target.nil? || target == state
 
+      entered = expiry_entry_anchor(state, deadline)
       state = target
-      entered = deadline
       break if state == membership_state
     end
 

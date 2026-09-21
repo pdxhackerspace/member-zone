@@ -105,7 +105,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'the overdue payment reminder page lays out the whole sequence including the lapse notice' do
-    MembershipSetting.instance.update!(overdue_grace_period_days: 30)
+    MembershipSetting.instance.update!(overdue_grace_period_days: 30, payment_grace_period_days: 5)
     set_reminder_cadence('payment_overdue', start_offset_days: 5, interval_days: 7, max_reminders: nil)
     ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
     lapsed_template = EmailTemplate.create!(
@@ -121,8 +121,12 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match 'What an overdue member hears, in order', response.body
+    assert_match 'Dues date, for 5 days', response.body
     assert_match 'waiting out the start offset', response.body
     assert_match 'repeats every 7 days', response.body
+    # The reminder's offset and the state machine's two grace periods all count from the
+    # dues date, which is the bit an admin reading one number in isolation gets wrong.
+    assert_match 'payment grace period, 5 days', response.body
     assert_select 'a[href=?]', email_template_path(lapsed_template), minimum: 1
     assert_match 'All three stages are governed by the Enabled switch', response.body
     assert_no_match(/no lapse notice when/, response.body)
