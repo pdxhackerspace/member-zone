@@ -49,13 +49,6 @@ class MembershipApplication < ApplicationRecord
     naggable_pending
       .where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) <= ?', stale_cutoff)
   }
-  scope :awaiting_admin_reminder, lambda { |stale_cutoff = 1.week.ago, repeat_cutoff = 3.days.ago|
-    stale_pending(stale_cutoff)
-      .where(
-        'application_reminder_sent_at IS NULL OR application_reminder_sent_at <= ?',
-        repeat_cutoff
-      )
-  }
   # Newest by when the application was submitted (or created if not yet submitted); tie-break on id for stable ordering.
   scope :newest_first, lambda {
     reorder(

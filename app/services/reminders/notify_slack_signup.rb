@@ -4,12 +4,6 @@ module Reminders
       new(now: now).call
     end
 
-    def self.record_delivery!(user, at: Time.current)
-      user.with_lock do
-        user.update!(slack_signup_reminder_sent_at: at)
-      end
-    end
-
     def initialize(now:)
       @now = now
     end
@@ -31,7 +25,9 @@ module Reminders
         result = deliver_reminder_mail(user, extras)
         return if result.nil?
 
-        self.class.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
+        # Mail held for review has not reached the member yet, so the clock on the next
+        # reminder only starts once something actually went out.
+        SlackSignupEligibility.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
       end
     end
 

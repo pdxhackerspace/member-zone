@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_16_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_21_120200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -622,8 +622,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_16_150000) do
 
   create_table "membership_settings", force: :cascade do |t|
     t.integer "admin_login_link_expiry_minutes", default: 15, null: false
-    t.integer "application_link_reminder_delay_days", default: 3, null: false
-    t.integer "application_link_reminder_max_count", default: 3, null: false
     t.integer "application_review_time_cap_days", default: 15, null: false
     t.integer "application_verification_expiry_hours", default: 24, null: false
     t.bigint "building_access_training_topic_id"
@@ -633,20 +631,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_16_150000) do
     t.integer "manual_payment_due_soon_days", default: 7, null: false
     t.integer "new_member_expiry_days", default: 90, null: false
     t.integer "new_member_grace_period_days", default: 14, null: false
-    t.integer "orientation_reminder_repeat_days", default: 14, null: false
     t.integer "overdue_grace_period_days", default: 30, null: false
-    t.integer "parking_notice_expired_reminder_repeat_days", default: 7, null: false
-    t.integer "parking_notice_final_reminder_days_after_expiration", default: 14, null: false
-    t.integer "parking_notice_reminder_days_before_expiration", default: 3, null: false
     t.integer "payment_currency_buffer_days", default: 2, null: false
-    t.integer "payment_grace_period_days", default: 14, null: false
-    t.integer "payment_overdue_reminder_grace_days", default: 5, null: false
-    t.integer "payment_overdue_reminder_repeat_days", default: 7, null: false
     t.integer "planless_payment_window_days", default: 32, null: false
     t.integer "reactivation_grace_period_months", default: 12, null: false
-    t.integer "slack_signup_reminder_initial_delay_days", default: 7, null: false
     t.integer "slack_signup_reminder_max_account_age_months", default: 6, null: false
-    t.integer "slack_signup_reminder_repeat_delay_days", default: 14, null: false
     t.datetime "updated_at", null: false
     t.boolean "use_builtin_membership_application", default: true, null: false
     t.index ["building_access_training_topic_id"], name: "index_membership_settings_on_building_access_training_topic_id"
@@ -891,14 +880,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_16_150000) do
     t.index ["user_id"], name: "index_recharge_payments_on_user_id"
   end
 
+  create_table "reminder_deliveries", force: :cascade do |t|
+    t.datetime "anchor_at"
+    t.datetime "created_at", null: false
+    t.datetime "first_sent_at"
+    t.datetime "last_sent_at"
+    t.string "reminder_key", null: false
+    t.integer "sent_count", default: 0, null: false
+    t.bigint "subject_id", null: false
+    t.string "subject_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reminder_key", "last_sent_at"], name: "index_reminder_deliveries_on_reminder_key_and_last_sent_at"
+    t.index ["reminder_key", "subject_type", "subject_id"], name: "index_reminder_deliveries_on_key_and_subject", unique: true
+    t.index ["subject_type", "subject_id"], name: "index_reminder_deliveries_on_subject_type_and_subject_id"
+  end
+
   create_table "reminder_settings", force: :cascade do |t|
     t.boolean "allow_opt_out", default: true, null: false
     t.datetime "created_at", null: false
     t.text "description"
     t.boolean "enabled", default: false, null: false
+    t.integer "interval_days", default: 7, null: false
     t.string "key", null: false
     t.integer "lookback_days", default: 1, null: false
+    t.integer "max_reminders"
     t.string "name", null: false
+    t.integer "start_offset_days", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["enabled"], name: "index_reminder_settings_on_enabled"
     t.index ["key"], name: "index_reminder_settings_on_key", unique: true

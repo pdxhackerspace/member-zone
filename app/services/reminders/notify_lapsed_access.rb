@@ -7,9 +7,12 @@ module Reminders
     # One reminder speaks for every visit it covered, so all of those entries are stamped even
     # though only one email goes out. Entries logged after this point stay unstamped and make the
     # member due again on the next daily run.
+    #
+    # The cadence is recorded before the entries are stamped: the sequence's anchor is the
+    # oldest visit nobody has heard about, and stamping is what makes it stop existing.
     def self.record_delivery!(user, at: Time.current, access_log_ids: nil)
       user.with_lock do
-        user.update_column(:lapsed_access_reminder_sent_at, at)
+        LapsedAccessEligibility.record_delivery!(user, at: at, access_log_ids: access_log_ids)
         mark_access_logs_notified!(user, at: at, access_log_ids: access_log_ids)
       end
     end
@@ -30,7 +33,7 @@ module Reminders
     end
 
     def call
-      return unless ReminderSetting.enabled?('lapsed_access')
+      return unless LapsedAccessEligibility.reminder_enabled?
 
       LapsedAccessEligibility.due(now: @now).find_each do |user|
         notify_user(user)

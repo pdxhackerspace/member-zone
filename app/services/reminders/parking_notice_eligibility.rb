@@ -1,6 +1,20 @@
 module Reminders
   # Who should receive parking permit/ticket reminder emails today.
+  #
+  # One sequence per notice, counted from the day it expires. The start offset is negative, so
+  # the first reminder is a warning that goes out before expiration; the rest follow at the
+  # configured interval afterwards.
+  #
+  # Which of the four emails a notice gets is decided by where the send falls in that sequence
+  # rather than by a phase of its own — see phase_for. The last send in the sequence is the
+  # final notice, which means this is the one reminder that wants a maximum set: without one
+  # there is no last send and the final notice never goes out.
   class ParkingNoticeEligibility
+    extend Cadence
+
+    REMINDER_KEY = 'parking_notices'.freeze
+    ANCHOR_SQL = 'parking_notices.expires_at'.freeze
+
     REMINDER_MAILER_ACTIONS = %w[
       parking_permit_expiring_soon parking_ticket_expiring_soon
       parking_permit_expired parking_ticket_expired
@@ -34,9 +48,17 @@ module Reminders
       )
     SQL
 
+    def self.reminder_key
+      REMINDER_KEY
+    end
+
+    def self.anchor(notice)
+      notice.expires_at
+    end
+
     def self.due(now: Time.current)
       ids = []
-      remindable_scope.find_each { |notice| ids << notice.id if due?(notice, now: now) }
+      candidates(now: now).find_each { |notice| ids << notice.id if due?(notice, now: now) }
       ParkingNotice.where(id: ids).includes(:user).order(:expires_at)
     end
 
@@ -51,10 +73,7 @@ module Reminders
     def self.due?(notice, now: Time.current)
       return false unless remindable?(notice)
 
-      pre_expiration_due?(notice, now: now) ||
-        expiration_due?(notice, now: now) ||
-        final_due?(notice, now: now) ||
-        overdue_repeat_due?(notice, now: now)
+      cadence_due?(notice, now: now)
     end
 
     def self.remindable?(notice)
@@ -66,34 +85,21 @@ module Reminders
       true
     end
 
-    def self.pre_expiration_due?(notice, now: Time.current)
-      return false if MembershipSetting.parking_notice_reminder_days_before_expiration.zero?
-      return false unless notice.active?
-      return false if notice.pre_expiration_reminder_sent_at.present?
-      return false if notice.expires_at <= now
+    # Which of the four emails this send is. Before expiration it is the warning; the first
+    # send after expiration says the notice has expired; the last send in the sequence is the
+    # final notice; everything in between is a follow-up.
+    #
+    # Nil when no reminder is coming, so a caller that has not checked due? cannot send the
+    # wrong email by accident.
+    def self.phase_for(notice, now: Time.current)
+      return nil unless due?(notice, now: now)
+      return :pre_expiration if now < notice.expires_at
+      return :final if schedule.final_send?(notice, anchor: anchor(notice))
 
-      notice.expires_at <= pre_expiration_cutoff(now: now)
-    end
+      last_sent_at = schedule.last_sent_at(notice, anchor: anchor(notice))
+      return :expiration if last_sent_at.nil? || last_sent_at < notice.expires_at
 
-    def self.expiration_due?(notice, now: Time.current)
-      notice.expired? && notice.expires_at <= now && notice.expiration_notice_sent_at.blank?
-    end
-
-    def self.overdue_repeat_due?(notice, now: Time.current)
-      return false unless notice.expired?
-      return false if notice.final_reminder_sent_at.present?
-      return false if final_window_reached?(notice, now: now)
-      return false if notice.expiration_notice_sent_at.blank?
-
-      last_sent = notice.overdue_reminder_sent_at || notice.expiration_notice_sent_at
-      last_sent <= repeat_cutoff(now: now)
-    end
-
-    def self.final_due?(notice, now: Time.current)
-      return false unless notice.expired?
-      return false if notice.final_reminder_sent_at.present?
-
-      final_window_reached?(notice, now: now)
+      :overdue
     end
 
     def self.pending_reminder_mail?(notice)
@@ -105,20 +111,9 @@ module Reminders
       ).exists?(["mailer_args ->> 'parking_notice_id' = ?", notice.id.to_s])
     end
 
-    def self.pre_expiration_cutoff(now: Time.current)
-      now + MembershipSetting.parking_notice_reminder_days_before_expiration.days
-    end
-
-    def self.repeat_cutoff(now: Time.current)
-      now - MembershipSetting.parking_notice_expired_reminder_repeat_days.days
-    end
-
-    def self.final_cutoff(notice)
-      notice.expires_at + MembershipSetting.parking_notice_final_reminder_days_after_expiration.days
-    end
-
-    def self.final_window_reached?(notice, now: Time.current)
-      final_cutoff(notice) <= now
+    def self.candidates(now: Time.current)
+      DeliveryScope.candidates(remindable_scope, key: REMINDER_KEY, anchor_sql: ANCHOR_SQL, now: now)
+                   .order(:expires_at)
     end
 
     def self.remindable_scope
@@ -126,18 +121,9 @@ module Reminders
                    .where(status: %w[active expired])
                    .where(DELIVERABLE_USER_SQL)
                    .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-                   .then { |scope| Notifications::EligibilityOptOuts.parking_notice_scope_excluding_opt_outs(scope, 'parking_notices') }
+                   .then do |scope|
+                     Notifications::EligibilityOptOuts.parking_notice_scope_excluding_opt_outs(scope, REMINDER_KEY)
+                   end
     end
-
-    def self.due_phase(notice, now: Time.current)
-      return :pre_expiration if pre_expiration_due?(notice, now: now)
-      return :expiration if expiration_due?(notice, now: now)
-      return :final if final_due?(notice, now: now)
-      return :overdue if overdue_repeat_due?(notice, now: now)
-
-      nil
-    end
-
-    private_class_method :final_cutoff, :final_window_reached?
   end
 end

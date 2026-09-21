@@ -6,24 +6,6 @@ module Reminders
       new(now: now).call
     end
 
-    def self.record_delivery!(notice, phase, at: Time.current)
-      column = delivery_column_for(phase)
-      return unless column
-
-      notice.with_lock do
-        notice.update_column(column, at)
-      end
-    end
-
-    def self.delivery_column_for(phase)
-      {
-        pre_expiration: :pre_expiration_reminder_sent_at,
-        expiration: :expiration_notice_sent_at,
-        overdue: :overdue_reminder_sent_at,
-        final: :final_reminder_sent_at
-      }[phase]
-    end
-
     def initialize(now:)
       @now = now
     end
@@ -38,7 +20,7 @@ module Reminders
     private
 
     def reminders_enabled?
-      ReminderSetting.enabled?('parking_notices')
+      ParkingNoticeEligibility.reminder_enabled?
     end
 
     def expire_past_due_notices!
@@ -50,20 +32,11 @@ module Reminders
 
     def notify_notice(notice)
       notice.with_lock do
-        phase = ParkingNoticeEligibility.due_phase(notice, now: @now)
+        phase = ParkingNoticeEligibility.phase_for(notice, now: @now)
         return if phase.nil?
 
-        case phase
-        when :pre_expiration then deliver_reminder!(notice, :pre_expiration)
-        when :expiration then deliver_expiration!(notice)
-        when :final then deliver_reminder!(notice, :final)
-        when :overdue then deliver_reminder!(notice, :overdue)
-        end
+        deliver_reminder!(notice, phase)
       end
-    end
-
-    def deliver_expiration!(notice)
-      deliver_reminder!(notice, :expiration)
     end
 
     def deliver_reminder!(notice, phase)
@@ -73,7 +46,11 @@ module Reminders
       result = notice.enqueue_notification!(template_key)
       return if result.nil?
 
-      self.class.record_delivery!(notice, phase, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
+      # Mail held for review has not reached the member yet, so the clock on the next reminder
+      # only starts once something actually went out.
+      return unless result.is_a?(QueuedMail::ImmediateDelivery)
+
+      ParkingNoticeEligibility.record_delivery!(notice, at: @now)
     rescue StandardError => e
       Rails.logger.error(
         "[NotifyParkingNotices] notice_id=#{notice.id} phase=#{phase} failed: #{e.class}: #{e.message}"

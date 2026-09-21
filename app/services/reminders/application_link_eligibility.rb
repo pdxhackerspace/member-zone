@@ -1,5 +1,14 @@
 module Reminders
+  # People who asked for a membership application link and have not sent anything back.
+  #
+  # The cadence counts from the day they asked, and this is the reminder most likely to have a
+  # maximum set: someone who has ignored three nudges has decided.
   class ApplicationLinkEligibility
+    extend Cadence
+
+    REMINDER_KEY = 'application_link'.freeze
+    ANCHOR_SQL = 'application_verifications.created_at'.freeze
+
     WITHOUT_PENDING_REMINDER_MAIL_SQL = <<~SQL.squish
       NOT EXISTS (
         SELECT 1
@@ -11,9 +20,16 @@ module Reminders
       )
     SQL
 
+    def self.reminder_key
+      REMINDER_KEY
+    end
+
+    def self.anchor(verification)
+      verification.created_at
+    end
+
     def self.active?
-      ReminderSetting.enabled?('application_link') &&
-        MembershipSetting.use_builtin_membership_application?
+      reminder_enabled? && MembershipSetting.use_builtin_membership_application?
     end
 
     def self.due(now: Time.current)
@@ -39,12 +55,7 @@ module Reminders
         email: verification.email
       )
 
-      delay = MembershipSetting.application_link_reminder_delay_days.days
-      max_count = MembershipSetting.application_link_reminder_max_count
-      cutoff = now - delay
-
-      verification.application_link_reminder_count < max_count &&
-        reminder_anchor(verification) <= cutoff
+      cadence_due?(verification, now: now)
     end
 
     def self.pending_reminder_mail?(verification)
@@ -61,19 +72,13 @@ module Reminders
     end
 
     def self.candidate_scope(now: Time.current)
-      delay = MembershipSetting.application_link_reminder_delay_days.days
-      max_count = MembershipSetting.application_link_reminder_max_count
-      cutoff = now - delay
+      scope = base_scope
+              .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+              .then do |relation|
+                Notifications::EligibilityOptOuts.verification_scope_excluding_opt_outs(relation, REMINDER_KEY)
+              end
 
-      base_scope
-        .where(application_link_reminder_count: ...max_count)
-        .where(
-          '(application_link_reminder_sent_at IS NULL AND application_verifications.created_at <= ?) OR ' \
-          '(application_link_reminder_sent_at IS NOT NULL AND application_link_reminder_sent_at <= ?)',
-          cutoff, cutoff
-        )
-        .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-        .then { |scope| Notifications::EligibilityOptOuts.verification_scope_excluding_opt_outs(scope, 'application_link') }
+      DeliveryScope.candidates(scope, key: REMINDER_KEY, anchor_sql: ANCHOR_SQL, now: now)
     end
 
     def self.base_verification?(verification)
@@ -82,10 +87,6 @@ module Reminders
         verification.email.present?
     end
 
-    def self.reminder_anchor(verification)
-      verification.application_link_reminder_sent_at || verification.created_at
-    end
-
-    private_class_method :base_scope, :candidate_scope, :base_verification?, :reminder_anchor
+    private_class_method :base_scope, :candidate_scope, :base_verification?
   end
 end

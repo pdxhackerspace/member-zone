@@ -1,16 +1,9 @@
 module Reminders
-  # Sends the building access orientation reminder. Disabled by default; how long after
-  # approval the first one goes out, and the gap between them after that, both come from
-  # MembershipSetting.orientation_reminder_repeat_days.
+  # Sends the building access orientation reminder. Disabled by default; the cadence comes
+  # from the reminder's settings row and counts from the day the membership was approved.
   class NotifyOrientation
     def self.call(now: Time.current)
       new(now: now).call
-    end
-
-    def self.record_delivery!(user, at: Time.current)
-      user.with_lock do
-        user.update_column(:orientation_reminder_sent_at, at)
-      end
     end
 
     def initialize(now:)
@@ -35,7 +28,7 @@ module Reminders
 
         # Mail held for review has not reached the member yet, so the clock on the next
         # reminder only starts once something actually went out.
-        self.class.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
+        OrientationEligibility.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
       end
     end
 

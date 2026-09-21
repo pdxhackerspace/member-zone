@@ -6,7 +6,51 @@ Member-facing emails are grouped into **notification categories**. Each category
 
 Members manage optional notices at `/profile/notifications`. Preferences are stored in `notification_opt_outs` (one row per user, category, and channel). Absence of a row means subscribed.
 
-Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. Parking reminders default to mandatory.
+Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. Parking reminders default to mandatory, as does `staff_application`, which goes to reviewers rather than to members.
+
+## Reminder cadence
+
+Every reminder is timed by the same three columns on `reminder_settings`, editable per reminder on the admin **Reminders** page:
+
+| Column | Meaning |
+| --- | --- |
+| `start_offset_days` | When the first reminder goes out, counted from the subject's anchor. Negative sends ahead of it. |
+| `interval_days` | The gap between each reminder after the first, counted from the last one that actually sent. |
+| `max_reminders` | How many to send in total. `NULL` repeats for as long as the subject stays eligible. |
+
+The **anchor** is the timestamp a reminder counts from, and each `Reminders::*Eligibility` service supplies its own through an `anchor` method:
+
+| Reminder | Anchor | Default cadence |
+| --- | --- | --- |
+| `slack_signup` | `users.membership_approved_at` | +7, every 14, unlimited |
+| `application_link` | `application_verifications.created_at` | +3, every 3, max 3 |
+| `payment_overdue` | when the member fell behind | +5, every 7, unlimited |
+| `orientation` | `users.membership_approved_at` | +14, every 14, unlimited |
+| `parking_notices` | `parking_notices.expires_at` | −3, every 7, max 4 |
+| `lapsed_access` | the earliest visit not yet mentioned | +0, daily, unlimited |
+| `staff_application` | `submitted_at` or `created_at` | +7, every 3, unlimited |
+
+`Reminders::Schedule` turns those numbers into dates (`next_due_at`, `due?`, `exhausted?`) and `Reminders::DeliveryScope` expresses the same predicates as a `LEFT JOIN` so candidate queries narrow in SQL instead of loading every row. Eligibility services keep only their domain questions — is the member still overdue, is the notice cleared, does the applicant still have no application — and `extend Reminders::Cadence` for the timing.
+
+Intervals count from the last send rather than from the anchor. A skipped run, or mail that sat in the review queue for a week, pushes the rest of the sequence back instead of firing several reminders at once to catch up.
+
+### Counting the sends
+
+`reminder_deliveries` holds one row per reminder and subject (`reminder_key`, `subject_type`, `subject_id`) carrying `sent_count`, `first_sent_at`, `last_sent_at` and the `anchor_at` the sequence started from. `ReminderDelivery.record!` upserts it, and `QueuedMailReminderDeliveries` calls it once the mail is handed off, so a reminder held for review is counted when it actually sends rather than when it was queued.
+
+**A moved anchor restarts the sequence.** When the anchor `record!` is given no longer matches the stored `anchor_at`, the count resets to 1 and the new anchor is written — a member who paid up and fell behind again is at reminder one, not reminder five. `ReminderDelivery::ANCHOR_DRIFT_TOLERANCE` keeps sub-day jitter in a computed anchor from tripping it.
+
+Two reminders keep state of their own alongside the count, because the count cannot answer their question. `lapsed_access` stamps each `access_log` row it mentions, so a visit is never described twice. Parking picks its template from where the send falls in the sequence rather than from a date:
+
+```ruby
+return :pre_expiration if now < notice.expires_at
+return :final if schedule.final_send?(notice, anchor: anchor)
+return :expiration if last_sent_at.nil? || last_sent_at < notice.expires_at
+
+:overdue
+```
+
+Because the final notice is "the last send" rather than a fixed day, parking is the one reminder that needs `max_reminders` set — without a limit there is no last send and the final template never fires. The Reminders page warns when it is blank.
 
 ## Applicant email opt-outs
 

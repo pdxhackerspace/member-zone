@@ -7,18 +7,23 @@ module Reminders
       @user = users(:one)
       @notice = parking_notices(:active_permit)
       @notice.update!(user: @user, expires_at: @now + 2.days, status: 'active')
-      ReminderSetting.seed_defaults!
-      MembershipSetting.instance.update!(
-        parking_notice_reminder_days_before_expiration: 3,
-        parking_notice_expired_reminder_repeat_days: 7,
-        parking_notice_final_reminder_days_after_expiration: 14
-      )
+      set_reminder_cadence('parking_notices', start_offset_days: -3, interval_days: 7, max_reminders: 4)
     end
 
-    test 'pre_expiration due when inside reminder window' do
+    test 'the first reminder is due inside the pre-expiration window' do
       travel_to @now do
-        assert ParkingNoticeEligibility.pre_expiration_due?(@notice.reload, now: @now)
+        assert ParkingNoticeEligibility.due?(@notice.reload, now: @now)
+        assert_equal :pre_expiration, ParkingNoticeEligibility.phase_for(@notice, now: @now)
         assert_includes ParkingNoticeEligibility.due(now: @now), @notice
+      end
+    end
+
+    test 'nothing is due before the pre-expiration window opens' do
+      @notice.update!(expires_at: @now + 10.days)
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.due?(@notice.reload, now: @now)
+        assert_nil ParkingNoticeEligibility.phase_for(@notice, now: @now)
       end
     end
 
@@ -31,27 +36,79 @@ module Reminders
       end
     end
 
-    test 'pre_expiration not due when days before is zero' do
-      MembershipSetting.instance.update!(parking_notice_reminder_days_before_expiration: 0)
+    # A zero offset is how an admin turns the advance warning off: the first email then lands
+    # on the expiration date and reads as the expiration notice.
+    test 'a zero start offset skips the pre-expiration warning' do
+      set_reminder_cadence('parking_notices', start_offset_days: 0)
 
       travel_to @now do
-        assert_not ParkingNoticeEligibility.pre_expiration_due?(@notice.reload, now: @now)
+        assert_not ParkingNoticeEligibility.due?(@notice.reload, now: @now)
+      end
+
+      travel_to @notice.expires_at do
+        assert_equal :expiration, ParkingNoticeEligibility.phase_for(@notice.reload, now: @notice.expires_at)
       end
     end
 
-    test 'expiration due when expired and past expires_at without notice sent' do
+    test 'the first send after expiration is the expiration notice' do
       @notice.update!(status: 'expired', expires_at: @now - 1.hour)
+      record_reminder_sent('parking_notices', @notice, at: @now - 8.days)
 
       travel_to @now do
-        assert ParkingNoticeEligibility.expiration_due?(@notice.reload, now: @now)
+        assert_equal :expiration, ParkingNoticeEligibility.phase_for(@notice.reload, now: @now)
       end
     end
 
-    test 'expiration not due for active notices before expire job runs' do
-      @notice.update!(status: 'active', expires_at: @now - 1.hour)
+    test 'sends between the expiration notice and the last one are follow-ups' do
+      @notice.update!(status: 'expired', expires_at: @now - 10.days)
+      record_reminder_sent('parking_notices', @notice, at: @now - 8.days, times: 2)
 
       travel_to @now do
-        assert_not ParkingNoticeEligibility.expiration_due?(@notice.reload, now: @now)
+        assert_equal :overdue, ParkingNoticeEligibility.phase_for(@notice.reload, now: @now)
+      end
+    end
+
+    # The final notice is the last send in the sequence rather than a fixed number of days
+    # after expiration, which is why parking needs a maximum set.
+    test 'the last send in the sequence is the final notice' do
+      @notice.update!(status: 'expired', expires_at: @now - 20.days)
+      record_reminder_sent('parking_notices', @notice, at: @now - 8.days, times: 3)
+
+      travel_to @now do
+        assert_equal :final, ParkingNoticeEligibility.phase_for(@notice.reload, now: @now)
+      end
+    end
+
+    test 'nothing is due once the maximum has been sent' do
+      @notice.update!(status: 'expired', expires_at: @now - 30.days)
+      record_reminder_sent('parking_notices', @notice, at: @now - 8.days, times: 4)
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.due?(@notice.reload, now: @now)
+        assert_not_includes ParkingNoticeEligibility.due(now: @now), @notice
+      end
+    end
+
+    # Extending a notice is a new anchor, so the member hears the whole sequence again rather
+    # than nothing at all.
+    test 'extending a notice starts the sequence over' do
+      @notice.update!(status: 'expired', expires_at: @now - 30.days)
+      record_reminder_sent('parking_notices', @notice, at: @now - 8.days, times: 4)
+      @notice.update!(status: 'active', expires_at: @now + 2.days)
+
+      travel_to @now do
+        assert ParkingNoticeEligibility.due?(@notice.reload, now: @now)
+        assert_equal :pre_expiration, ParkingNoticeEligibility.phase_for(@notice, now: @now)
+        assert_includes ParkingNoticeEligibility.due(now: @now), @notice
+      end
+    end
+
+    test 'nothing is due inside the interval since the last reminder' do
+      @notice.update!(status: 'expired', expires_at: @now - 10.days)
+      record_reminder_sent('parking_notices', @notice, at: @now - 2.days)
+
+      travel_to @now do
+        assert_not ParkingNoticeEligibility.due?(@notice.reload, now: @now)
       end
     end
 
@@ -61,31 +118,6 @@ module Reminders
       travel_to @now do
         assert_not ParkingNoticeEligibility.remindable?(@notice.reload)
         assert_not_includes ParkingNoticeEligibility.due(now: @now), @notice
-      end
-    end
-
-    test 'final due after final reminder window' do
-      @notice.update!(
-        status: 'expired',
-        expires_at: @now - 15.days,
-        expiration_notice_sent_at: @now - 15.days
-      )
-
-      travel_to @now do
-        assert ParkingNoticeEligibility.final_due?(@notice.reload, now: @now)
-      end
-    end
-
-    test 'overdue repeat due after repeat interval' do
-      @notice.update!(
-        status: 'expired',
-        expires_at: @now - 10.days,
-        expiration_notice_sent_at: @now - 10.days,
-        overdue_reminder_sent_at: @now - 8.days
-      )
-
-      travel_to @now do
-        assert ParkingNoticeEligibility.overdue_repeat_due?(@notice.reload, now: @now)
       end
     end
 
@@ -113,7 +145,7 @@ module Reminders
 
       travel_to @now do
         assert ParkingNoticeEligibility.remindable?(@notice.reload)
-        assert ParkingNoticeEligibility.pre_expiration_due?(@notice, now: @now)
+        assert ParkingNoticeEligibility.due?(@notice, now: @now)
       end
     end
 

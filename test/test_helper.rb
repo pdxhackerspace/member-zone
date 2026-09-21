@@ -83,6 +83,22 @@ module ActiveSupport
       ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
     end
 
+    # Reminder cadence lives on the reminder's own settings row, which is seeded from the
+    # catalog rather than from a fixture. Pass only what the test cares about.
+    def set_reminder_cadence(key, **attributes)
+      ReminderSetting.seed_defaults!
+      setting = ReminderSetting.find_by!(key: key)
+      setting.update!(attributes)
+      setting
+    end
+
+    # Puts a subject partway through its sequence, the way a run that already sent would.
+    def record_reminder_sent(key, subject, at: Time.current, anchor: nil, times: 1)
+      anchor ||= Reminders::Registry.eligibility_for(key)&.anchor(subject)
+      times.times { ReminderDelivery.record!(key, subject, anchor: anchor, at: at) }
+      ReminderDelivery.state_for(key, subject)
+    end
+
     # Fails delivery the way an unreachable mail server does in production: the exception comes back
     # out of +deliver_now+ to whoever raised the mail.
     class UnreachableServerDelivery

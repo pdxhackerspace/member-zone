@@ -230,27 +230,33 @@ queue unless its template opts out of review.
 | Entering `cancelled_member` | `membership_cancelled` | Once, guarded by `membership_cancelled_email_sent_at` |
 | `ban!` | `membership_banned` | Once per ban |
 | Entering `inactive_member` | `membership_lapsed` | Once per lapse, **unless they cancelled**, and only while the `payment_overdue` reminder is enabled |
-| Being in `overdue_member` | `payment_past_due` | Weekly from `payment_overdue_reminder_grace_days` after the dues date, while the reminder is enabled |
-| Being in `new_member` | `orientation_reminder` | Every `orientation_reminder_repeat_days`, while the reminder is enabled |
+| Being in `overdue_member` | `payment_past_due` | The `payment_overdue` reminder cadence (default: 5 days after the dues date, then weekly), while the reminder is enabled |
+| Being in `new_member` | `orientation_reminder` | The `orientation` reminder cadence (default: 14 days after approval, then every 14), while the reminder is enabled |
 | `mark_deceased!` | — | No email |
 
 The overdue reminder is a `ReminderSetting` keyed `payment_overdue`, **disabled by
 default**. `PaymentOverdueReminderJob` runs daily at 7:30 AM and
 `Reminders::PaymentOverdueEligibility` decides who is due: members whose resolved state is
-still `overdue_member`, at least `payment_overdue_reminder_grace_days` (default 5) past the
-moment they fell behind, not reminded within `payment_overdue_reminder_repeat_days` (default
-7), with an email address, no reminder already waiting in the queue, and not a service
-account. Reading the resolved state rather than the column means a member whose overdue
-grace has run out does not get one last nag on their way to inactive. Cancelled members are
-excluded by design — they told us they were leaving — as are members with a cancellation on
-file that has not been reconciled yet (see below).
+still `overdue_member` and whose cadence says a reminder is due (by default the first at 5
+days past the moment they fell behind, then every 7), with an email address, no reminder
+already waiting in the queue, and not a service account. Reading the resolved state rather
+than the column means a member whose overdue grace has run out does not get one last nag on
+their way to inactive. Cancelled members are excluded by design — they told us they were
+leaving — as are members with a cancellation on file that has not been reconciled yet (see
+below).
 
-The reminder grace period is measured from `PaymentOverdueEligibility.overdue_since`, which
+This reminder has no grace period of its own: waiting before the first reminder *is* the
+start offset, configured on the Reminders page like every other reminder's. See
+[notifications.md](notifications.md) for the cadence columns.
+
+The offset is measured from `PaymentOverdueEligibility.overdue_since`, which
 is `membership_state_entered_at` for a member already sitting in `overdue_member` and
 `membership_state_expires_at` — the deadline that has already passed — for one whose stored
 state still reads `current_member` or `provisional_member`. Either way it is the day the
 member actually fell behind, not the day `Membership::TickJob` noticed, so a late bank
-transfer or a retried card has the same window however the state was materialized.
+transfer or a retried card has the same window however the state was materialized. It is
+also the reminder's anchor, so a member who pays up and falls behind again starts the
+sequence over rather than resuming where they left off.
 
 `payment_past_due` and `membership_lapsed` chase two different populations and are often
 confused for each other. `payment_past_due` repeats while a member is `overdue_member` and
@@ -273,8 +279,8 @@ turned it on sends no lapse notices at all.
 The orientation reminder is a `ReminderSetting` keyed `orientation`, **disabled by default**.
 `OrientationReminderJob` runs daily at 7:45 AM and `Reminders::OrientationEligibility` decides
 who is due: members whose resolved state is still `new_member`, with no training recorded
-against the building access topic, approved more than `orientation_reminder_repeat_days`
-(default 14) ago and not reminded within that same window. `new_member` already means
+against the building access topic, and whose cadence says a reminder is due — by default
+14 days after approval, then every 14. `new_member` already means
 "approved, nothing has granted building access yet", so recording the training ends the
 reminders by moving the member to `provisional_member`; the training check is a backstop for
 members who reached `new_member` already trained, where the transition never fired. Reading
@@ -443,11 +449,13 @@ Settings → Membership settings, stored on the `MembershipSetting` singleton:
 | `new_member_grace_period_days` | 14 | How long a trained member has before their first payment is expected |
 | `new_member_expiry_days` | 90 | How long an approved member who never trains stays active |
 | `overdue_grace_period_days` | 30 | How long an overdue member keeps access |
-| `payment_overdue_reminder_grace_days` | 5 | How long after the dues date before the first overdue reminder |
-| `payment_overdue_reminder_repeat_days` | 7 | Minimum gap between overdue reminders |
-| `orientation_reminder_repeat_days` | 14 | Delay after approval before the first orientation reminder, and the gap between them |
 | `reactivation_grace_period_months` | 12 | How long a lapsed member can resubscribe without reapplying |
 | `building_access_training_topic_id` | — | Which training topic triggers `grant_building_access!` |
+
+Reminder timing is **not** here. Settings → Reminders owns it, one cadence per reminder on
+`ReminderSetting` — see [notifications.md](notifications.md#reminder-cadence). The overdue
+and orientation reminders used to keep their delay and repeat on `MembershipSetting`; those
+columns are gone, and their values were migrated into the cadence.
 
 Building access used to be found by matching `LOWER(name) LIKE '%building access%'`, which
 meant renaming the topic silently broke onboarding. It is now an explicit setting; if it is

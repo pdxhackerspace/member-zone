@@ -2,7 +2,8 @@
   <div>
     <h1 class="h-page-title mb-0">Reminders</h1>
     <div class="text-13 text-secondary mt-1">
-      <span class="text-body"><%= @reminder_settings.size %></span> configured
+      <span class="text-body"><%= @reminder_settings.size %></span> configured ·
+      <span class="<%= @enabled_count.positive? ? 'text-success' : 'text-secondary' %>"><%= @enabled_count %></span> enabled
     </div>
   </div>
   <div>
@@ -24,118 +25,19 @@
 <% end %>
 
 <% @reminder_settings.each do |reminder| %>
-  <% case reminder.key %>
-  <% when 'slack_signup' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @slack_email_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @slack_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @slack_without_slack_count %> active without Slack</span>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing:
-        <%= @membership_setting.slack_signup_reminder_initial_delay_days %> days after approval,
-        every <%= @membership_setting.slack_signup_reminder_repeat_delay_days %> days,
-        members who joined within <%= @membership_setting.slack_signup_reminder_max_account_age_months %> <%= 'month'.pluralize(@membership_setting.slack_signup_reminder_max_account_age_months) %>
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-    <% end %>
-  <% when 'application_link' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @application_link_email_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @application_link_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @application_link_awaiting_count %> awaiting application</span>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing:
-        every <%= @membership_setting.application_link_reminder_delay_days %> days,
-        up to <%= @membership_setting.application_link_reminder_max_count %> reminders
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-    <% end %>
-  <% when 'payment_overdue' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @payment_overdue_email_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @payment_overdue_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @payment_overdue_total_count %> overdue</span>
-        <% if @payment_overdue_grace_count.to_i.positive? %>
-          <span class="text-secondary">· <%= @payment_overdue_grace_count %> still inside the grace period</span>
-        <% end %>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing:
-        first reminder <%= @membership_setting.payment_overdue_reminder_grace_days %> <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %> after the dues date,
-        then every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days,
-        then the lapse notice once at <%= @membership_setting.overdue_grace_period_days %> days
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Both emails are switched on and off together. The lapse notice fires when a member becomes inactive rather than
-        on the daily run, so “Send now” does not send it.
-      </div>
-    <% end %>
-  <% when 'orientation' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @orientation_email_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @orientation_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @orientation_awaiting_count %> awaiting orientation</span>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing:
-        every <%= @membership_setting.orientation_reminder_repeat_days %> days after approval,
-        stopping after <%= @membership_setting.new_member_expiry_days %> days when they become inactive
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-    <% end %>
-  <% when 'parking_notices' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @parking_expiring_soon_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @parking_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @parking_awaiting_count %> active or expired, not cleared</span>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing:
-        <%= @membership_setting.parking_notice_reminder_days_before_expiration %> days before expiration,
-        at expiration,
-        every <%= @membership_setting.parking_notice_expired_reminder_repeat_days %> days after,
-        final at <%= @membership_setting.parking_notice_final_reminder_days_after_expiration %> days
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Issued emails on creation are always sent and are not controlled by this toggle.
-      </div>
-    <% end %>
-  <% when 'lapsed_access' %>
-    <%= render layout: 'reminder_card',
-               locals: { reminder: reminder, email_template: @lapsed_access_email_template,
-                         email_templates: @reminder_email_templates[reminder.key] } do %>
-      <div class="text-13">
-        <span class="fw-medium text-body"><%= @lapsed_access_due_count %></span>
-        <span class="text-secondary">would be emailed today ·</span>
-        <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window</span>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        Timing: daily scan of the last <%= reminder.lookback_days %> <%= 'day'.pluralize(reminder.lookback_days) %> of access logs for inactive members
-        · Reactivation window: <%= @membership_setting.reactivation_grace_period_months %> <%= 'month'.pluralize(@membership_setting.reactivation_grace_period_months) %>
-        · <%= link_to "Edit in Membership settings", membership_settings_path, class: "text-secondary" %>
-      </div>
-      <div class="text-12 text-secondary mt-1">
-        A member is emailed once per batch of visits. Visits already covered by a reminder are never mentioned again.
-      </div>
+  <% counts = @reminder_counts[reminder.key] || {} %>
+  <%= render layout: 'reminder_card',
+             locals: { reminder: reminder, email_template: @headline_email_templates[reminder.key],
+                       email_templates: @reminder_email_templates[reminder.key] } do %>
+    <div class="text-13">
+      <span class="fw-medium text-body"><%= counts[:due].to_i %></span>
+      <span class="text-secondary">would be emailed today</span>
+      <% if counts[:context].present? %>
+        <span class="text-secondary">· <%= counts[:context] %></span>
+      <% end %>
+    </div>
+    <% if counts[:note].present? %>
+      <div class="text-12 text-secondary mt-1"><%= counts[:note] %></div>
     <% end %>
   <% end %>
 <% end %>
