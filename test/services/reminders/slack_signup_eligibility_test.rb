@@ -3,11 +3,8 @@ require 'test_helper'
 module Reminders
   class SlackSignupEligibilityTest < ActiveSupport::TestCase
     setup do
-      MembershipSetting.instance.update!(
-        slack_signup_reminder_initial_delay_days: 7,
-        slack_signup_reminder_repeat_delay_days: 14,
-        slack_signup_reminder_max_account_age_months: 6
-      )
+      MembershipSetting.instance.update!(slack_signup_reminder_max_account_age_months: 6)
+      set_reminder_cadence('slack_signup', start_offset_days: 7, interval_days: 14, max_reminders: nil)
     end
 
     test 'due includes active members without slack past initial delay' do
@@ -107,21 +104,32 @@ module Reminders
       end
     end
 
-    test 'due excludes members nagged inside repeat window' do
+    test 'due excludes members reminded inside repeat window' do
       now = Time.zone.local(2026, 8, 5, 7, 0, 0)
-      user = eligible_user(now: now, email: 'recent-nag@example.com', slack_signup_reminder_sent_at: now - 3.days)
+      user = eligible_user(now: now, email: 'recent-nag@example.com', last_reminded_at: now - 3.days)
 
       travel_to now do
         assert_not_includes SlackSignupEligibility.due(now: now), user
       end
     end
 
-    test 'due includes members nagged outside repeat window' do
+    test 'due includes members reminded outside repeat window' do
       now = Time.zone.local(2026, 8, 5, 7, 0, 0)
-      user = eligible_user(now: now, email: 'old-nag@example.com', slack_signup_reminder_sent_at: now - 15.days)
+      user = eligible_user(now: now, email: 'old-nag@example.com', last_reminded_at: now - 15.days)
 
       travel_to now do
         assert_includes SlackSignupEligibility.due(now: now), user
+      end
+    end
+
+    test 'due stops once the maximum number of reminders has gone out' do
+      now = Time.zone.local(2026, 8, 5, 7, 0, 0)
+      set_reminder_cadence('slack_signup', max_reminders: 2)
+      user = eligible_user(now: now, email: 'maxed-slack@example.com', last_reminded_at: now - 30.days, reminders: 2)
+
+      travel_to now do
+        assert_not_includes SlackSignupEligibility.due(now: now), user
+        assert_not SlackSignupEligibility.due?(user, now: now)
       end
     end
 
@@ -237,7 +245,8 @@ module Reminders
     private
 
     def eligible_user(now:, email:, **attrs)
-      nag_sent_at = attrs.delete(:slack_signup_reminder_sent_at)
+      last_reminded_at = attrs.delete(:last_reminded_at)
+      reminders = attrs.delete(:reminders) || 1
       active_override = attrs.delete(:active)
 
       user = User.create!(
@@ -251,10 +260,7 @@ module Reminders
         }.merge(attrs)
       )
 
-      column_updates = {}
-      column_updates[:active] = active_override unless active_override.nil?
-      column_updates[:slack_signup_reminder_sent_at] = nag_sent_at unless nag_sent_at.nil?
-      user.update_columns(column_updates) if column_updates.any?
+      user.update_columns(active: active_override) unless active_override.nil?
       MembershipApplication.create!(
         user: user,
         email: email,
@@ -262,6 +268,7 @@ module Reminders
         reviewed_at: now - 10.days,
         submitted_at: now - 12.days
       )
+      record_reminder_sent('slack_signup', user.reload, at: last_reminded_at, times: reminders) if last_reminded_at
       user
     end
   end

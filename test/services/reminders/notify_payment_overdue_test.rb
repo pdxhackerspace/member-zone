@@ -7,16 +7,9 @@ module Reminders
       # See PaymentOverdueEligibilityTest: eligibility partly resolves against the real clock,
       # so these fixed dates only behave if the clock is frozen with them.
       travel_to @now
-      MembershipSetting.instance.update!(
-        payment_overdue_reminder_grace_days: 5,
-        payment_overdue_reminder_repeat_days: 7,
-        overdue_grace_period_days: 30
-      )
-      ReminderSetting.find_or_create_by!(key: 'payment_overdue') do |setting|
-        setting.name = 'Payment overdue reminder'
-        setting.description = 'Test'
-      end
-      ReminderSetting.find_by!(key: 'payment_overdue').update!(enabled: true)
+      MembershipSetting.instance.update!(overdue_grace_period_days: 30)
+      set_reminder_cadence('payment_overdue', enabled: true, start_offset_days: 5, interval_days: 7,
+                                              max_reminders: nil)
       EmailTemplate.where(key: 'payment_past_due').delete_all
       EmailTemplate.create!(
         key: 'payment_past_due',
@@ -29,14 +22,14 @@ module Reminders
       )
     end
 
-    test 'sends the reminder and stamps when it went out' do
+    test 'sends the reminder and records when it went out' do
       user = overdue_user(email: 'notify-overdue@example.com')
 
       assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
         NotifyPaymentOverdue.call(now: @now)
       end
 
-      assert_equal @now, user.reload.payment_overdue_reminder_sent_at
+      assert_equal @now, ReminderDelivery.state_for('payment_overdue', user).last_sent_at
     end
 
     test 'sends nothing while the reminder is disabled' do
@@ -48,7 +41,7 @@ module Reminders
       end
     end
 
-    test 'does not stamp when the mail is held for review' do
+    test 'does not record a send when the mail is held for review' do
       EmailTemplate.find_by!(key: 'payment_past_due').update!(send_immediately: false)
       user = overdue_user(email: 'held-for-review@example.com')
 
@@ -58,17 +51,31 @@ module Reminders
         end
       end
 
-      assert_nil user.reload.payment_overdue_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('payment_overdue', user)
     end
 
-    test 'leaves a member alone until the reminder grace period has passed' do
+    # Held mail used to leave no trace at all when it finally went out, so the member was due
+    # again the next morning and heard the same thing twice.
+    test 'records the send when mail held for review is later delivered' do
+      EmailTemplate.find_by!(key: 'payment_past_due').update!(send_immediately: false)
+      user = overdue_user(email: 'overdue-deferred@example.com')
+      NotifyPaymentOverdue.call(now: @now)
+
+      queued = QueuedMail.find_by!(recipient: user, mailer_action: 'payment_past_due')
+      queued.update!(status: 'approved')
+      queued.deliver_now!
+
+      assert_equal 1, ReminderDelivery.state_for('payment_overdue', user).sent_count
+    end
+
+    test 'leaves a member alone until the start offset has passed' do
       user = overdue_user(email: 'still-in-grace@example.com', overdue_for: 2)
 
       assert_no_difference -> { ActionMailer::Base.deliveries.size } do
         NotifyPaymentOverdue.call(now: @now)
       end
 
-      assert_nil user.reload.payment_overdue_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('payment_overdue', user)
     end
 
     test 'leaves cancelled members alone' do

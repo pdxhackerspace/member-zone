@@ -39,7 +39,7 @@ module Reminders
         end
       end
 
-      assert_equal @now, user.reload.lapsed_access_reminder_sent_at
+      assert_equal @now, ReminderDelivery.state_for('lapsed_access', user).last_sent_at
       mail = ActionMailer::Base.deliveries.last
       assert_equal [user.email], mail.to
       assert_includes mail.text_part.body.decoded, 'reactivate without reapplying'
@@ -128,7 +128,7 @@ module Reminders
         end
       end
 
-      assert_equal tomorrow, user.reload.lapsed_access_reminder_sent_at
+      assert_equal tomorrow, ReminderDelivery.state_for('lapsed_access', user).last_sent_at
       assert_empty AccessLog.where(user_id: user.id).lapsed_access_unnotified
     end
 
@@ -204,7 +204,7 @@ module Reminders
                                                 .where.not(lapsed_access_reminder_sent_at: nil)
                                                 .pluck(:id).sort
       assert_nil later.reload.lapsed_access_reminder_sent_at
-      assert_equal sent_at, user.reload.lapsed_access_reminder_sent_at
+      assert_equal sent_at, ReminderDelivery.state_for('lapsed_access', user).last_sent_at
     end
 
     test 'a member with mail awaiting review is not queued again' do

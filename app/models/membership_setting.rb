@@ -1,5 +1,10 @@
+# Timing that belongs to the membership itself: how long states last, how long tokens stay
+# valid, what counts as a current payment.
+#
+# Reminder cadence is deliberately not here. How long after an event a reminder goes out, how
+# often it repeats, and how many go out in total live on the reminder's own ReminderSetting row
+# — see Reminders::Schedule.
 class MembershipSetting < ApplicationRecord
-  validates :payment_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :reactivation_grace_period_months, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :invitation_expiry_hours, presence: true, numericality: { greater_than: 0 }
   validates :login_link_expiry_hours, presence: true, numericality: { greater_than: 0 }
@@ -7,21 +12,10 @@ class MembershipSetting < ApplicationRecord
   validates :application_verification_expiry_hours, presence: true, numericality: { greater_than: 0 }
   validates :manual_payment_due_soon_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :application_review_time_cap_days, presence: true, numericality: { greater_than: 0 }
-  validates :slack_signup_reminder_initial_delay_days, presence: true, numericality: { greater_than: 0 }
-  validates :slack_signup_reminder_repeat_delay_days, presence: true, numericality: { greater_than: 0 }
   validates :slack_signup_reminder_max_account_age_months, presence: true, numericality: { greater_than: 0 }
-  validates :application_link_reminder_delay_days, presence: true, numericality: { greater_than: 0 }
-  validates :application_link_reminder_max_count, presence: true, numericality: { greater_than: 0 }
   validates :new_member_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :new_member_expiry_days, presence: true, numericality: { greater_than: 0 }
   validates :overdue_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
-  validates :payment_overdue_reminder_grace_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
-  validates :payment_overdue_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
-  validates :orientation_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
-  validates :parking_notice_reminder_days_before_expiration,
-            presence: true, numericality: { greater_than_or_equal_to: 0 }
-  validates :parking_notice_expired_reminder_repeat_days, presence: true, numericality: { greater_than: 0 }
-  validates :parking_notice_final_reminder_days_after_expiration, presence: true, numericality: { greater_than: 0 }
   validates :planless_payment_window_days, presence: true, numericality: { greater_than: 0 }
   validates :payment_currency_buffer_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
@@ -30,7 +24,6 @@ class MembershipSetting < ApplicationRecord
   # What the singleton row starts with when the table is empty. Mirrors the column
   # defaults, which is what an existing row gets when a new setting is added.
   DEFAULTS = {
-    payment_grace_period_days: 14,
     reactivation_grace_period_months: 12,
     invitation_expiry_hours: 72,
     login_link_expiry_hours: 180,
@@ -38,20 +31,10 @@ class MembershipSetting < ApplicationRecord
     application_verification_expiry_hours: 24,
     manual_payment_due_soon_days: 7,
     application_review_time_cap_days: 15,
-    slack_signup_reminder_initial_delay_days: 7,
-    slack_signup_reminder_repeat_delay_days: 14,
     slack_signup_reminder_max_account_age_months: 6,
-    application_link_reminder_delay_days: 3,
-    application_link_reminder_max_count: 3,
     new_member_grace_period_days: 14,
     new_member_expiry_days: 90,
     overdue_grace_period_days: 30,
-    payment_overdue_reminder_grace_days: 5,
-    payment_overdue_reminder_repeat_days: 7,
-    orientation_reminder_repeat_days: 14,
-    parking_notice_reminder_days_before_expiration: 3,
-    parking_notice_expired_reminder_repeat_days: 7,
-    parking_notice_final_reminder_days_after_expiration: 14,
     planless_payment_window_days: 32,
     payment_currency_buffer_days: 2
   }.freeze
@@ -62,10 +45,6 @@ class MembershipSetting < ApplicationRecord
   end
 
   # Convenience methods for accessing settings
-  def self.payment_grace_period_days
-    instance.payment_grace_period_days
-  end
-
   def self.reactivation_grace_period_months
     instance.reactivation_grace_period_months
   end
@@ -98,24 +77,11 @@ class MembershipSetting < ApplicationRecord
     instance.use_builtin_membership_application?
   end
 
-  def self.slack_signup_reminder_initial_delay_days
-    instance.slack_signup_reminder_initial_delay_days
-  end
-
-  def self.slack_signup_reminder_repeat_delay_days
-    instance.slack_signup_reminder_repeat_delay_days
-  end
-
+  # Not a cadence: however many reminders are left in the sequence, somebody who joined years
+  # ago and never wanted Slack is not going to be persuaded now. Also filters the report of
+  # members without Slack.
   def self.slack_signup_reminder_max_account_age_months
     instance.slack_signup_reminder_max_account_age_months
-  end
-
-  def self.application_link_reminder_delay_days
-    instance.application_link_reminder_delay_days
-  end
-
-  def self.application_link_reminder_max_count
-    instance.application_link_reminder_max_count
   end
 
   # How long a newly trained member stays active before their first payment is expected.
@@ -131,34 +97,6 @@ class MembershipSetting < ApplicationRecord
   # How long an overdue member keeps access before falling inactive.
   def self.overdue_grace_period_days
     instance.overdue_grace_period_days
-  end
-
-  # How long a member is left alone after their dues date passes before the first overdue
-  # reminder. Nobody is emailed on the day the payment is due.
-  def self.payment_overdue_reminder_grace_days
-    instance.payment_overdue_reminder_grace_days
-  end
-
-  def self.payment_overdue_reminder_repeat_days
-    instance.payment_overdue_reminder_repeat_days
-  end
-
-  # How long after approval an un-oriented member is first reminded, and how long between
-  # reminders after that.
-  def self.orientation_reminder_repeat_days
-    instance.orientation_reminder_repeat_days
-  end
-
-  def self.parking_notice_reminder_days_before_expiration
-    instance.parking_notice_reminder_days_before_expiration
-  end
-
-  def self.parking_notice_expired_reminder_repeat_days
-    instance.parking_notice_expired_reminder_repeat_days
-  end
-
-  def self.parking_notice_final_reminder_days_after_expiration
-    instance.parking_notice_final_reminder_days_after_expiration
   end
 
   # How long a payment counts as current when the member has no membership plan assigned.

@@ -3,13 +3,9 @@ require 'test_helper'
 module Reminders
   class ApplicationLinkEligibilityTest < ActiveSupport::TestCase
     setup do
-      MembershipSetting.instance.update!(
-        application_link_reminder_delay_days: 3,
-        application_link_reminder_max_count: 3,
-        use_builtin_membership_application: true
-      )
-      ReminderSetting.seed_defaults!
-      ReminderSetting.find_by!(key: 'application_link').update!(enabled: true)
+      MembershipSetting.instance.update!(use_builtin_membership_application: true)
+      set_reminder_cadence('application_link', enabled: true, start_offset_days: 3, interval_days: 3,
+                                               max_reminders: 3)
     end
 
     test 'due includes active verifications awaiting application past delay' do
@@ -38,11 +34,8 @@ module Reminders
 
     test 'due excludes verifications reminded inside delay window' do
       now = Time.zone.local(2026, 8, 6, 7, 15, 0)
-      verification = awaiting_verification(
-        now: now,
-        email: 'recent-reminder@example.com',
-        application_link_reminder_sent_at: now - 1.day
-      )
+      verification = awaiting_verification(now: now, email: 'recent-reminder@example.com',
+                                           last_reminded_at: now - 1.day)
 
       travel_to now do
         assert_not_includes ApplicationLinkEligibility.due(now: now), verification
@@ -51,15 +44,12 @@ module Reminders
 
     test 'due excludes verifications at max reminder count' do
       now = Time.zone.local(2026, 8, 6, 7, 15, 0)
-      verification = awaiting_verification(
-        now: now,
-        email: 'max-count@example.com',
-        application_link_reminder_count: 3,
-        application_link_reminder_sent_at: now - 4.days
-      )
+      verification = awaiting_verification(now: now, email: 'max-count@example.com',
+                                           last_reminded_at: now - 4.days, reminders: 3)
 
       travel_to now do
         assert_not_includes ApplicationLinkEligibility.due(now: now), verification
+        assert_not ApplicationLinkEligibility.due?(verification, now: now)
       end
     end
 
@@ -85,8 +75,6 @@ module Reminders
 
     test 'count_due returns zero when builtin application is disabled' do
       now = Time.zone.local(2026, 8, 6, 7, 15, 0)
-      ReminderSetting.seed_defaults!
-      ReminderSetting.find_by!(key: 'application_link').update!(enabled: true)
       MembershipSetting.instance.update!(use_builtin_membership_application: false)
       awaiting_verification(now: now, email: 'builtin-off@example.com')
 
@@ -140,7 +128,10 @@ module Reminders
     private
 
     def awaiting_verification(now:, email:, **attrs)
-      ApplicationVerification.create!(
+      last_reminded_at = attrs.delete(:last_reminded_at)
+      reminders = attrs.delete(:reminders) || 1
+
+      verification = ApplicationVerification.create!(
         {
           email: email,
           confirmed_open_house: true,
@@ -149,6 +140,8 @@ module Reminders
           expires_at: now + 2.days
         }.merge(attrs)
       )
+      record_reminder_sent('application_link', verification, at: last_reminded_at, times: reminders) if last_reminded_at
+      verification
     end
   end
 end

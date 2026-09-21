@@ -8,11 +8,8 @@ module Reminders
       # real clock rather than the injected now. Without freezing it, these members drift out of
       # their overdue grace period as the wall clock moves and stop being due.
       travel_to @now
-      MembershipSetting.instance.update!(
-        payment_overdue_reminder_grace_days: 5,
-        payment_overdue_reminder_repeat_days: 7,
-        overdue_grace_period_days: 30
-      )
+      MembershipSetting.instance.update!(overdue_grace_period_days: 30)
+      set_reminder_cadence('payment_overdue', start_offset_days: 5, interval_days: 7, max_reminders: nil)
     end
 
     test 'due includes overdue members who have never been reminded' do
@@ -67,15 +64,35 @@ module Reminders
       assert_includes PaymentOverdueEligibility.due(now: @now), user
     end
 
-    test 'reminder grace period follows the setting' do
+    test 'the wait before the first reminder follows the start offset' do
       user = overdue_user(email: 'longer-grace@example.com', overdue_for: 6)
-      MembershipSetting.instance.update!(payment_overdue_reminder_grace_days: 10)
+      set_reminder_cadence('payment_overdue', start_offset_days: 10)
 
       assert_not PaymentOverdueEligibility.due?(user, now: @now)
 
-      MembershipSetting.instance.update!(payment_overdue_reminder_grace_days: 0)
+      set_reminder_cadence('payment_overdue', start_offset_days: 0)
 
       assert PaymentOverdueEligibility.due?(user, now: @now)
+    end
+
+    test 'due stops once the maximum number of reminders has gone out' do
+      user = overdue_user(email: 'maxed-out@example.com', overdue_for: 20)
+      set_reminder_cadence('payment_overdue', max_reminders: 2)
+      record_reminder_sent('payment_overdue', user, at: @now - 10.days, times: 2)
+
+      assert_not PaymentOverdueEligibility.due?(user.reload, now: @now)
+      assert_not_includes PaymentOverdueEligibility.due(now: @now), user
+    end
+
+    # A member who pays up and falls behind again is at reminder one, not wherever the last
+    # spell left off — the anchor moved, so the sequence restarted.
+    test 'a fresh overdue spell starts the sequence over' do
+      user = overdue_user(email: 'lapsed-again@example.com', overdue_for: 20)
+      set_reminder_cadence('payment_overdue', max_reminders: 2)
+      record_reminder_sent('payment_overdue', user, at: @now - 10.days, anchor: @now - 400.days, times: 2)
+
+      assert PaymentOverdueEligibility.due?(user.reload, now: @now)
+      assert_includes PaymentOverdueEligibility.due(now: @now), user
     end
 
     # A member whose stored state has not caught up is overdue as of the dues date that
@@ -108,7 +125,7 @@ module Reminders
 
     test 'due excludes members reminded inside the repeat window' do
       user = overdue_user(email: 'recently-reminded@example.com')
-      user.update_columns(payment_overdue_reminder_sent_at: @now - 3.days)
+      record_reminder_sent('payment_overdue', user, at: @now - 3.days)
 
       assert_not_includes PaymentOverdueEligibility.due(now: @now), user.reload
       assert_not PaymentOverdueEligibility.due?(user, now: @now)
@@ -116,7 +133,7 @@ module Reminders
 
     test 'due includes members reminded outside the repeat window' do
       user = overdue_user(email: 'reminded-long-ago@example.com')
-      user.update_columns(payment_overdue_reminder_sent_at: @now - 8.days)
+      record_reminder_sent('payment_overdue', user, at: @now - 8.days)
 
       assert_includes PaymentOverdueEligibility.due(now: @now), user.reload
       assert PaymentOverdueEligibility.due?(user, now: @now)
@@ -202,7 +219,7 @@ module Reminders
     test 'total_overdue counts every overdue member regardless of reminder history' do
       overdue_user(email: 'overdue-a@example.com')
       reminded = overdue_user(email: 'overdue-b@example.com')
-      reminded.update_columns(payment_overdue_reminder_sent_at: @now)
+      record_reminder_sent('payment_overdue', reminded, at: @now)
 
       assert_equal 2, PaymentOverdueEligibility.total_overdue
       assert_equal 1, PaymentOverdueEligibility.count_due(now: @now)

@@ -13,10 +13,6 @@
   <div class="col-lg-8">
     <%= render "setting_group", title: "Payments" do %>
       <%= render "show_field",
-          label: "Payment grace period",
-          value: safe_join([content_tag(:strong, @membership_setting.payment_grace_period_days), " days"]),
-          help: "Days after payment due date before membership is marked as lapsed." %>
-      <%= render "show_field",
           label: "Planless payment window",
           value: safe_join([content_tag(:strong, @membership_setting.planless_payment_window_days), " days"]),
           help: "How long a linked payment counts as current when the member has no membership plan assigned." %>
@@ -86,59 +82,14 @@
 
     <%= render "setting_group", title: "Reminders", context: link_to("Reminders settings", reminder_settings_path, class: "text-secondary") do %>
       <%= render "show_field",
-          label: "Slack signup reminder — initial delay",
-          value: safe_join([content_tag(:strong, @membership_setting.slack_signup_reminder_initial_delay_days), " ",
-                            "day".pluralize(@membership_setting.slack_signup_reminder_initial_delay_days)]),
-          help: "Days after approval before the first Slack signup reminder." %>
-      <%= render "show_field",
-          label: "Slack signup reminder — repeat interval",
-          value: safe_join([content_tag(:strong, @membership_setting.slack_signup_reminder_repeat_delay_days), " ",
-                            "day".pluralize(@membership_setting.slack_signup_reminder_repeat_delay_days)]),
-          help: "Minimum days between Slack signup reminders for the same member." %>
-      <%= render "show_field",
           label: "Slack signup reminder — account age limit",
           value: safe_join([content_tag(:strong, @membership_setting.slack_signup_reminder_max_account_age_months), " ",
                             "month".pluralize(@membership_setting.slack_signup_reminder_max_account_age_months)]),
           help: "Only members who joined within this window are nudged to join Slack." %>
-      <%= render "show_field",
-          label: "Application link reminder — delay",
-          value: safe_join([content_tag(:strong, @membership_setting.application_link_reminder_delay_days), " ",
-                            "day".pluralize(@membership_setting.application_link_reminder_delay_days)]),
-          help: "Days after sending an application link before the first reminder, and between subsequent reminders." %>
-      <%= render "show_field",
-          label: "Application link reminder — maximum",
-          value: content_tag(:strong, @membership_setting.application_link_reminder_max_count),
-          help: "Stop after this many reminders or when the link expires, whichever comes first." %>
-      <%= render "show_field",
-          label: "Overdue payment reminder — grace period",
-          value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_grace_days), " ",
-                            "day".pluralize(@membership_setting.payment_overdue_reminder_grace_days)]),
-          help: "Days after the dues date passes before the first overdue reminder. 0 reminds on the day payment was due." %>
-      <%= render "show_field",
-          label: "Overdue payment reminder — repeat interval",
-          value: safe_join([content_tag(:strong, @membership_setting.payment_overdue_reminder_repeat_days), " ",
-                            "day".pluralize(@membership_setting.payment_overdue_reminder_repeat_days)]),
-          help: "Minimum days between overdue payment reminders for the same member." %>
-      <%= render "show_field",
-          label: "Orientation reminder — interval",
-          value: safe_join([content_tag(:strong, @membership_setting.orientation_reminder_repeat_days), " ",
-                            "day".pluralize(@membership_setting.orientation_reminder_repeat_days)]),
-          help: "How long after approval the first orientation reminder goes out, and the gap between them after that." %>
-      <%= render "show_field",
-          label: "Parking notice — days before expiration",
-          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_reminder_days_before_expiration), " ",
-                            "day".pluralize(@membership_setting.parking_notice_reminder_days_before_expiration)]),
-          help: "Pre-expiration reminder timing. 0 disables pre-expiration reminders." %>
-      <%= render "show_field",
-          label: "Parking notice — repeat after expiration",
-          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_expired_reminder_repeat_days), " ",
-                            "day".pluralize(@membership_setting.parking_notice_expired_reminder_repeat_days)]),
-          help: "Minimum days between follow-up reminders after expiration." %>
-      <%= render "show_field",
-          label: "Parking notice — final reminder after expiration",
-          value: safe_join([content_tag(:strong, @membership_setting.parking_notice_final_reminder_days_after_expiration), " ",
-                            "day".pluralize(@membership_setting.parking_notice_final_reminder_days_after_expiration)]),
-          help: "Final warning with disposal notice, sent once after expiration." %>
+      <div class="text-13 text-secondary">
+        How long after an event each reminder goes out, how often it repeats, and how many are sent in total are set
+        per reminder on the <%= link_to "Reminders page", reminder_settings_path, class: "text-secondary" %>.
+      </div>
     <% end %>
   </div>
 

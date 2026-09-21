@@ -1,15 +1,9 @@
 module Reminders
-  # Sends the overdue dues reminder. Disabled by default; the cadence between reminders
-  # to the same member comes from MembershipSetting.payment_overdue_reminder_repeat_days.
+  # Sends the overdue dues reminder. Disabled by default; the cadence comes from the
+  # reminder's settings row and counts from the moment the member fell behind.
   class NotifyPaymentOverdue
     def self.call(now: Time.current)
       new(now: now).call
-    end
-
-    def self.record_delivery!(user, at: Time.current)
-      user.with_lock do
-        user.update_column(:payment_overdue_reminder_sent_at, at)
-      end
     end
 
     def initialize(now:)
@@ -35,7 +29,7 @@ module Reminders
 
         # Mail held for review has not reached the member yet, so the clock on the next
         # reminder only starts once something actually went out.
-        self.class.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
+        PaymentOverdueEligibility.record_delivery!(user, at: @now) if result.is_a?(QueuedMail::ImmediateDelivery)
       end
     end
 

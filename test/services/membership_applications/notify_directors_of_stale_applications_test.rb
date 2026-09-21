@@ -9,6 +9,8 @@ module MembershipApplications
     setup do
       ActionMailer::Base.deliveries.clear
       clear_enqueued_jobs
+      set_reminder_cadence('staff_application', enabled: true, start_offset_days: 7, interval_days: 3,
+                                                max_reminders: nil)
       EmailTemplate.where(key: 'staff_application_reminder').delete_all
       EmailTemplate.create!(
         key: 'staff_application_reminder',
@@ -38,7 +40,7 @@ module MembershipApplications
         end
       end
 
-      assert_equal now, application.reload.application_reminder_sent_at
+      assert_equal now, ReminderDelivery.state_for('staff_application', application).last_sent_at
       assert_equal [users(:one).email, users(:two).email].sort,
                    ActionMailer::Base.deliveries.flat_map(&:to).sort
 
@@ -67,7 +69,7 @@ module MembershipApplications
       train_staff(users(:one))
       stale_application(now: now, email: 'already-approved@example.com', status: 'approved')
       stale_application(now: now, email: 'already-rejected@example.com', status: 'rejected')
-      stale_application(now: now, email: 'recently-reminded@example.com', application_reminder_sent_at: now - 2.days)
+      stale_application(now: now, email: 'recently-reminded@example.com', last_reminded_at: now - 2.days)
       MembershipApplication.create!(
         email: 'too-new@example.com',
         status: 'submitted',
@@ -89,7 +91,7 @@ module MembershipApplications
       application = stale_application(
         now: now,
         email: 'repeat-due@example.com',
-        application_reminder_sent_at: now - 3.days
+        last_reminded_at: now - 3.days
       )
       train_staff(users(:one))
 
@@ -101,7 +103,8 @@ module MembershipApplications
         end
       end
 
-      assert_equal now, application.reload.application_reminder_sent_at
+      assert_equal now, ReminderDelivery.state_for('staff_application', application).last_sent_at
+      assert_equal 2, ReminderDelivery.state_for('staff_application', application).sent_count
     end
 
     test 'does not repeat reminder before three days have passed' do
@@ -109,7 +112,7 @@ module MembershipApplications
       application = stale_application(
         now: now,
         email: 'repeat-not-due@example.com',
-        application_reminder_sent_at: now - 2.days
+        last_reminded_at: now - 2.days
       )
       train_staff(users(:one))
 
@@ -121,7 +124,7 @@ module MembershipApplications
         end
       end
 
-      assert_equal now - 2.days, application.reload.application_reminder_sent_at
+      assert_equal now - 2.days, ReminderDelivery.state_for('staff_application', application).last_sent_at
     end
 
     test 'deduplicates reviewers and only marks sent when a recipient exists' do
@@ -140,7 +143,7 @@ module MembershipApplications
         end
       end
 
-      assert_equal now, application.reload.application_reminder_sent_at
+      assert_equal now, ReminderDelivery.state_for('staff_application', application).last_sent_at
       assert_equal [users(:one).email], ActionMailer::Base.deliveries.flat_map(&:to)
     end
 
@@ -156,7 +159,7 @@ module MembershipApplications
         end
       end
 
-      assert_nil application.reload.application_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('staff_application', application)
     end
 
     test 'does not email applications parked as needs review' do
@@ -176,19 +179,35 @@ module MembershipApplications
         end
       end
 
-      assert_nil application.reload.application_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('staff_application', application)
+    end
+
+    test 'sends nothing while the reminder is disabled' do
+      now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      train_staff(users(:one))
+      set_reminder_cadence('staff_application', enabled: false)
+      stale_application(now: now, email: 'reminder-off@example.com')
+
+      travel_to now do
+        assert_no_difference 'ActionMailer::Base.deliveries.size' do
+          perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
+            NotifyDirectorsOfStaleApplications.call(now: now)
+          end
+        end
+      end
     end
 
     private
 
-    def stale_application(now:, email:, status: 'submitted', application_reminder_sent_at: nil)
-      MembershipApplication.create!(
+    def stale_application(now:, email:, status: 'submitted', last_reminded_at: nil)
+      application = MembershipApplication.create!(
         email: email,
         status: status,
         submitted_at: now - 8.days,
-        created_at: now - 8.days,
-        application_reminder_sent_at: application_reminder_sent_at
+        created_at: now - 8.days
       )
+      record_reminder_sent('staff_application', application, at: last_reminded_at) if last_reminded_at
+      application
     end
 
     # Reviewers are whoever holds applications.review through a role on a topic they hold.

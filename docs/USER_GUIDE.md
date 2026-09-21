@@ -2,11 +2,28 @@
 
 Admin-facing notes for MemberZone features.
 
-## Automated nags
+## Automated reminders
 
-Settings → **Nags** lists automated member reminders. Each nag can be enabled or disabled independently. Preview counts and the due-member list are always visible, even when a nag is disabled.
+Settings → **Reminders** lists every automated reminder. Each can be enabled or disabled independently. Preview counts and the due-member list are always visible, even when a reminder is disabled.
 
 Each reminder lists every email template it can send, linked so you can jump straight to the copy. Parking notice reminders have eight — permit and ticket copy for each phase. A template that has been disabled is flagged on the reminder, because a disabled template means the reminder sends nothing.
+
+### Setting the timing
+
+Every reminder is timed the same way, by three fields on its card. There is nothing to configure in Membership settings any more.
+
+- **First — N days from …** — when the first reminder goes out, counted from whatever that reminder starts from: the day a member was approved, the day their dues lapsed, the day a permit expires. The card names it. A **negative** number sends ahead of it, which is how parking warns people before their notice runs out.
+- **then every — N days** — the gap between reminders after the first.
+- **up to — N reminders** — how many to send in total. Leave it blank for no limit.
+
+Underneath, the card states the cadence back to you in plain English — "Cadence: 5 days after the dues date, then every 7 days, with no limit" — so you can check a change did what you meant before anything goes out.
+
+Two things are worth knowing about how the numbers behave:
+
+- **The gap is measured from the last reminder that actually sent**, not from the start. A run that was skipped, or a message that sat in the review queue for a week, pushes the rest of the sequence back rather than firing several reminders at once to catch up.
+- **The sequence starts over when the situation does.** A member who pays up and later falls behind again is back at reminder one. So is a permit that gets a new expiration date.
+
+The **Send now** button runs the reminder immediately against everyone the cadence says is due; it does not skip ahead of anyone's timing.
 
 Every parking permit and ticket email ends with a link to the notice it is about, so the member can open it, add a note, or clear it without hunting through their profile. The link is the `{{parking_notice_url}}` variable, and it points at the member's own view of the notice rather than the admin page.
 
@@ -14,41 +31,34 @@ Every parking permit and ticket email ends with a link to the notice it is about
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.
 
-**Timing** (Settings → Membership settings):
+**Timing** counts from application approval. Out of the box the first reminder goes out 7 days after approval and repeats every 14 with no limit. Members without an approved application use their member record creation date instead.
 
-- **Initial delay after approval** — days after application approval before the first reminder
-- **Repeat interval** — minimum days between reminders to the same member
+**Email copy** is editable under Settings → Email templates (`Slack Signup Reminder`). The template sends immediately when the reminder runs (it does not wait in the outbound mail review queue).
 
-Members without an approved application use their member record creation date as the starting point.
-
-**Email copy** is editable under Settings → Email templates (`Slack Signup Reminder`). The template sends immediately when the nag runs (it does not wait in the outbound mail review queue).
-
-The nag only sends when the Slack member source is enabled.
+The reminder only sends when the Slack member source is enabled. **Slack signup reminder — maximum account age (months)**, in Settings → Membership settings, decides who is eligible at all; it is not part of the timing.
 
 ### Overdue payment reminder
 
-Reminds members whose dues are past due, and sends the one-off notice when they lapse. Disabled by default — while it is off, neither email goes out. The daily job runs at 7:30 AM and reminds each overdue member at most once per repeat interval.
+Reminds members whose dues are past due, and sends the one-off notice when they lapse. Disabled by default — while it is off, neither email goes out. The daily job runs at 7:30 AM.
 
-Nobody is reminded on the day their payment was due. A member gets a grace period after their dues date — five days out of the box — before the first reminder, which leaves room for a late bank transfer or a retried card to land on its own. The reminders page shows how many overdue members are currently being held back by it.
+Nobody is reminded on the day their payment was due. The start offset — five days out of the box — leaves room for a late bank transfer or a retried card to land on its own. The reminders page shows how many overdue members are currently being held back by it. Set the offset to 0 to remind on the day payment was due.
 
 Members who have told us they are cancelling are never reminded, and neither are members whose overdue grace period has already run out — by then the conversation is about reactivating, not paying a late invoice.
 
-**Timing** (Settings → Membership settings):
+**Timing** counts from the day the member fell behind, and lives on the reminder card: 5 days, then every 7, with no limit. If a member pays and later goes overdue again, the sequence starts over.
 
-- **Overdue payment reminder — grace period (days)** — days after the dues date before the first reminder. Defaults to 5; set it to 0 to remind on the day payment was due
-- **Overdue payment reminder — repeat interval (days)** — minimum days between reminders to the same member
-- **Overdue grace period (days)** — how long an overdue member keeps building access, and therefore how long they can be reminded
+One related setting stays in Settings → Membership settings: **Overdue grace period (days)**, how long an overdue member keeps building access. It bounds how long they can be reminded and decides when the lapse notice fires, but it is not part of the cadence.
 
 **Email copy** is editable under Settings → Email templates (`Payment Past Due` and `Membership Lapsed`), and both are linked from the reminder. Reminders wait in the outbound mail review queue for approval before they go out.
 
 #### The “Membership Lapsed” email
 
-The lapse notice is the last stage of this reminder, not a separate system. The reminder page lays the sequence out in order: a grace period with nothing sent, then repeating Payment Past Due reminders, then the one-off lapse notice when the overdue grace period runs out.
+The lapse notice is the last stage of this reminder, not a separate system. The reminder page lays the sequence out in order: the start offset with nothing sent, then repeating Payment Past Due reminders, then the one-off lapse notice when the overdue grace period runs out.
 
 | | Payment Past Due | Membership Lapsed |
 | --- | --- | --- |
 | Who gets it | Members who are overdue but still have access | Members who have just fallen inactive |
-| When | Repeatedly, from the end of the reminder grace period until the overdue grace period runs out | Once, at the moment they become inactive |
+| When | Repeatedly, from the end of the start offset until the overdue grace period runs out | Once, at the moment they become inactive |
 | Sent by | The daily 7:30 AM job, and the **Send now** button | The membership state change itself — **Send now** does not send it |
 
 **One switch, one opt-out.** Turning this reminder off stops both emails: an overdue member hears nothing, and nothing goes out when they lapse. A member who opts out opts out of the whole sequence, under **Overdue dues and lapse notices** on their notification preferences.
@@ -65,9 +75,7 @@ Reminds members whose membership was **approved but who have not been through bu
 
 Recording the member's building access training is what stops the reminders: it moves them out of the New member state and off the list. Members whose new-member window has already run out are not reminded — by then they have fallen inactive and the conversation is about rejoining.
 
-**Timing** (Settings → Membership settings):
-
-- **Orientation reminder — interval (days)** — how long after approval the first reminder goes out, and the gap between reminders after that. Defaults to 14 days.
+**Timing** counts from approval, and lives on the reminder card: 14 days, then every 14, with no limit.
 
 **Email copy** is editable under Settings → Email templates (`Orientation Reminder`). Reminders wait in the outbound mail review queue for approval before they go out.
 
@@ -83,7 +91,9 @@ Tells **inactive members who have badged into the building** that their membersh
 
 Having cancelled is not a reason to stay quiet. A member who cancelled and stopped coming has no recent access logs and never comes up; a member who cancelled and is still letting themselves in is precisely who this reminder is for. The only standing that matters is being inactive.
 
-**Timing** (on the reminder card itself, not Membership settings):
+**Timing** counts from the earliest visit we have not mentioned yet: 0 days, then daily, with no limit. In practice that means a member becomes due the run after they badge in.
+
+One extra field sits on this card because the reminder scans a range rather than a single date:
 
 - **Scan back — days** — how far back through the access logs each run looks. Defaults to 1 day, and can be set as high as 90.
 
@@ -97,11 +107,39 @@ The due list shows a **New visits** count per member, so you can see how much a 
 
 **Email copy** is editable under Settings → Email templates (`Lapsed Member Access Reminder`). Reminders wait in the outbound mail review queue for approval before they go out. A message held for review records the visits it actually described, so visits that happen while it waits are not silently swallowed — they show up in the next reminder.
 
+### Application link reminder
+
+Reminds people who asked for a membership application link but never submitted one. Disabled by default.
+
+**Timing** counts from the day they requested the link: 3 days, then every 3, up to 3 reminders. This is the one reminder that ships with a limit — somebody who has ignored three nudges has decided.
+
+### Parking notice reminders
+
+Warns members before a permit or ticket expires, then follows up afterwards until the notice is cleared. Disabled by default. Members cannot opt out; a ticket is not optional mail.
+
+**Timing** counts from the notice's expiration date, and the start offset is negative: −3 days, then every 7, up to 4 reminders. So a notice expiring on the 10th is warned on the 7th, then followed up on the 14th, 21st and 28th.
+
+**Which of the four emails a member gets depends on where the send falls in the sequence**, not on a fixed date. The one before expiration is the warning. The first one after it says the notice has expired. The **last one in the sequence is the final notice**, and everything between is a follow-up.
+
+> That makes parking the one reminder that needs **up to** filled in. With no limit there is no last reminder, so the final notice never goes out and the follow-ups repeat indefinitely. The card shows a warning if you clear the field.
+
+Changing the interval or the maximum changes which days those four emails land on. Raising the maximum to 6, for instance, adds two more follow-ups and pushes the final notice out by two intervals.
+
+Each notice runs its own sequence, so clearing one has no effect on another. Giving a notice a new expiration date starts its sequence over from the warning.
+
+### Stale application reminder
+
+Tells directors that a membership application has been sitting unreviewed. **This is the one reminder that ships enabled** — a review queue nobody is told about is exactly the problem it exists to prevent.
+
+It goes to reviewers rather than to the applicant, so there is nobody to opt out and the card does not offer a **Members can opt out** switch.
+
+**Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
+
 ## Member notification preferences
 
 Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off.
 
-Optional reminder categories can also be disabled per category on Settings → **Reminders** via **Members can opt out**. Parking permit and ticket reminders default to mandatory.
+Optional reminder categories can also be disabled per category on Settings → **Reminders** via **Members can opt out**. Parking permit and ticket reminders default to mandatory, as does the stale application reminder, which goes to reviewers rather than to members.
 
 Applicants without an account can opt out from links in application reminder emails. Opted-out addresses are blocked at the apply gate until an admin removes the opt-out under Settings → **Email opt-outs**.
 

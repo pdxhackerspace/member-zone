@@ -51,7 +51,15 @@
           · <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window total</span>
         <% end %>
       </div>
+    <% elsif @reminder_setting.key == 'staff_application' %>
+      <div class="text-13 text-secondary mt-1">
+        <span class="fw-medium text-body"><%= @staff_application_due_count %></span> would be emailed on the next run
+        <% if @staff_application_awaiting_count > @staff_application_due_count %>
+          · <span class="text-secondary"><%= @staff_application_awaiting_count %> pending review total</span>
+        <% end %>
+      </div>
     <% end %>
+    <div class="text-12 text-secondary mt-1">Cadence: <%= @reminder_setting.schedule.description %></div>
     <%= render 'reminder_email_templates', reminder: @reminder_setting,
                                            email_templates: @reminder_setting.email_templates %>
   </div>
@@ -77,6 +85,7 @@
                 <th>Member</th>
                 <th>Approved</th>
                 <th>Last reminder</th>
+                <th class="num">Sent</th>
                 <th>Email</th>
               </tr>
             </thead>
@@ -85,7 +94,8 @@
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
                   <td><%= admin_profile_time(user.membership_approved_at, empty: 'Unknown') %></td>
-                  <td><%= admin_profile_time(user.slack_signup_reminder_sent_at) %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(user)) %></td>
+                  <td class="num"><%= reminder_sent_count_display(user, @reminder_setting) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>
               <% end %>
@@ -113,7 +123,7 @@
                 <th>Email</th>
                 <th>Link sent</th>
                 <th>Last reminder</th>
-                <th class="num">Count</th>
+                <th class="num">Sent</th>
                 <th>Expires</th>
               </tr>
             </thead>
@@ -122,8 +132,8 @@
                 <tr>
                   <td class="text-secondary"><%= verification.email %></td>
                   <td><%= admin_profile_time(verification.created_at) %></td>
-                  <td><%= admin_profile_time(verification.application_link_reminder_sent_at) %></td>
-                  <td class="num"><%= verification.application_link_reminder_count %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(verification)) %></td>
+                  <td class="num"><%= reminder_sent_count_display(verification, @reminder_setting) %></td>
                   <td><%= admin_profile_time(verification.expires_at) %></td>
                 </tr>
               <% end %>
@@ -166,6 +176,7 @@
                 <th>Member</th>
                 <th>Overdue since</th>
                 <th>Last reminder</th>
+                <th class="num">Sent</th>
                 <th>Email</th>
               </tr>
             </thead>
@@ -174,7 +185,8 @@
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
                   <td><%= admin_profile_time(Reminders::PaymentOverdueEligibility.overdue_since(user), empty: 'Unknown') %></td>
-                  <td><%= admin_profile_time(user.payment_overdue_reminder_sent_at) %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(user)) %></td>
+                  <td class="num"><%= reminder_sent_count_display(user, @reminder_setting) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>
               <% end %>
@@ -209,6 +221,7 @@
                 <th>Member</th>
                 <th>Accepted</th>
                 <th>Last reminder</th>
+                <th class="num">Sent</th>
                 <th>Email</th>
               </tr>
             </thead>
@@ -217,7 +230,8 @@
                 <tr>
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
                   <td><%= admin_profile_time(user.membership_approved_at, empty: 'Unknown') %></td>
-                  <td><%= admin_profile_time(user.orientation_reminder_sent_at) %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(user)) %></td>
+                  <td class="num"><%= reminder_sent_count_display(user, @reminder_setting) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>
               <% end %>
@@ -251,12 +265,13 @@
                 <th>Location</th>
                 <th>Expires</th>
                 <th>Due</th>
+                <th class="num">Sent</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
               <% @due_notices.each do |notice| %>
-                <% phase = Reminders::ParkingNoticeEligibility.due_phase(notice) %>
+                <% phase = Reminders::ParkingNoticeEligibility.phase_for(notice) %>
                 <tr>
                   <td>
                     <% if notice.user %>
@@ -269,6 +284,7 @@
                   <td class="text-secondary"><%= notice.location_display.presence || '—' %></td>
                   <td><%= admin_profile_time(notice.expires_at) %></td>
                   <td><%= parking_reminder_phase_label(phase) %></td>
+                  <td class="num"><%= reminder_sent_count_display(notice, @reminder_setting) %></td>
                   <td class="text-end">
                     <div class="d-inline-flex gap-2">
                       <%= link_to "View", parking_notice_path(notice), class: "btn btn-outline-secondary btn-sm" %>
@@ -325,7 +341,7 @@
                   <td><%= link_to user.display_name, user_path(user), class: "text-decoration-none fw-medium" %></td>
                   <td class="num <%= 'fw-medium' if visits > 1 %>"><%= visits %></td>
                   <td><%= admin_profile_time(user.membership_state_entered_at, empty: 'Unknown') %></td>
-                  <td><%= admin_profile_time(user.lapsed_access_reminder_sent_at) %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(user)) %></td>
                   <td class="text-secondary"><%= user.email %></td>
                 </tr>
               <% end %>
@@ -339,6 +355,52 @@
         <% end %>
       <% else %>
         <p class="text-secondary text-13 mb-0 p-3">No inactive members are due for this reminder right now.</p>
+      <% end %>
+    </div>
+  </div>
+<% elsif @reminder_setting.key == 'staff_application' %>
+  <div class="alert alert-secondary text-13 py-2 mb-3">
+    This reminder goes to directors rather than to the applicant, so members cannot opt out of it. An application
+    leaves the list as soon as somebody records a decision on it.
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <% if @due_applications.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Last reminder</th>
+                <th class="num">Sent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @due_applications.each do |application| %>
+                <tr>
+                  <td>
+                    <%= link_to application.applicant_display_name, membership_application_path(application),
+                                class: "text-decoration-none fw-medium" %>
+                  </td>
+                  <td class="text-secondary"><%= application.status.humanize %></td>
+                  <td><%= admin_profile_time(application.submitted_at || application.created_at, empty: 'Unknown') %></td>
+                  <td><%= admin_profile_time(reminder_last_sent_at(application)) %></td>
+                  <td class="num"><%= reminder_sent_count_display(application, @reminder_setting) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <% if @pagy.pages > 1 %>
+          <div class="p-3 border-top">
+            <%== pagy_bootstrap_nav(@pagy) %>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-secondary text-13 mb-0 p-3">No applications are due for a reminder right now.</p>
       <% end %>
     </div>
   </div>

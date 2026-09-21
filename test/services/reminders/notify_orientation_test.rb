@@ -6,15 +6,11 @@ module Reminders
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
       @topic = training_topics(:building_access)
       MembershipSetting.instance.update!(
-        orientation_reminder_repeat_days: 14,
         new_member_expiry_days: 90,
         building_access_training_topic: @topic
       )
-      ReminderSetting.find_or_create_by!(key: 'orientation') do |setting|
-        setting.name = 'Orientation reminder'
-        setting.description = 'Test'
-      end
-      ReminderSetting.find_by!(key: 'orientation').update!(enabled: true)
+      set_reminder_cadence('orientation', enabled: true, start_offset_days: 14, interval_days: 14,
+                                          max_reminders: nil)
       EmailTemplate.where(key: 'orientation_reminder').delete_all
       EmailTemplate.create!(
         key: 'orientation_reminder',
@@ -27,14 +23,14 @@ module Reminders
       )
     end
 
-    test 'sends the reminder and stamps when it went out' do
+    test 'sends the reminder and records when it went out' do
       user = awaiting_user(email: 'notify-orientation@example.com')
 
       assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
         NotifyOrientation.call(now: @now)
       end
 
-      assert_equal @now, user.reload.orientation_reminder_sent_at
+      assert_equal @now, ReminderDelivery.state_for('orientation', user).last_sent_at
     end
 
     test 'sends nothing while the reminder is disabled' do
@@ -46,7 +42,7 @@ module Reminders
       end
     end
 
-    test 'does not stamp when the mail is held for review' do
+    test 'does not record a send when the mail is held for review' do
       EmailTemplate.find_by!(key: 'orientation_reminder').update!(send_immediately: false)
       user = awaiting_user(email: 'orientation-held@example.com')
 
@@ -56,7 +52,7 @@ module Reminders
         end
       end
 
-      assert_nil user.reload.orientation_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('orientation', user)
     end
 
     test 'leaves members who have had their orientation alone' do
@@ -76,7 +72,7 @@ module Reminders
       assert_match 'approved 21 days ago', ActionMailer::Base.deliveries.last.to_s
     end
 
-    test 'stamps the member when mail held for review is later delivered' do
+    test 'records the send when mail held for review is later delivered' do
       EmailTemplate.find_by!(key: 'orientation_reminder').update!(send_immediately: false)
       user = awaiting_user(email: 'orientation-deferred@example.com')
       NotifyOrientation.call(now: @now)
@@ -85,7 +81,7 @@ module Reminders
       queued.update!(status: 'approved')
       queued.deliver_now!
 
-      assert_not_nil user.reload.orientation_reminder_sent_at
+      assert_equal 1, ReminderDelivery.state_for('orientation', user).sent_count
     end
 
     private

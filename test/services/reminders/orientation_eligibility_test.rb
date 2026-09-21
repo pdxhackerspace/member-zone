@@ -6,10 +6,10 @@ module Reminders
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
       @topic = training_topics(:building_access)
       MembershipSetting.instance.update!(
-        orientation_reminder_repeat_days: 14,
         new_member_expiry_days: 90,
         building_access_training_topic: @topic
       )
+      set_reminder_cadence('orientation', start_offset_days: 14, interval_days: 14, max_reminders: nil)
     end
 
     test 'due includes an approved member with no orientation who has never been reminded' do
@@ -58,7 +58,7 @@ module Reminders
 
     test 'due excludes members reminded inside the interval' do
       user = awaiting_user(email: 'recently-reminded@example.com')
-      user.update_columns(orientation_reminder_sent_at: @now - 3.days)
+      record_reminder_sent('orientation', user, at: @now - 3.days)
 
       assert_not_includes OrientationEligibility.due(now: @now), user.reload
       assert_not OrientationEligibility.due?(user, now: @now)
@@ -66,10 +66,19 @@ module Reminders
 
     test 'due includes members reminded outside the interval' do
       user = awaiting_user(email: 'reminded-long-ago@example.com')
-      user.update_columns(orientation_reminder_sent_at: @now - 15.days)
+      record_reminder_sent('orientation', user, at: @now - 15.days)
 
       assert_includes OrientationEligibility.due(now: @now), user.reload
       assert OrientationEligibility.due?(user, now: @now)
+    end
+
+    test 'due stops once the maximum number of reminders has gone out' do
+      user = awaiting_user(email: 'orientation-maxed@example.com')
+      set_reminder_cadence('orientation', max_reminders: 2)
+      record_reminder_sent('orientation', user, at: @now - 15.days, times: 2)
+
+      assert_not_includes OrientationEligibility.due(now: @now), user.reload
+      assert_not OrientationEligibility.due?(user, now: @now)
     end
 
     test 'due excludes members with reminder mail still awaiting review' do
@@ -111,7 +120,7 @@ module Reminders
     test 'total_awaiting counts everyone waiting regardless of reminder history' do
       awaiting_user(email: 'awaiting-a@example.com')
       reminded = awaiting_user(email: 'awaiting-b@example.com')
-      reminded.update_columns(orientation_reminder_sent_at: @now)
+      record_reminder_sent('orientation', reminded, at: @now)
       awaiting_user(email: 'awaiting-c@example.com', approved_ago: 1.day)
 
       assert_equal 3, OrientationEligibility.total_awaiting

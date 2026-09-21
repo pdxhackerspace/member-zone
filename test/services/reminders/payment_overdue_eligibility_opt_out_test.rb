@@ -5,7 +5,7 @@ module Reminders
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
       ReminderSetting.seed_defaults!
-      MembershipSetting.instance.update!(payment_overdue_reminder_repeat_days: 7)
+      set_reminder_cadence('payment_overdue', interval_days: 7)
     end
 
     test 'due excludes members who opted out of payment overdue email' do

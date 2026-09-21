@@ -1,5 +1,15 @@
 module Reminders
+  # Active members without a linked Slack account.
+  #
+  # The cadence is counted from the day the membership was approved and lives on the reminder's
+  # settings row; this service only decides who is still missing Slack. The account age cutoff
+  # is a separate judgement from the cadence: someone who joined years ago and never wanted
+  # Slack is not going to be persuaded now, however few reminders they have had.
   class SlackSignupEligibility
+    extend Cadence
+
+    REMINDER_KEY = 'slack_signup'.freeze
+
     APPROVAL_ANCHOR_SQL = <<~SQL.squish
       COALESCE(
         (SELECT MAX(membership_applications.reviewed_at)
@@ -23,16 +33,18 @@ module Reminders
 
     DELIVERABLE_EMAIL_SQL = "users.email IS NOT NULL AND users.email ~ '\\S'".freeze
 
-    def self.due(now: Time.current)
-      initial_cutoff = now - MembershipSetting.slack_signup_reminder_initial_delay_days.days
-      repeat_cutoff = now - MembershipSetting.slack_signup_reminder_repeat_delay_days.days
+    def self.reminder_key
+      REMINDER_KEY
+    end
 
-      base_scope(now: now)
-        .where("#{APPROVAL_ANCHOR_SQL} <= ?", initial_cutoff)
-        .where('slack_signup_reminder_sent_at IS NULL OR slack_signup_reminder_sent_at <= ?', repeat_cutoff)
-        .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-        .then { |scope| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(scope, 'slack_signup') }
-        .order(:full_name)
+    def self.anchor(user)
+      user.membership_approved_at
+    end
+
+    def self.due(now: Time.current)
+      ids = []
+      candidates(now: now).find_each { |user| ids << user.id if due?(user, now: now) }
+      User.where(id: ids).order(:full_name)
     end
 
     def self.count_due(now: Time.current)
@@ -47,16 +59,20 @@ module Reminders
       base_scope(now: now)
     end
 
+    def self.candidates(now: Time.current)
+      scope = base_scope(now: now)
+              .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
+              .then { |relation| Notifications::EligibilityOptOuts.user_scope_excluding_opt_outs(relation, REMINDER_KEY) }
+
+      DeliveryScope.candidates(scope, key: REMINDER_KEY, anchor_sql: APPROVAL_ANCHOR_SQL, now: now)
+                   .order(:full_name)
+    end
+
     def self.due?(user, now: Time.current)
       return false unless base_user?(user, now: now)
       return false if pending_reminder_mail?(user)
 
-      initial_cutoff = now - MembershipSetting.slack_signup_reminder_initial_delay_days.days
-      repeat_cutoff = now - MembershipSetting.slack_signup_reminder_repeat_delay_days.days
-      anchor = user.membership_approved_at
-
-      anchor <= initial_cutoff &&
-        (user.slack_signup_reminder_sent_at.nil? || user.slack_signup_reminder_sent_at <= repeat_cutoff)
+      cadence_due?(user, now: now)
     end
 
     def self.pending_reminder_mail?(user)

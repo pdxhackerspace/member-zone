@@ -4,17 +4,9 @@ module Reminders
   class NotifyApplicationLinkTest < ActiveSupport::TestCase
     setup do
       @now = Time.zone.local(2026, 8, 6, 7, 15, 0)
-      MembershipSetting.instance.update!(
-        application_link_reminder_delay_days: 3,
-        application_link_reminder_max_count: 3,
-        use_builtin_membership_application: true
-      )
-      ReminderSetting.find_or_create_by!(key: 'application_link') do |setting|
-        setting.name = 'Application link reminder'
-        setting.description = 'Test'
-        setting.enabled = true
-      end
-      ReminderSetting.find_by!(key: 'application_link').update!(enabled: true)
+      MembershipSetting.instance.update!(use_builtin_membership_application: true)
+      set_reminder_cadence('application_link', enabled: true, start_offset_days: 3, interval_days: 3,
+                                               max_reminders: 3)
       EmailTemplate.where(key: 'application_link_reminder').delete_all
       EmailTemplate.create!(
         key: 'application_link_reminder',
@@ -27,7 +19,7 @@ module Reminders
       )
     end
 
-    test 'sends reminder and stamps verification when enabled' do
+    test 'sends reminder and records it against the sequence when enabled' do
       verification = due_verification(email: 'notify-link@example.com')
 
       travel_to @now do
@@ -36,9 +28,10 @@ module Reminders
         end
       end
 
-      verification.reload
-      assert_equal @now, verification.application_link_reminder_sent_at
-      assert_equal 1, verification.application_link_reminder_count
+      delivery = ReminderDelivery.state_for('application_link', verification)
+
+      assert_equal @now, delivery.last_sent_at
+      assert_equal 1, delivery.sent_count
     end
 
     test 'skips when reminder is disabled' do
@@ -63,7 +56,7 @@ module Reminders
       end
     end
 
-    test 'queued delivery stamps the verification that triggered the reminder' do
+    test 'queued delivery records against the verification that triggered the reminder' do
       EmailTemplate.find_by!(key: 'application_link_reminder').update!(send_immediately: false)
       older = due_verification(email: 'same-link@example.com')
       newer = ApplicationVerification.create!(
@@ -87,13 +80,12 @@ module Reminders
         queued_mail.deliver_now!
       end
 
-      assert_equal delivery_time, older.reload.application_link_reminder_sent_at
-      assert_equal 1, older.application_link_reminder_count
-      assert_nil newer.reload.application_link_reminder_sent_at
-      assert_equal 0, newer.application_link_reminder_count
+      assert_equal delivery_time, ReminderDelivery.state_for('application_link', older).last_sent_at
+      assert_equal 1, ReminderDelivery.state_for('application_link', older).sent_count
+      assert_nil ReminderDelivery.state_for('application_link', newer)
     end
 
-    test 'does not stamp reminder time when mail is queued for review' do
+    test 'does not record a send when mail is queued for review' do
       EmailTemplate.find_by!(key: 'application_link_reminder').update!(send_immediately: false)
       verification = due_verification(email: 'queued-link@example.com')
 
@@ -105,15 +97,13 @@ module Reminders
         end
       end
 
-      verification.reload
-      assert_nil verification.application_link_reminder_sent_at
-      assert_equal 0, verification.application_link_reminder_count
+      assert_nil ReminderDelivery.state_for('application_link', verification)
     end
 
-    test 'raises when delivery succeeds but stamping fails' do
+    test 'raises when delivery succeeds but recording fails' do
       verification = due_verification(email: 'stamp-failure@example.com')
-      original = NotifyApplicationLink.method(:record_delivery!)
-      NotifyApplicationLink.define_singleton_method(:record_delivery!) do |*_args|
+      original = ApplicationLinkEligibility.method(:record_delivery!)
+      ApplicationLinkEligibility.define_singleton_method(:record_delivery!) do |*_args, **_kwargs|
         raise ActiveRecord::StatementInvalid, 'stamp failed'
       end
 
@@ -125,14 +115,12 @@ module Reminders
         end
       end
 
-      verification.reload
-      assert_nil verification.application_link_reminder_sent_at
-      assert_equal 0, verification.application_link_reminder_count
+      assert_nil ReminderDelivery.state_for('application_link', verification)
     ensure
-      NotifyApplicationLink.define_singleton_method(:record_delivery!, original)
+      ApplicationLinkEligibility.define_singleton_method(:record_delivery!, original)
     end
 
-    test 'swallows delivery failures without stamping' do
+    test 'swallows delivery failures without recording a send' do
       verification = due_verification(email: 'delivery-failure@example.com')
       original = QueuedMail.method(:enqueue_application_link_reminder)
       QueuedMail.define_singleton_method(:enqueue_application_link_reminder) do |*_args|
@@ -147,9 +135,7 @@ module Reminders
         end
       end
 
-      verification.reload
-      assert_nil verification.application_link_reminder_sent_at
-      assert_equal 0, verification.application_link_reminder_count
+      assert_nil ReminderDelivery.state_for('application_link', verification)
     ensure
       QueuedMail.define_singleton_method(:enqueue_application_link_reminder, original)
     end

@@ -16,12 +16,8 @@
         </thead>
         <tbody>
           <tr>
-            <td class="text-nowrap">
-              Dues date, for
-              <%= @membership_setting.payment_overdue_reminder_grace_days %>
-              <%= 'day'.pluralize(@membership_setting.payment_overdue_reminder_grace_days) %>
-            </td>
-            <td class="text-secondary">Nothing — reminder grace period</td>
+            <td class="text-nowrap">Dues date, for <%= pluralize(@reminder_setting.start_offset_days, 'day') %></td>
+            <td class="text-secondary">Nothing — waiting out the start offset</td>
             <td>
               <% if @payment_overdue_grace_count.to_i.positive? %>
                 <span class="fw-medium"><%= @payment_overdue_grace_count %></span> waiting
@@ -41,9 +37,7 @@
               <% else %>
                 Payment Past Due
               <% end %>
-              <span class="text-secondary">
-                · repeats every <%= @membership_setting.payment_overdue_reminder_repeat_days %> days
-              </span>
+              <span class="text-secondary">· repeats every <%= pluralize(@reminder_setting.interval_days, 'day') %><%= ", up to #{@reminder_setting.max_reminders}" unless @reminder_setting.unlimited_reminders? %></span>
             </td>
             <td>
               <% if @payment_overdue_reminded_count.to_i.positive? %>

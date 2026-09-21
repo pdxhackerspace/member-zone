@@ -6,16 +6,8 @@ module Reminders
 
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
-      MembershipSetting.instance.update!(
-        slack_signup_reminder_initial_delay_days: 7,
-        slack_signup_reminder_repeat_delay_days: 14
-      )
-      ReminderSetting.find_or_create_by!(key: 'slack_signup') do |setting|
-        setting.name = 'Slack signup reminder'
-        setting.description = 'Test'
-        setting.enabled = true
-      end
-      ReminderSetting.find_by!(key: 'slack_signup').update!(enabled: true)
+      set_reminder_cadence('slack_signup', enabled: true, start_offset_days: 7, interval_days: 14,
+                                           max_reminders: nil)
       member_sources(:slack).update!(enabled: true)
       EmailTemplate.where(key: 'slack_signup_reminder').delete_all
       EmailTemplate.create!(
@@ -29,7 +21,7 @@ module Reminders
       )
     end
 
-    test 'sends reminder and stamps reminder time when enabled' do
+    test 'sends reminder and records it against the sequence when enabled' do
       user = due_user(email: 'notify-slack@example.com')
 
       travel_to @now do
@@ -38,7 +30,10 @@ module Reminders
         end
       end
 
-      assert_equal @now, user.reload.slack_signup_reminder_sent_at
+      delivery = ReminderDelivery.state_for('slack_signup', user)
+
+      assert_equal @now, delivery.last_sent_at
+      assert_equal 1, delivery.sent_count
     end
 
     test 'skips when reminder is disabled' do
@@ -52,7 +47,7 @@ module Reminders
       end
     end
 
-    test 'does not stamp reminder time when mail is queued for review' do
+    test 'does not record a send when mail is queued for review' do
       EmailTemplate.find_by!(key: 'slack_signup_reminder').update!(send_immediately: false)
       user = due_user(email: 'queued-reminder@example.com')
 
@@ -64,10 +59,10 @@ module Reminders
         end
       end
 
-      assert_nil user.reload.slack_signup_reminder_sent_at
+      assert_nil ReminderDelivery.state_for('slack_signup', user)
     end
 
-    test 'deliver_now stamps legacy slack signup nag mail' do
+    test 'deliver_now records legacy slack signup nag mail' do
       EmailTemplate.find_by!(key: 'slack_signup_reminder').update!(send_immediately: false)
       user = due_user(email: 'legacy-nag-mail@example.com')
 
@@ -84,7 +79,7 @@ module Reminders
         queued_mail.deliver_now!
       end
 
-      assert_equal delivery_time, user.reload.slack_signup_reminder_sent_at
+      assert_equal delivery_time, ReminderDelivery.state_for('slack_signup', user).last_sent_at
     end
 
     private
