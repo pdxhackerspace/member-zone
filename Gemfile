@@ -42,7 +42,7 @@ gem 'jbuilder'
 
 # json 3.0 dropped the positional options argument to JSON.parse, which
 # ActiveSupport::JSON.decode still passes. Unpin once Rails supports json 3.
-gem 'json', '~> 2.21'
+gem 'json', '~> 3.0'
 
 # Use Redis adapter to run Action Cable in production
 gem 'redis', '>= 4.0.1'
