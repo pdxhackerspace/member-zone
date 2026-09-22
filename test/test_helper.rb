@@ -13,9 +13,12 @@ module ActiveSupport
     # find, so a scan stored by worker 2 is a perfectly good candidate for a claim made by worker
     # 1 in the same second. Pointing each worker at its own database removes the question.
     #
-    # Redis ships with 16 databases and leaves 0 for anything run outside the suite. A machine
-    # with more than 15 cores wraps around and two workers share again, which is why the tests
-    # also use RFID values unique to each example.
+    # Database 0 is left for anything run outside the suite, so workers take 1 upwards. How many
+    # there are to hand out is asked of the server rather than assumed: Redis ships with 16, this
+    # suite runs one worker per core, and a machine with more than 15 of them wraps around and
+    # puts two workers back in one database. The test container is started with enough of them
+    # (see docker-compose.test.yml); the tests also use RFID values unique to each example, which
+    # is the belt to this braces.
     parallelize_setup do |worker|
       ENV['REDIS_URL'] = redis_url_for_test_worker(worker)
       # The connection is memoized, and reading ENV again is the only way to pick up the new
@@ -26,8 +29,18 @@ module ActiveSupport
     def self.redis_url_for_test_worker(worker)
       base = ENV.fetch('REDIS_URL', 'redis://localhost:6379/0')
       uri = URI.parse(base)
-      uri.path = "/#{(worker % 15) + 1}"
+      uri.path = "/#{(worker % (redis_database_count(base) - 1)) + 1}"
       uri.to_s
+    end
+
+    # Falls back to the stock 16 if the server will not say, which is no worse than assuming it.
+    def self.redis_database_count(url)
+      @redis_database_count ||= begin
+        reported = Redis.new(url: url).config(:get, 'databases')['databases'].to_i
+        reported > 1 ? reported : 16
+      rescue StandardError
+        16
+      end
     end
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
@@ -42,12 +55,13 @@ module ActiveSupport
 
     # Redis is not rolled back between tests the way the database is, so anything that leaves a
     # pending scan, a claim, or a count of failed guesses behind has to clear up after itself.
+    # One scan covers the scans, the claims on them, the failed-guess counts and the session
+    # bindings, because every key the service writes begins this way. Matching each prefix
+    # separately walked the whole keyspace once per prefix, and this runs in the setup and the
+    # teardown of every RFID test.
     def reset_rfid_webhook_state!
       redis = RfidWebhookService.redis
-      patterns = [RfidWebhookService::REDIS_KEY_PREFIX,
-                  RfidWebhookService::CLAIM_KEY_PREFIX,
-                  RfidWebhookService::ATTEMPTS_KEY_PREFIX]
-      keys = patterns.flat_map { |prefix| redis.scan_each(match: "#{prefix}*").to_a }
+      keys = redis.scan_each(match: "#{RfidWebhookService::REDIS_KEY_PREFIX.chomp(':')}*").to_a
       redis.del(*keys) if keys.any?
     end
 

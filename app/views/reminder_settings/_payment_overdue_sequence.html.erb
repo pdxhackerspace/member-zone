@@ -67,6 +67,10 @@
       </table>
     </div>
     <div class="text-12 text-secondary mt-2">
+      Every stage counts from the dues date, including the two in
+      <%= link_to "Membership settings", membership_settings_path, class: "text-secondary" %>: a member's standing reads
+      Current for the payment grace period, <%= pluralize(@membership_setting.payment_grace_period_days, 'day') %> while
+      their payment could still be clearing, and Overdue from then until they lapse.
       All three stages are governed by the Enabled switch on the reminders page, and a member who opts out opts out of
       the whole sequence. The lapse notice fires on the move to inactive rather than on the daily run, so “Send now”
       covers the past-due reminders only.

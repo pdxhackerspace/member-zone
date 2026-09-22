@@ -8,7 +8,7 @@ module Reminders
       # real clock rather than the injected now. Without freezing it, these members drift out of
       # their overdue grace period as the wall clock moves and stop being due.
       travel_to @now
-      MembershipSetting.instance.update!(overdue_grace_period_days: 30)
+      MembershipSetting.instance.update!(overdue_grace_period_days: 30, payment_grace_period_days: 5)
       set_reminder_cadence('payment_overdue', start_offset_days: 5, interval_days: 7, max_reminders: nil)
     end
 
@@ -95,9 +95,11 @@ module Reminders
       assert_includes PaymentOverdueEligibility.due(now: @now), user
     end
 
-    # A member whose stored state has not caught up is overdue as of the dues date that
-    # passed, not as of whenever Membership::TickJob gets around to moving them.
-    test 'grace period for a current member runs from their paid-through date' do
+    # A member whose stored state has not caught up is overdue as of their dues date, not as
+    # of whenever Membership::TickJob gets around to moving them — and not as of the end of
+    # the payment grace period either, which exists to keep the state machine quiet rather
+    # than to delay the mail.
+    test 'grace period for a current member runs from their dues date' do
       user = User.create!(
         email: 'current-inside-grace@example.com',
         full_name: 'Barely Past Due',
@@ -108,8 +110,28 @@ module Reminders
       )
       user.update_columns(membership_state: 'current_member', membership_state_entered_at: @now - 60.days)
 
-      assert_equal 'overdue_member', user.reload.effective_membership_state
+      assert_equal @now - 2.days, PaymentOverdueEligibility.overdue_since(user.reload)
+      assert PaymentOverdueEligibility.within_grace_period?(user, now: @now)
       assert_not PaymentOverdueEligibility.due?(user, now: @now)
+    end
+
+    # The payment grace period buys the state machine time to see a payment; it must not
+    # also push back the first reminder, which has its own offset from the same dues date.
+    test 'the first reminder is not delayed by the payment grace period' do
+      MembershipSetting.instance.update!(payment_grace_period_days: 5)
+      user = User.create!(
+        email: 'reminder-not-delayed@example.com',
+        full_name: 'Six Days Past Due',
+        service_account: false,
+        membership_state: 'current_member',
+        payment_type: 'cash',
+        dues_due_at: @now - 6.days
+      )
+      user.update_columns(membership_state: 'current_member', membership_state_entered_at: @now - 60.days)
+
+      assert_equal 'overdue_member', user.reload.effective_membership_state
+      assert_not PaymentOverdueEligibility.within_grace_period?(user, now: @now)
+      assert PaymentOverdueEligibility.due?(user, now: @now)
     end
 
     test 'overdue_counts reports members held back by the grace period' do

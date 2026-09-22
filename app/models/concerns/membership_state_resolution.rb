@@ -34,8 +34,8 @@ module MembershipStateResolution
       target = EXPIRY_TARGETS[state]
       break if target.nil? || target == state
 
+      entered = expiry_entry_anchor(state, deadline)
       state = target
-      entered = deadline
     end
 
     state
@@ -79,6 +79,21 @@ module MembershipStateResolution
     (anchor + window).in_time_zone.beginning_of_day
   end
 
+  # When a current member stops counting as paid up: their paid-through date plus the grace
+  # the settings allow. A payment has to clear its processor and then reach us through a
+  # sync that has not necessarily run yet, so on the dues date itself we cannot tell a
+  # member who paid that morning from one who did not pay at all.
+  #
+  # Only current_member gets it. A cancelled member's paid-through date is the end of what
+  # they bought, and a guest's is the end of a window somebody granted them — no payment is
+  # on its way in either case, so there is nothing to wait for.
+  def dues_grace_ends_at
+    paid_through = dues_paid_through_at
+    return nil if paid_through.nil?
+
+    paid_through + MembershipSetting.payment_grace_period_days.days
+  end
+
   # Most recent payment using only columns on this row, so it is safe to call during a
   # save. #most_recent_payment_date queries the payment tables and is not.
   def last_payment_on
@@ -95,12 +110,27 @@ module MembershipStateResolution
     end
   end
 
+  # What the clock on a newly resolved state starts from. Ordinarily the deadline that
+  # fired, which is when the member arrived in it.
+  #
+  # A member leaving current_member is the exception: their overdue clock starts at the
+  # dues date rather than at the end of the payment grace period. Both grace periods are
+  # offsets from the same dues date, so anchoring one at the end of the other would stack
+  # them — turning the payment grace up would push back the day the member lapses and the
+  # day their reminders start, which are separate decisions.
+  def expiry_entry_anchor(from_state, deadline)
+    return dues_paid_through_at || deadline if from_state == 'current_member'
+
+    deadline
+  end
+
   def membership_state_deadline(state, entered)
     case state
     when 'new_member' then entered + MembershipSetting.new_member_expiry_days.days
     when 'provisional_member' then entered + MembershipSetting.new_member_grace_period_days.days
     when 'overdue_member' then entered + MembershipSetting.overdue_grace_period_days.days
-    when 'current_member', 'cancelled_member', 'guest_member' then dues_paid_through_at
+    when 'current_member' then dues_grace_ends_at
+    when 'cancelled_member', 'guest_member' then dues_paid_through_at
     end
   end
 

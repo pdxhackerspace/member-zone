@@ -47,7 +47,9 @@ Members who have told us they are cancelling are never reminded, and neither are
 
 **Timing** counts from the day the member fell behind, and lives on the reminder card: 5 days, then every 7, with no limit. If a member pays and later goes overdue again, the sequence starts over.
 
-One related setting stays in Settings → Membership settings: **Overdue grace period (days)**, how long an overdue member keeps building access. It bounds how long they can be reminded and decides when the lapse notice fires, but it is not part of the cadence.
+Two related settings stay in Settings → Membership settings, and neither is part of the cadence. **Payment grace period (days)** — five out of the box — is how long past their dues date a member's standing still reads Current, so a card retry or a bank transfer has time to clear and be picked up by a payment sync rather than looking like a missed payment. **Overdue grace period (days)** is how long past the same dues date they keep building access; it bounds how long they can be reminded and decides when the lapse notice fires.
+
+All three timings are counted from the dues date, not from each other, so you can change one without moving the others. On the defaults a member who never pays reads Current for five days, gets their first Payment Past Due email on day five, and lapses on day thirty.
 
 **Email copy** is editable under Settings → Email templates (`Payment Past Due` and `Membership Lapsed`), and both are linked from the reminder. Reminders wait in the outbound mail review queue for approval before they go out.
 
@@ -151,7 +153,7 @@ A member's standing is a single state, shown on their profile and filterable on 
 | --- | --- | --- |
 | New member | Yes | Application approved, waiting on building access training |
 | In grace period | Yes | Trained, inside the window before their first payment is expected |
-| Current | Yes | Paying and up to date — the ordinary case |
+| Current | Yes | Paying and up to date — the ordinary case. Stays Current for the payment grace period past their dues date, so a payment still clearing does not read as a missed one |
 | Overdue | Yes | Behind on dues, still inside the overdue grace period |
 | Cancelled | Yes | They told us they are leaving; access runs to the end of what they paid for |
 | Inactive | No | Lapsed, cancelled and past their paid-through date, or approved and never trained |

@@ -26,10 +26,15 @@
                             "day".pluralize(@membership_setting.manual_payment_due_soon_days)]),
           help: "Admin dashboard and manual payments list treat dues as “due soon” when the next due date is today, overdue, or within this many calendar days." %>
       <%= render "show_field",
+          label: "Payment grace period",
+          value: safe_join([content_tag(:strong, @membership_setting.payment_grace_period_days), " ",
+                            "day".pluralize(@membership_setting.payment_grace_period_days)]),
+          help: "How long after their dues date a member stays current, leaving time for a payment to process and sync before they count as overdue." %>
+      <%= render "show_field",
           label: "Overdue grace period",
           value: safe_join([content_tag(:strong, @membership_setting.overdue_grace_period_days), " ",
                             "day".pluralize(@membership_setting.overdue_grace_period_days)]),
-          help: "How long an overdue member keeps access after their dues date passes." %>
+          help: "How long after their dues date a member keeps access before becoming inactive. Counted from the same dues date as the payment grace period, not added to it." %>
       <%= render "show_field",
           label: "Reactivation grace period",
           value: safe_join([content_tag(:strong, @membership_setting.reactivation_grace_period_months), " months"]),

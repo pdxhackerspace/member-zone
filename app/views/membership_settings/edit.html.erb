@@ -45,9 +45,21 @@
         </div>
 
         <div class="mb-3">
+          <%= f.label :payment_grace_period_days, "Payment grace period (days)", class: "form-label" %>
+          <%= f.number_field :payment_grace_period_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
+          <div class="form-text">
+            How long after their dues date a member still counts as current, so a payment has time to clear its processor and reach us in a sync.
+            Use <strong>0</strong> to mark a member overdue the moment their dues date passes.
+          </div>
+        </div>
+
+        <div class="mb-3">
           <%= f.label :overdue_grace_period_days, "Overdue grace period (days)", class: "form-label" %>
           <%= f.number_field :overdue_grace_period_days, class: "form-control", min: 0, style: "max-width: 150px;" %>
-          <div class="form-text">How long an overdue member keeps access after their dues date passes, before they become inactive.</div>
+          <div class="form-text">
+            How long after their dues date a member keeps access before becoming inactive.
+            Counted from the same dues date as the payment grace period rather than added onto it, so changing one does not move the other.
+          </div>
         </div>
 
         <div class="mb-0">
