@@ -101,6 +101,34 @@ module AuditLogs
       assert_equal Time.utc(2026, 9, 30), source.reload.last_entry_at
     end
 
+    test 'a run that stores nothing leaves the cursor where it was' do
+      source = create_audit_log_source(script: 'json_lines.sh')
+      RunSource.call(source)
+      cursor = source.reload.last_entry_at
+
+      RunSource.call(source)
+
+      assert_equal 0, source.audit_log_runs.order(:id).last.entries_added
+      assert_equal cursor, source.reload.last_entry_at
+    end
+
+    test 'a first run that prints nothing does not set a cursor' do
+      source = create_audit_log_source(script: 'empty.sh')
+
+      RunSource.call(source)
+
+      assert_nil source.reload.last_entry_at
+      assert_equal 'success', source.run_status
+    end
+
+    test 'a failed run that stored nothing does not set a cursor' do
+      source = create_audit_log_source(script_path: '/nonexistent/nope.sh')
+
+      RunSource.call(source)
+
+      assert_nil source.reload.last_entry_at
+    end
+
     test 'the program is handed a cursor that is not in the future after a run with skewed timestamps' do
       source = create_audit_log_source(script: 'future.sh')
       RunSource.call(source)

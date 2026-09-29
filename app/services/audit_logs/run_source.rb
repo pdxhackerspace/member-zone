@@ -47,9 +47,13 @@ module AuditLogs
 
     # The cursor handed back to the program as AUDIT_LOG_SINCE. It never runs ahead of the
     # start of this run, whatever the entries claim, or one bad timestamp would make programs
-    # that honour it as a lower bound collect nothing from then on.
+    # that honour it as a lower bound collect nothing from then on. A run that stored nothing
+    # leaves the cursor exactly where it was: the start of the run is a ceiling, not a candidate.
     def latest_entry_time(added, started_at)
-      [[added.map(&:occurred_at).max, started_at].compact.min, @source.last_entry_at].compact.max
+      newest = added.map(&:occurred_at).max
+      return @source.last_entry_at if newest.nil?
+
+      [[newest, started_at].min, @source.last_entry_at].compact.max
     end
   end
 end
