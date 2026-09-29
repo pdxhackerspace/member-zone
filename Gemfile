@@ -3,7 +3,7 @@ source 'https://rubygems.org'
 ruby '4.0.6'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem 'rails', '~> 8.1.2'
+gem 'rails', '~> 8.1.4'
 
 # The original asset pipeline for Rails [https://github.com/rails/sprockets-rails]
 gem 'sprockets-rails'
@@ -116,7 +116,7 @@ group :development do
 
   # Code style checker
   gem 'rubocop', '~> 1.91', require: false
-  gem 'rubocop-rails', '~> 2.36', require: false
+  gem 'rubocop-rails', '~> 2.38', require: false
 
   # Preview emails in browser instead of sending
   gem 'letter_opener', '~> 1.10'

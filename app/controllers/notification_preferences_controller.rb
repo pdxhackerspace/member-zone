@@ -57,7 +57,7 @@ class NotificationPreferencesController < ApplicationController
   end
 
   def load_preferences
-    @grouped_categories = NotificationCategory.grouped_for_member
+    @grouped_categories = NotificationCategory.grouped_for_member(@subject_user)
     @opt_out_lookup = NotificationOptOut.where(user: @subject_user).each_with_object({}) do |row, hash|
       hash[row.category] ||= {}
       hash[row.category][row.channel] = true

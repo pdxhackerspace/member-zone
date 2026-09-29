@@ -199,6 +199,24 @@ module ActiveSupport
       Rails.application.config.x.local_auth.enabled = original
     end
 
+    AUDIT_LOG_FIXTURE_DIR = Rails.root.join('test/fixtures/files/audit-log').freeze
+
+    def audit_log_script(name)
+      AUDIT_LOG_FIXTURE_DIR.join(name).to_s
+    end
+
+    def create_audit_log_source(script: 'json_lines.sh', **attributes)
+      AuditLogSource.create!(
+        { name: "Source #{SecureRandom.hex(4)}", script_path: audit_log_script(script) }.merge(attributes)
+      )
+    end
+
+    def create_audit_log_entry(source, message: 'something happened', occurred_at: Time.current, **attributes)
+      source.audit_log_entries.create!(
+        { message: message, occurred_at: occurred_at, fingerprint: SecureRandom.hex(16) }.merge(attributes)
+      )
+    end
+
     # Proves both halves of a privilege gate at once: the affordance is absent without the
     # privilege, present with it, and — when a request is supplied — the underlying action is
     # refused without it, so hiding is never the only thing protecting it.

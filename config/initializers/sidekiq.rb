@@ -178,6 +178,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Audit Logs - a little past every hour, queueing a run for each source whose interval has elapsed
+  Sidekiq::Cron::Job.create(
+    name: 'Audit Log Dispatch - Hourly',
+    cron: '2 * * * *',
+    class: 'AuditLogs::DispatchJob',
+    active_job: true
+  )
+
   # Member Geocoding - Hourly
   Sidekiq::Cron::Job.create(
     name: 'Member Geocoding - Hourly',

@@ -1,0 +1,101 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Audit log</h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="text-body"><%= @total_count %></span> entries from
+      <span class="text-body"><%= @sources.size %></span> <%= 'source'.pluralize(@sources.size) %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <% if can?(:'audit_logs.manage') %>
+      <%= link_to "Sources", audit_log_sources_path, class: "btn btn-outline-secondary btn-sm" %>
+    <% end %>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+  <%= render 'shared/filter_chip', label: 'All sources', count: @total_count,
+             path: audit_log_filter_path(source: nil), active: @source.nil? %>
+  <% @sources.each do |source| %>
+    <%= render 'shared/filter_chip', label: source.name, count: @source_counts.fetch(source.id, 0),
+               path: audit_log_filter_path(source: source.id), active: @source&.id == source.id %>
+  <% end %>
+  <span class="text-secondary">·</span>
+  <%= render 'shared/filter_chip', label: 'Unexplained', count: @unexplained_count, variant: 'warning',
+             path: audit_log_filter_path(state: (@state == 'unexplained' ? nil : 'unexplained')),
+             active: @state == 'unexplained' %>
+  <%= render 'shared/filter_chip', label: 'Alerted', count: @alerted_count, variant: 'danger',
+             path: audit_log_filter_path(state: (@state == 'alerted' ? nil : 'alerted')),
+             active: @state == 'alerted' %>
+</div>
+
+<%= form_with url: audit_log_entries_path, method: :get, class: "d-flex flex-wrap align-items-center gap-2 mb-3" do %>
+  <%= hidden_field_tag :source, @source&.id if @source %>
+  <%= hidden_field_tag :state, @state if @state %>
+  <%= search_field_tag :q, @query, class: "form-control form-control-sm", style: "max-width: 280px;",
+                       placeholder: "Search log text", "aria-label": "Search log text" %>
+  <%= date_field_tag :from, @from, class: "form-control form-control-sm", style: "max-width: 150px;",
+                     "aria-label": "From date" %>
+  <span class="text-12 text-secondary">to</span>
+  <%= date_field_tag :to, @to, class: "form-control form-control-sm", style: "max-width: 150px;",
+                     "aria-label": "To date" %>
+  <%= submit_tag "Filter", name: nil, class: "btn btn-outline-secondary btn-sm" %>
+  <% if audit_log_filters_active? %>
+    <%= link_to "Clear filters", audit_log_entries_path, class: "text-12" %>
+  <% end %>
+<% end %>
+
+<% if @entries.any? %>
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 20px;"></th>
+            <th scope="col">When</th>
+            <th scope="col">Source</th>
+            <th scope="col">Entry</th>
+            <th scope="col">Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @entries.each do |entry| %>
+            <tr>
+              <td>
+                <% if entry.alerted? %>
+                  <span class="status-dot status-danger" title="Matched an alert rule"></span>
+                <% end %>
+              </td>
+              <td class="text-nowrap" title="<%= l(entry.occurred_at, format: :long) %>">
+                <%= l(entry.occurred_at, format: :short) %>
+              </td>
+              <td class="text-secondary"><%= entry.audit_log_source.name %></td>
+              <td>
+                <%= link_to entry.message.truncate(240), audit_log_entry_path(entry),
+                            class: "text-body text-decoration-none font-monospace text-13" %>
+              </td>
+              <td class="text-secondary">
+                <% if entry.explained? %>
+                  <%= entry.explanation.truncate(120) %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <%= render 'shared/pagination', pagy: @pagy %>
+<% else %>
+  <div class="card shadow-sm border-0">
+    <div class="card-body text-center py-5 text-secondary">
+      <% if audit_log_filters_active? %>
+        Nothing matches those filters.
+      <% elsif @sources.empty? %>
+        No audit logs are available to you yet.
+      <% else %>
+        Nothing has been logged yet.
+      <% end %>
+    </div>
+  </div>
+<% end %>

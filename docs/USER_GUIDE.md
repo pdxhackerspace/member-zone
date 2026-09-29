@@ -139,11 +139,29 @@ It goes to reviewers rather than to the applicant, so there is nobody to opt out
 
 ## Member notification preferences
 
-Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off.
+Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off. Staff who receive audit log alerts also see an *Audit log alerts* row they can switch off.
 
 Optional reminder categories can also be disabled per category on Settings → **Reminders** via **Members can opt out**. Parking permit and ticket reminders default to mandatory, as does the stale application reminder, which goes to reviewers rather than to members.
 
 Applicants without an account can opt out from links in application reminder emails. Opted-out addresses are blocked at the apply gate until an admin removes the opt-out under Settings → **Email opt-outs**.
+
+## Audit logs
+
+**Audit** in the navbar lists log entries collected from external sources, newest first. Each source is a filter pill; **Unexplained** and **Alerted** narrow the list further, and you can search the text of an entry or limit it to a date range. You only see the sources you have been given access to.
+
+Open an entry to read it in full. Anyone who can read an entry can add an **explanation** — the context for whoever reads it later (for example, “planned door test”). The entry records who explained it and when. Log entries themselves can never be edited or deleted.
+
+### Setting up a source
+
+Administrators (and anyone with *Configure audit log sources and alert rules*) use **Settings → Audit log sources**:
+
+1. **New source.** Give the path to the program, any arguments, and any environment variables it needs (API tokens and the like — these are stored encrypted). Choose how often it runs. Optionally attach a training topic: members holding the *Audit log reviewer* role through that topic can then read, explain and be alerted about this log.
+2. **Test run** shows what the program prints and how it would be stored, without saving anything. **Run now** queues a real run.
+3. **Alert rules.** Add a name and a regular expression. When a *new* entry matches, the people responsible for the log get one email per run listing the matches. Rules can be turned off or removed at any time.
+
+The run history on the source's page shows each run's status, how many entries were new, and anything the program wrote to its error output. A source that has entries cannot be deleted; disable it instead.
+
+Alert emails can be turned off under **Notifications** (the *Audit log alerts* row appears only for people who receive them). See `docs/audit-logs.md` for how programs are written.
 
 ## Membership states
 

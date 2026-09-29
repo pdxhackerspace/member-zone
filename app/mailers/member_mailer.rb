@@ -445,6 +445,30 @@ class MemberMailer < ApplicationMailer
     end
   end
 
+  MAX_ALERT_ENTRIES_LISTED = 50
+
+  def audit_log_alert(user, source, entry_ids)
+    entries = source.audit_log_entries.where(id: entry_ids).newest_first.limit(MAX_ALERT_ENTRIES_LISTED).to_a
+    @user = user
+    @source = source
+    @entries = entries
+    @match_count = Array(entry_ids).size
+    @organization = organization_name
+    @audit_log_url = "#{ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')}/audit_log_entries?source=#{source.id}"
+
+    extra_vars = {
+      audit_source_name: source.name,
+      audit_match_count: @match_count.to_s,
+      audit_matches_html: audit_matches_html(entries),
+      audit_matches_text: audit_matches_text(entries),
+      audit_log_url: @audit_log_url
+    }
+
+    return if send_from_template('audit_log_alert', user, extra_vars, to: user.email)
+
+    mail(to: user.email, subject: "#{@organization}: #{@match_count} audit log alert(s) from #{source.name}")
+  end
+
   def message_received(message)
     @message = message
     @sender = message.sender
@@ -738,6 +762,18 @@ class MemberMailer < ApplicationMailer
   def application_age_days(application)
     start_at = application.submitted_at || application.created_at
     ((Time.current - start_at) / 1.day).floor
+  end
+
+  def audit_matches_html(entries)
+    rows = entries.map do |entry|
+      when_text = ERB::Util.html_escape(l(entry.occurred_at, format: :long))
+      "<li><strong>#{when_text}</strong><br>#{ERB::Util.html_escape(entry.message.truncate(500))}</li>"
+    end
+    "<ul>#{rows.join}</ul>"
+  end
+
+  def audit_matches_text(entries)
+    entries.map { |entry| "- #{l(entry.occurred_at, format: :long)}\n  #{entry.message.truncate(500)}" }.join("\n\n")
   end
 
   def urgent_items_html(items)

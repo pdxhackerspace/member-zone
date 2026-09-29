@@ -1,0 +1,148 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0"><%= @source.name %></h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="status-dot status-<%= { 'success' => 'success', 'failed' => 'danger',
+                                           'running' => 'warning' }.fetch(@source.run_status, 'muted') %>"></span>
+      <%= @source.status_label %> · <%= @source.interval_label.downcase %> ·
+      <span class="text-body"><%= @entry_count %></span> entries
+      <% unless @source.enabled? %>· Disabled<% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= button_to "Run now", run_audit_log_source_path(@source), method: :post,
+                  class: "btn btn-primary btn-sm", disabled: !@source.enabled? %>
+    <%= button_to "Test run", preview_audit_log_source_path(@source), method: :post,
+                  class: "btn btn-outline-secondary btn-sm", data: { turbo: false } %>
+    <%= link_to "Edit", edit_audit_log_source_path(@source), class: "btn btn-outline-secondary btn-sm" %>
+    <%= link_to "All sources", audit_log_sources_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="h-section-label mb-2">Alert rules</div>
+    <div class="card shadow-sm border-0 mb-3">
+      <% if @rules.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead><tr><th>Name</th><th>Pattern</th><th></th></tr></thead>
+            <tbody>
+              <% @rules.each do |rule| %>
+                <tr class="<%= 'text-secondary' unless rule.enabled? %>">
+                  <td><%= rule.name %></td>
+                  <td>
+                    <code>/<%= rule.pattern %>/<%= 'i' if rule.case_insensitive? %></code>
+                  </td>
+                  <td class="text-end">
+                    <div class="d-flex gap-2 justify-content-end">
+                      <%= button_to rule.enabled? ? "Disable" : "Enable",
+                                    audit_log_source_audit_log_alert_rule_path(@source, rule), method: :patch,
+                                    params: { audit_log_alert_rule: { enabled: !rule.enabled? } },
+                                    class: "btn btn-outline-secondary btn-sm" %>
+                      <%= button_to "Remove", audit_log_source_audit_log_alert_rule_path(@source, rule),
+                                    method: :delete, class: "btn btn-outline-danger btn-sm",
+                                    data: { turbo_confirm: "Remove alert rule '#{rule.name}'?" } %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="card-body text-secondary text-13">
+          No alert rules. Add a regular expression to be emailed when a new entry matches it.
+        </div>
+      <% end %>
+      <div class="card-body border-top">
+        <%= form_with model: [@source, @new_rule], class: "row g-2 align-items-end" do |f| %>
+          <div class="col-md-4">
+            <%= f.label :name, class: "form-label text-12" %>
+            <%= f.text_field :name, class: "form-control form-control-sm", required: true,
+                             placeholder: "Failed logins" %>
+          </div>
+          <div class="col-md-5">
+            <%= f.label :pattern, "Regular expression", class: "form-label text-12" %>
+            <%= f.text_field :pattern, class: "form-control form-control-sm font-monospace", required: true,
+                             placeholder: "failed (login|password)" %>
+          </div>
+          <div class="col-md-2 form-check ms-2">
+            <%= f.check_box :case_insensitive, class: "form-check-input", checked: true %>
+            <%= f.label :case_insensitive, "Ignore case", class: "form-check-label text-12" %>
+          </div>
+          <div class="col-auto">
+            <%= f.submit "Add rule", class: "btn btn-outline-secondary btn-sm" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="h-section-label mb-2">Recent runs</div>
+    <div class="card shadow-sm border-0">
+      <% if @runs.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead><tr><th>Started</th><th>Status</th><th class="num">New entries</th><th>Output</th></tr></thead>
+            <tbody>
+              <% @runs.each do |run| %>
+                <tr>
+                  <td class="text-nowrap"><%= l(run.created_at, format: :short) %></td>
+                  <td>
+                    <span class="status-dot status-<%= { 'success' => 'success', 'failed' => 'danger',
+                                                         'running' => 'warning' }.fetch(run.status, 'muted') %>"></span>
+                    <%= run.status.humanize %><% if run.exit_code && run.exit_code != 0 %> (exit <%= run.exit_code %>)<% end %>
+                  </td>
+                  <td class="num <%= 'text-secondary' if run.entries_added.zero? %>"><%= run.entries_added %></td>
+                  <td class="text-secondary font-monospace text-12"><%= run.output.to_s.truncate(200) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="card-body text-secondary text-13">This source has not run yet.</div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Configuration</div>
+        <dl class="mb-0 text-13">
+          <dt class="text-secondary fw-normal">Program</dt>
+          <dd><code class="text-break"><%= @source.command_arguments.join(' ') %></code></dd>
+          <dt class="text-secondary fw-normal">Environment variables</dt>
+          <dd><%= @source.parsed_environment_variables.keys.presence&.join(', ') || 'None' %></dd>
+          <dt class="text-secondary fw-normal">Visible by topic</dt>
+          <dd><%= @source.training_topic&.name || 'No topic' %></dd>
+          <% if @source.description.present? %>
+            <dt class="text-secondary fw-normal">Description</dt>
+            <dd><%= @source.description %></dd>
+          <% end %>
+        </dl>
+      </div>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Manage</div>
+        <div class="d-flex gap-2">
+          <%= button_to @source.enabled? ? "Disable" : "Enable", toggle_audit_log_source_path(@source),
+                        method: :post, class: "btn btn-outline-secondary btn-sm" %>
+          <% if @entry_count.zero? %>
+            <%= button_to "Delete", audit_log_source_path(@source), method: :delete,
+                          class: "btn btn-outline-danger btn-sm",
+                          data: { turbo_confirm: "Delete '#{@source.name}'?" } %>
+          <% end %>
+        </div>
+        <% if @entry_count.positive? %>
+          <div class="text-12 text-secondary mt-2">
+            A source with log entries cannot be deleted, because entries are kept permanently. Disable it to stop
+            it running.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

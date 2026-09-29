@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_trgm"
 
   create_table "access_controller_logs", force: :cascade do |t|
     t.bigint "access_controller_id", null: false
@@ -240,6 +241,71 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_130000) do
     t.string "internal_url"
     t.string "name"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "audit_log_alert_rules", force: :cascade do |t|
+    t.bigint "audit_log_source_id", null: false
+    t.boolean "case_insensitive", default: true, null: false
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.string "name", null: false
+    t.string "pattern", null: false
+    t.datetime "updated_at", null: false
+    t.index ["audit_log_source_id"], name: "index_audit_log_alert_rules_on_audit_log_source_id"
+  end
+
+  create_table "audit_log_entries", force: :cascade do |t|
+    t.datetime "alerted_at"
+    t.bigint "audit_log_source_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "explained_at"
+    t.bigint "explained_by_id"
+    t.text "explanation"
+    t.string "fingerprint", null: false
+    t.bigint "matched_rule_ids", default: [], null: false, array: true
+    t.text "message", null: false
+    t.datetime "occurred_at", null: false
+    t.jsonb "raw", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["audit_log_source_id", "fingerprint"], name: "index_audit_log_entries_on_audit_log_source_id_and_fingerprint", unique: true
+    t.index ["audit_log_source_id", "occurred_at"], name: "index_audit_log_entries_on_audit_log_source_id_and_occurred_at"
+    t.index ["audit_log_source_id"], name: "index_audit_log_entries_on_audit_log_source_id"
+    t.index ["explained_by_id"], name: "index_audit_log_entries_on_explained_by_id"
+    t.index ["message"], name: "index_audit_log_entries_on_message_trgm", opclass: :gin_trgm_ops, using: :gin
+    t.index ["occurred_at"], name: "index_audit_log_entries_on_occurred_at"
+    t.index ["raw"], name: "index_audit_log_entries_on_raw", using: :gin
+  end
+
+  create_table "audit_log_runs", force: :cascade do |t|
+    t.bigint "audit_log_source_id", null: false
+    t.string "command_line"
+    t.datetime "created_at", null: false
+    t.integer "entries_added", default: 0, null: false
+    t.integer "exit_code"
+    t.text "output"
+    t.string "status", default: "running", null: false
+    t.datetime "updated_at", null: false
+    t.index ["audit_log_source_id"], name: "index_audit_log_runs_on_audit_log_source_id"
+    t.index ["created_at"], name: "index_audit_log_runs_on_created_at"
+  end
+
+  create_table "audit_log_sources", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.boolean "enabled", default: true, null: false
+    t.text "environment_variables"
+    t.datetime "last_entry_at"
+    t.datetime "last_run_at"
+    t.string "name", null: false
+    t.string "run_interval", default: "daily", null: false
+    t.string "run_status", default: "unknown", null: false
+    t.string "script_arguments"
+    t.string "script_path", null: false
+    t.bigint "training_topic_id"
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_audit_log_sources_on_enabled"
+    t.index ["name"], name: "index_audit_log_sources_on_name", unique: true
+    t.index ["training_topic_id"], name: "index_audit_log_sources_on_training_topic_id"
   end
 
   create_table "authentik_users", force: :cascade do |t|
@@ -1244,6 +1310,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_130000) do
   add_foreign_key "application_groups", "training_topics"
   add_foreign_key "application_groups_users", "application_groups"
   add_foreign_key "application_groups_users", "users"
+  add_foreign_key "audit_log_alert_rules", "audit_log_sources", on_delete: :cascade
+  add_foreign_key "audit_log_entries", "audit_log_sources", on_delete: :restrict
+  add_foreign_key "audit_log_entries", "users", column: "explained_by_id", on_delete: :nullify
+  add_foreign_key "audit_log_runs", "audit_log_sources", on_delete: :cascade
+  add_foreign_key "audit_log_sources", "training_topics", on_delete: :nullify
   add_foreign_key "authentik_users", "users"
   add_foreign_key "cash_payments", "membership_plans"
   add_foreign_key "cash_payments", "users"
@@ -1315,4 +1386,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_130000) do
   add_foreign_key "user_supplementary_plans", "membership_plans"
   add_foreign_key "user_supplementary_plans", "users"
   add_foreign_key "users", "membership_plans"
+  execute <<~'SQL'
+    CREATE OR REPLACE FUNCTION audit_log_entries_guard() RETURNS trigger AS $$
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        IF (NEW.audit_log_source_id, NEW.occurred_at, NEW.message, NEW.raw, NEW.fingerprint, NEW.created_at)
+           IS DISTINCT FROM (OLD.audit_log_source_id, OLD.occurred_at, OLD.message, OLD.raw, OLD.fingerprint, OLD.created_at) THEN
+          RAISE EXCEPTION 'audit_log_entries rows cannot be edited; only the explanation and alert columns may change';
+        END IF;
+        RETURN NEW;
+      END IF;
+      RAISE EXCEPTION 'audit_log_entries rows cannot be deleted';
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS audit_log_entries_guard_rows ON audit_log_entries;
+    CREATE TRIGGER audit_log_entries_guard_rows BEFORE UPDATE OR DELETE ON audit_log_entries
+      FOR EACH ROW EXECUTE FUNCTION audit_log_entries_guard();
+
+    DROP TRIGGER IF EXISTS audit_log_entries_guard_truncate ON audit_log_entries;
+    CREATE TRIGGER audit_log_entries_guard_truncate BEFORE TRUNCATE ON audit_log_entries
+      FOR EACH STATEMENT EXECUTE FUNCTION audit_log_entries_guard();
+  SQL
+
 end

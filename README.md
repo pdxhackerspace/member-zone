@@ -262,6 +262,17 @@ rails recharge:sync_payments
 
 The sync job pulls recent charges from Recharge, records them in `recharge_payments`, and surfaces them inside the app under **Recharge Payments** plus in each Authentik/Sheet profile’s payment history (alongside PayPal results).
 
+## Audit Logs
+
+Audit logs are collected from external programs, combined under **Audit** in the navbar, and kept permanently. Configure sources under **Settings → Audit log sources**: each names an executable (by convention in an `audit-log/` directory beside the access controller scripts), how often to run it (hourly, every 6 hours, every 12 hours, daily), environment variables (encrypted at rest) and optional alert rules. Programs may be shell, Python or Ruby — the production image includes `python3`, and anything with a shebang line works. Entries cannot be deleted; readers may add an explanation to any entry.
+
+```bash
+rails 'audit_logs:preview[Door log]'   # dry run: what would be stored
+rails 'audit_logs:run[Door log]'       # run now and store
+```
+
+`docs/audit-logs.md` describes the program contract, output format, alerts and the five `audit_logs.*` privileges. A new `Audit log administrator` role bundles the global ones; `Audit log reviewer` is meant to be attached to the topic whose logs its holders should read.
+
 ## Roles and Privileges
 
 Privileges bundle into roles, roles attach to training topics, and holding a topic confers that topic's roles. Members are never granted privileges directly. `is_admin` remains a superuser bypass, so a misconfigured role cannot lock administrators out.

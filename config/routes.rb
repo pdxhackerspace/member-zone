@@ -414,6 +414,19 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :audit_log_entries, only: %i[index show] do
+    member { patch :explain }
+  end
+
+  resources :audit_log_sources do
+    member do
+      post :toggle
+      post :run
+      post :preview
+    end
+    resources :audit_log_alert_rules, only: %i[create update destroy]
+  end
+
   resources :access_controllers do
     member do
       post :toggle

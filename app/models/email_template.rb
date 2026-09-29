@@ -46,10 +46,25 @@ class EmailTemplate < ApplicationRecord
     '{{delivery_to}}' => 'Address the blocked message was addressed to (admin only)',
     '{{blocked_subject}}' => 'Subject line of the blocked message (admin only)',
     '{{mailer_action}}' => 'Mailer action of the blocked message (admin only)',
-    '{{queued_mail_url}}' => 'Link to the rejected queued message (admin only)'
+    '{{queued_mail_url}}' => 'Link to the rejected queued message (admin only)',
+    '{{audit_source_name}}' => 'Name of the audit log source that matched (audit log alerts only)',
+    '{{audit_match_count}}' => 'Number of new entries that matched an alert rule (audit log alerts only)',
+    '{{audit_matches_html}}' => 'HTML list of the matching entries (audit log alerts only)',
+    '{{audit_matches_text}}' => 'Plain-text list of the matching entries (audit log alerts only)',
+    '{{audit_log_url}}' => 'Link to this source in the audit log (audit log alerts only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
+    'audit_log_alert' => %w[
+      {{member_name}}
+      {{organization_name}}
+      {{date}}
+      {{audit_source_name}}
+      {{audit_match_count}}
+      {{audit_matches_html}}
+      {{audit_matches_text}}
+      {{audit_log_url}}
+    ],
     'training_requested' => %w[
       {{member_name}}
       {{organization_name}}
@@ -446,6 +461,29 @@ class EmailTemplate < ApplicationRecord
         {{urgent_items_text}}
 
         Open the admin dashboard: {{dashboard_url}}
+      TEXT
+    },
+    'audit_log_alert' => {
+      name: 'Audit Log Alert',
+      description: 'Sent to the people following an audit log when new entries match one of its alert rules',
+      subject: '{{organization_name}}: {{audit_match_count}} audit log alert(s) from {{audit_source_name}}',
+      body_html: <<~HTML,
+        <h1>Audit log alert: {{audit_source_name}}</h1>
+        <p>Hello {{member_name}},</p>
+        <p>{{audit_match_count}} new log entries in <strong>{{audit_source_name}}</strong> matched an alert rule.</p>
+        {{audit_matches_html}}
+        <p><a href="{{audit_log_url}}">Open this log in Member Zone</a></p>
+      HTML
+      body_text: <<~TEXT
+        Audit log alert: {{audit_source_name}}
+
+        Hello {{member_name}},
+
+        {{audit_match_count}} new log entries in {{audit_source_name}} matched an alert rule.
+
+        {{audit_matches_text}}
+
+        Open this log in Member Zone: {{audit_log_url}}
       TEXT
     },
     'training_requested' => {
