@@ -36,7 +36,7 @@ module AuditLogs
       status = result.success? ? 'success' : 'failed'
       run.update!(status: status, exit_code: result.exit_code, entries_added: added.size,
                   output: result.stderr.to_s.strip.presence&.truncate(20_000))
-      @source.update!(run_status: status, last_entry_at: latest_entry_time(added))
+      @source.update!(run_status: status, last_entry_at: latest_entry_time(added, started_at))
       Alerter.call(@source, added) if added.any?
     end
 
@@ -45,8 +45,11 @@ module AuditLogs
       Ingestor.call(@source, entries).to_a
     end
 
-    def latest_entry_time(added)
-      [added.map(&:occurred_at).max, @source.last_entry_at].compact.max
+    # The cursor handed back to the program as AUDIT_LOG_SINCE. It never runs ahead of the
+    # start of this run, whatever the entries claim, or one bad timestamp would make programs
+    # that honour it as a lower bound collect nothing from then on.
+    def latest_entry_time(added, started_at)
+      [[added.map(&:occurred_at).max, started_at].compact.min, @source.last_entry_at].compact.max
     end
   end
 end

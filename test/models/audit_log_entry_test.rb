@@ -127,4 +127,62 @@ class AuditLogEntryTest < ActiveSupport::TestCase
     assert_equal recent, ordered.first
     assert_equal old, ordered.last
   end
+
+  # --- Journal ---
+
+  test 'a first explanation is not journaled' do
+    assert_no_difference -> { Journal.count } do
+      @entry.explain!('first', by: users(:one))
+    end
+  end
+
+  test 'rewriting an explanation journals the old and new text, the entry and who did it' do
+    author = users(:one)
+    rewriter = users(:two)
+    @entry.explain!('first', by: author)
+
+    assert_difference -> { Journal.count }, 1 do
+      @entry.explain!('second', by: rewriter)
+    end
+
+    journal = Journal.order(:id).last
+    assert_equal 'audit_log_explanation_rewritten', journal.action
+    assert_equal rewriter, journal.actor_user
+    assert_predicate journal, :highlight?
+    data = journal.changes_json['audit_log_entry']
+    assert_equal @entry.id, data['id']
+    assert_equal @source.name, data['source']
+    assert_equal 'original text', data['message']
+    assert_equal({ 'from' => 'first', 'to' => 'second' }, data['explanation'])
+    assert_equal rewriter, @entry.reload.explained_by
+  end
+
+  test 'clearing an explanation is journaled as a rewrite to nothing' do
+    @entry.explain!('first', by: users(:one))
+
+    assert_difference -> { Journal.count }, 1 do
+      @entry.explain!('  ', by: users(:two))
+    end
+
+    assert_equal({ 'from' => 'first', 'to' => nil },
+                 Journal.order(:id).last.changes_json.dig('audit_log_entry', 'explanation'))
+    assert_nil @entry.reload.explanation
+  end
+
+  test 'saving the same explanation again changes and journals nothing' do
+    @entry.explain!('same', by: users(:one))
+    stamp = @entry.reload.explained_at
+
+    assert_no_difference -> { Journal.count } do
+      @entry.explain!(' same ', by: users(:two))
+    end
+    assert_equal users(:one), @entry.reload.explained_by
+    assert_equal stamp, @entry.explained_at
+  end
+
+  test 'clearing an explanation that was never set journals nothing' do
+    assert_no_difference -> { Journal.count } do
+      @entry.explain!('', by: users(:one))
+    end
+  end
 end

@@ -79,6 +79,36 @@ module AuditLogs
       assert_equal '2026-09-29T10:05:00Z', environment['AUDIT_LOG_SINCE']
     end
 
+    test 'a future timestamp cannot push the cursor ahead of the run' do
+      source = create_audit_log_source(script: 'future.sh')
+
+      before = Time.current
+      RunSource.call(source)
+
+      source.reload
+      assert_equal 2, source.audit_log_entries.count
+      assert_operator source.last_entry_at, :<=, Time.current
+      assert_operator source.last_entry_at, :>=, before - 1.minute
+    end
+
+    test 'the cursor still advances to real entry times and never moves backwards' do
+      source = create_audit_log_source(script: 'json_lines.sh')
+      RunSource.call(source)
+      assert_equal Time.utc(2026, 9, 29, 10, 5), source.reload.last_entry_at
+
+      source.update!(last_entry_at: Time.utc(2026, 9, 30))
+      RunSource.call(source)
+      assert_equal Time.utc(2026, 9, 30), source.reload.last_entry_at
+    end
+
+    test 'the program is handed a cursor that is not in the future after a run with skewed timestamps' do
+      source = create_audit_log_source(script: 'future.sh')
+      RunSource.call(source)
+
+      since = ScriptRunner.new(source.reload, source.last_entry_at, 1).environment['AUDIT_LOG_SINCE']
+      assert_operator Time.iso8601(since), :<=, Time.current
+    end
+
     test 'alerts fire for new matching entries only' do
       source = create_audit_log_source(script: 'json_lines.sh')
       source.audit_log_alert_rules.create!(name: 'door', pattern: 'door opened')

@@ -15,6 +15,13 @@ module AuditLogs
   # Identical lines within one run are kept apart by an occurrence count.
   class OutputParser
     TIMESTAMP_KEYS = %w[timestamp time ts @timestamp].freeze
+
+    # Epoch values above this are milliseconds, not seconds (as seconds it is the year 5138).
+    EPOCH_MILLISECONDS_THRESHOLD = 100_000_000_000
+
+    # A timestamp further ahead than this is clock skew or a mis-scaled epoch. It is not
+    # trusted as the entry's time, because AUDIT_LOG_SINCE is derived from entry times.
+    FUTURE_TOLERANCE = 1.day
     MESSAGE_KEYS = %w[message msg].freeze
 
     def self.call(output, run_at: Time.current)
@@ -52,7 +59,7 @@ module AuditLogs
     def structured_entry(json)
       message = message_from(json)
       time = time_from(json)
-      basis = json['id'].present? ? "id:#{json['id']}" : "#{time.utc.iso8601(6)}|#{message}"
+      basis = json['id'].present? ? "id:#{json['id']}" : "#{raw_time_value(json)}|#{message}"
 
       { occurred_at: time, message: message, raw: json, fingerprint: fingerprint(basis, exact: json['id'].present?) }
     end
@@ -65,14 +72,20 @@ module AuditLogs
       MESSAGE_KEYS.filter_map { |key| json[key] }.first.to_s.strip
     end
 
+    def raw_time_value(json)
+      TIMESTAMP_KEYS.filter_map { |key| json[key] }.first
+    end
+
+    # The fingerprint is built from the value as printed, not the parsed time, so a line that
+    # falls back to the run time still fingerprints the same on every run.
     def time_from(json)
-      value = TIMESTAMP_KEYS.filter_map { |key| json[key] }.first
-      parse_time(value) || @run_at
+      parsed = parse_time(raw_time_value(json))
+      parsed && parsed <= @run_at + FUTURE_TOLERANCE ? parsed : @run_at
     end
 
     def parse_time(value)
       case value
-      when Numeric then Time.zone.at(value)
+      when Numeric then Time.zone.at(value > EPOCH_MILLISECONDS_THRESHOLD ? value / 1000.0 : value)
       when String then Time.zone.parse(value)
       end
     rescue ArgumentError, RangeError

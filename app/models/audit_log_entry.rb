@@ -71,17 +71,31 @@ class AuditLogEntry < ApplicationRecord
     alerted_at.present?
   end
 
-  # Records who wrote the explanation. Clearing it clears the attribution too.
+  # Records who wrote the explanation. Clearing it clears the attribution too. Replacing or
+  # clearing an explanation that was already there is journaled with the old and new text,
+  # because the entry itself keeps only the latest.
   def explain!(text, by:)
-    text = text.to_s.strip
-    if text.blank?
-      update!(explanation: nil, explained_by: nil, explained_at: nil)
-    else
-      update!(explanation: text, explained_by: by, explained_at: Time.current)
+    text = text.to_s.strip.presence
+    previous = explanation.presence
+    return if text == previous
+
+    transaction do
+      update!(explanation: text, explained_by: (by if text), explained_at: (Time.current if text))
+      journal_rewrite!(previous, text, by) if previous
     end
   end
 
   private
+
+  def journal_rewrite!(from, to, actor)
+    Journal.create!(
+      user: nil, actor_user: actor, action: 'audit_log_explanation_rewritten', highlight: true,
+      changed_at: Time.current,
+      changes_json: { 'audit_log_entry' => { 'id' => id, 'source' => audit_log_source.name,
+                                             'message' => message.truncate(200),
+                                             'explanation' => { 'from' => from, 'to' => to } } }
+    )
+  end
 
   def only_annotations_change
     locked = changed - MUTABLE_ATTRIBUTES

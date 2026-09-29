@@ -31,6 +31,32 @@ module AuditLogs
       assert_equal Time.at(1_790_679_900).utc, entry[:occurred_at].utc
     end
 
+    test 'epoch milliseconds are read as milliseconds, not as a date tens of thousands of years away' do
+      entry = parse(%({"message": "ms", "ts": 1790679900000})).sole
+      assert_equal Time.at(1_790_679_900).utc, entry[:occurred_at].utc
+    end
+
+    test 'a timestamp far in the future is not trusted and the entry is stamped with the run time' do
+      entry = parse(%({"message": "skewed", "timestamp": "2099-01-01T00:00:00Z"})).sole
+
+      assert_equal RUN_AT, entry[:occurred_at]
+      assert_equal '2099-01-01T00:00:00Z', entry[:raw]['timestamp'], 'what the program printed is kept'
+    end
+
+    test 'a timestamp slightly ahead, within clock skew, is kept' do
+      soon = (RUN_AT + 1.hour).utc.iso8601
+      assert_equal Time.zone.parse(soon), parse(%({"message": "a", "timestamp": "#{soon}"})).sole[:occurred_at]
+    end
+
+    test 'a line that fell back to the run time still fingerprints the same on the next run' do
+      line = %({"message": "skewed", "timestamp": "2099-01-01T00:00:00Z"})
+
+      assert_equal parse(line).sole[:fingerprint],
+                   OutputParser.call(line, run_at: RUN_AT + 1.day).sole[:fingerprint]
+      assert_equal parse(%({"message": "no time"})).sole[:fingerprint],
+                   OutputParser.call(%({"message": "no time"}), run_at: RUN_AT + 1.day).sole[:fingerprint]
+    end
+
     test 'a JSON line without a timestamp, or with an unreadable one, is stamped with the run time' do
       assert_equal RUN_AT, parse(%({"message": "no time"})).sole[:occurred_at]
       assert_equal RUN_AT, parse(%({"message": "bad", "timestamp": "not a time"})).sole[:occurred_at]

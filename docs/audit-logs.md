@@ -52,6 +52,10 @@ Preferred: one JSON object per line.
 
 - `message` (or `msg`) is required. `timestamp` (or `time`, `ts`, `@timestamp`) may be ISO8601 or epoch
   seconds; it defaults to the time of the run.
+- Epoch values above 100 billion are read as milliseconds. A timestamp more than a day in the future is treated
+  as unreadable and the entry is stamped with the time of the run (the value you printed is still kept in the
+  details). This matters because `AUDIT_LOG_SINCE` is derived from entry times, and it never runs ahead of the
+  start of the run whatever the entries claim.
 - `id` is optional but makes de-duplication exact. Every key is kept and shown on the entry page.
 
 Any other non-blank line is stored as plain text, stamped with the time of the run.

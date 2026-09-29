@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1386,4 +1386,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120100) do
   add_foreign_key "user_supplementary_plans", "membership_plans"
   add_foreign_key "user_supplementary_plans", "users"
   add_foreign_key "users", "membership_plans"
+  execute <<~'SQL'
+    CREATE OR REPLACE FUNCTION audit_log_entries_guard() RETURNS trigger AS $$
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        IF (NEW.audit_log_source_id, NEW.occurred_at, NEW.message, NEW.raw, NEW.fingerprint, NEW.created_at)
+           IS DISTINCT FROM (OLD.audit_log_source_id, OLD.occurred_at, OLD.message, OLD.raw, OLD.fingerprint, OLD.created_at) THEN
+          RAISE EXCEPTION 'audit_log_entries rows cannot be edited; only the explanation and alert columns may change';
+        END IF;
+        RETURN NEW;
+      END IF;
+      RAISE EXCEPTION 'audit_log_entries rows cannot be deleted';
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS audit_log_entries_guard_rows ON audit_log_entries;
+    CREATE TRIGGER audit_log_entries_guard_rows BEFORE UPDATE OR DELETE ON audit_log_entries
+      FOR EACH ROW EXECUTE FUNCTION audit_log_entries_guard();
+
+    DROP TRIGGER IF EXISTS audit_log_entries_guard_truncate ON audit_log_entries;
+    CREATE TRIGGER audit_log_entries_guard_truncate BEFORE TRUNCATE ON audit_log_entries
+      FOR EACH STATEMENT EXECUTE FUNCTION audit_log_entries_guard();
+  SQL
+
 end

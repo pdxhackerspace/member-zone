@@ -310,6 +310,25 @@ class AuditLogEntriesControllerTest < ActionDispatch::IntegrationTest
     assert AuditLogEntry.exists?(@door_entry.id)
   end
 
+  # --- Journal ---
+
+  test 'rewriting an explanation over HTTP is journaled and shows on the journal page' do
+    admin = sign_in_as_admin
+    patch explain_audit_log_entry_path(@door_entry), params: { audit_log_entry: { explanation: 'first take' } }
+
+    assert_difference -> { Journal.count }, 1 do
+      patch explain_audit_log_entry_path(@door_entry), params: { audit_log_entry: { explanation: 'second take' } }
+    end
+    assert_equal admin, Journal.order(:id).last.actor_user
+
+    get journals_path
+    assert_response :success
+    assert_select 'div.small', text: /Doors/
+    assert_select 'div', text: /Was:.*first take/
+    assert_select 'div', text: /Now:.*second take/
+    assert_select 'a[href=?]', audit_log_entry_path(@door_entry)
+  end
+
   # --- Impersonation ---
 
   test 'an administrator viewing as a plain member sees no audit log, and an explanation is attributed to the admin' do
