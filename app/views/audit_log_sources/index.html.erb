@@ -1,0 +1,66 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Audit log sources</h1>
+    <div class="text-13 text-secondary mt-1">
+      Programs run on a schedule; what they print becomes the audit log.
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= link_to "New source", new_audit_log_source_path, class: "btn btn-primary btn-sm" %>
+    <%= link_to "Audit log", audit_log_entries_path, class: "btn btn-outline-secondary btn-sm" %>
+    <%= link_to "Settings", settings_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<% if @sources.any? %>
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Program</th>
+            <th scope="col">Runs</th>
+            <th scope="col">Last run</th>
+            <th scope="col" class="num">Entries</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @sources.each do |source| %>
+            <tr class="<%= 'text-secondary' unless source.enabled? %>">
+              <td>
+                <%= link_to source.name, audit_log_source_path(source), class: "fw-medium text-decoration-none" %>
+                <% unless source.enabled? %><span class="badge text-bg-secondary-subtle ms-1">Disabled</span><% end %>
+                <% if source.training_topic %>
+                  <div class="text-12 text-secondary">Visible to holders of <%= source.training_topic.name %></div>
+                <% end %>
+              </td>
+              <td><code><%= source.script_path %></code></td>
+              <td><%= source.interval_label %></td>
+              <td>
+                <span class="status-dot status-<%= { 'success' => 'success', 'failed' => 'danger',
+                                                     'running' => 'warning' }.fetch(source.run_status, 'muted') %>"></span>
+                <%= source.last_run_at ? l(source.last_run_at, format: :short) : 'Never' %>
+              </td>
+              <td class="num <%= 'text-secondary' if @entry_counts.fetch(source.id, 0).zero? %>">
+                <%= @entry_counts.fetch(source.id, 0) %>
+              </td>
+              <td class="text-end">
+                <%= link_to "Edit", edit_audit_log_source_path(source), class: "btn btn-outline-secondary btn-sm" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <div class="card shadow-sm border-0">
+    <div class="card-body text-center py-5 text-secondary">
+      No sources yet. A source is an executable program in the <code>audit-log</code> directory beside the access
+      controller scripts.
+      <div class="mt-3"><%= link_to "Add a source", new_audit_log_source_path, class: "btn btn-primary btn-sm" %></div>
+    </div>
+  </div>
+<% end %>

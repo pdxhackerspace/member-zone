@@ -1,0 +1,40 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Test run: <%= @source.name %></h1>
+    <div class="text-13 text-secondary mt-1">
+      Nothing was stored.
+      <% if @result.timed_out %>The program did not finish within <%= AuditLogSourcesController::PREVIEW_TIMEOUT %> seconds and was stopped.<% end %>
+      <% unless @result.timed_out %>Exit status <%= @result.exit_code %>.<% end %>
+    </div>
+  </div>
+  <%= link_to "Back", audit_log_source_path(@source), class: "btn btn-outline-secondary btn-sm" %>
+</div>
+
+<% if @result.stderr.present? %>
+  <div class="h-section-label mb-2">Error output</div>
+  <pre class="card card-body shadow-sm border-0 text-12"><%= @result.stderr %></pre>
+<% end %>
+
+<div class="h-section-label mb-2">Parsed entries (<%= @parsed.size %>)</div>
+<div class="card shadow-sm border-0">
+  <% if @parsed.any? %>
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead><tr><th>Time</th><th>Entry</th><th></th></tr></thead>
+        <tbody>
+          <% @parsed.first(200).each do |entry| %>
+            <tr>
+              <td class="text-nowrap"><%= l(entry[:occurred_at], format: :short) %></td>
+              <td class="font-monospace text-13"><%= entry[:message].truncate(300) %></td>
+              <td class="text-secondary text-12">
+                <%= @already_stored.include?(entry[:fingerprint]) ? 'Already stored' : 'New' %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="card-body text-secondary text-13">The program printed no log lines.</div>
+  <% end %>
+</div>

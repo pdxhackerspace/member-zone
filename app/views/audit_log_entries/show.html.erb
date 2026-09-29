@@ -1,0 +1,67 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Audit log entry</h1>
+    <div class="text-13 text-secondary mt-1">
+      <%= @entry.audit_log_source.name %> · <%= l(@entry.occurred_at, format: :long) %>
+    </div>
+  </div>
+  <%= link_to "Back to audit log", audit_log_filter_path(source: @entry.audit_log_source_id),
+              class: "btn btn-outline-secondary btn-sm" %>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Entry</div>
+        <pre class="mb-0 text-13" style="white-space: pre-wrap;"><%= @entry.message %></pre>
+        <% if @entry.alerted? %>
+          <div class="text-12 text-secondary mt-3">
+            <span class="status-dot status-danger"></span>
+            Matched an alert rule <%= l(@entry.alerted_at, format: :long) %>
+            <% names = @entry.audit_log_source.audit_log_alert_rules.where(id: @entry.matched_rule_ids).pluck(:name) %>
+            <% if names.any? %>(<%= names.to_sentence %>)<% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Explanation</div>
+        <%= form_with model: @entry, url: explain_audit_log_entry_path(@entry), method: :patch do |f| %>
+          <%= f.text_area :explanation, class: "form-control mb-2", rows: 4,
+                          placeholder: "Add context for whoever reads this later",
+                          "aria-label": "Explanation" %>
+          <div class="d-flex align-items-center gap-3">
+            <%= f.submit "Save explanation", class: "btn btn-primary btn-sm" %>
+            <% if @entry.explained? && @entry.explained_by %>
+              <span class="text-12 text-secondary">
+                <%= @entry.explained_by.display_name %>, <%= l(@entry.explained_at, format: :long) %>
+              </span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <% if @entry.raw.present? %>
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+          <div class="h-section-label mb-2">Details</div>
+          <dl class="mb-0 text-13">
+            <% @entry.raw.each do |key, value| %>
+              <dt class="text-secondary fw-normal"><%= key %></dt>
+              <dd class="text-break"><%= value.is_a?(String) ? value : value.to_json %></dd>
+            <% end %>
+          </dl>
+        </div>
+      </div>
+    <% end %>
+    <div class="text-12 text-secondary">
+      Log entries are kept permanently and cannot be edited or deleted.
+    </div>
+  </div>
+</div>

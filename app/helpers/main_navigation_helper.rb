@@ -16,6 +16,8 @@ module MainNavigationHelper
       { key: 'training', label: 'Training', path: training_catalog_path,
         controllers: %w[training_catalog], always: true },
       { key: 'journal', label: 'Journal', path: journals_path, privilege: :'journal.view' },
+      { key: 'audit', label: 'Audit', path: audit_log_entries_path,
+        privilege: %i[audit_logs.view_all audit_logs.view], any_topic: true, controllers: %w[audit_log_entries] },
       { key: 'building', label: 'Building', items: building_nav_items },
       { key: 'admin', label: 'Admin', items: admin_nav_items }
     ]

@@ -30,7 +30,7 @@ class NavigationPrivilegesTest < ActionDispatch::IntegrationTest
     keys = nav_keys_on(help_path)
 
     %w[members_index authentik sheet slack applications incident_reports onboarding
-       paypal recharge kofi cash payment_events training journal
+       paypal recharge kofi cash payment_events training journal audit
        access_logs parking reports member_map queued_mail mail_log settings sidekiq].each do |key|
       assert_includes keys, key, "an administrator should still see #{key}"
     end

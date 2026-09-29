@@ -75,7 +75,7 @@ ENV APP_VERSION=$APP_VERSION
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libvips postgresql-client libyaml-0-2 tzdata openssh-client iputils-ping cups-client && \
+    apt-get install --no-install-recommends -y curl libvips postgresql-client libyaml-0-2 tzdata openssh-client iputils-ping cups-client python3 && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Copy built artifacts: gems, application

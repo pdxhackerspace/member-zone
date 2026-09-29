@@ -66,6 +66,8 @@ People without accounts who opt out during the application flow are recorded in 
 
 Mandatory categories (membership status, parking issued, account security, etc.) always deliver.
 
+A category is optional when a reminder backs it and that reminder allows opt-out, or when its catalog entry sets `opt_out: true` (`NotificationCategory.opt_out_allowed?`). `audit_log_alerts` is the second kind: staff email with no reminder behind it that the recipient may still switch off. A catalog entry may also list `staff_privileges`, which hides it from `/profile/notifications` for members who hold none of them, so people who could never receive the mail are not offered a switch for it.
+
 `membership_lapsed` is the exception that proves the shape: it is a state-entry email, not something a reminder job sends, but it belongs to the `payment_overdue` category rather than `membership_status`. Falling behind on dues and lapsing because of it is one sequence to the member, so one switch governs the lot — the reminder's `enabled` flag gates whether the lapse notice is queued at all (`MembershipNotifications#notify_membership_lapsed`), and a member who opts out of `payment_overdue` opts out of both emails.
 
 ## Email banner and footers

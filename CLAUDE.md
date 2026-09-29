@@ -65,6 +65,7 @@ Each integration follows the same shape: a service namespace under `app/services
 | Slack | `app/services/slack/` | in (`slack_users`) |
 | PayPal / Recharge | `app/services/paypal/`, `recharge/` | in (payments) |
 | Ollama / AI | `app/services/ollama/` | out (application feedback, RAG) |
+| Audit logs | `app/services/audit_logs/` | in (`audit_log_entries`, append-only; see `docs/audit-logs.md`) |
 
 Authentik is the only bidirectional one and the only place with a push path. Pull: `Authentik::GroupSyncJob` reconciles the configured group into `users`, creating, updating, and deactivating. Push: model callbacks set `authentik_dirty` and enqueue `Authentik::UserSyncJob` when syncable fields change. **`Current.skip_authentik_sync` suppresses that push** — set it in any code that writes users while importing *from* Authentik, or the sync loops back on itself. API access uses a static `AUTHENTIK_API_TOKEN` bearer token; there is no OAuth refresh flow for API calls.
 
