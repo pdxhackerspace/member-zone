@@ -142,6 +142,11 @@ program never alerts twice). Matching entries are stamped with the rules that ma
 gets **one** email per run listing the matches (up to 50; the total is in the subject), built from the
 `audit_log_alert` email template.
 
+An entry counts as checked only once its emails have been handed to the mail queue. If that fails, the run
+still succeeds (the failure is noted on the run and reported) and the entries are checked again on the next
+run, so an alert is delayed rather than lost. A recipient reached before the failure may get a second copy.
+Entries stored before a rule existed are never re-checked against it.
+
 Patterns are checked with a one-second budget per match, so a pattern that backtracks badly is skipped rather
 than stalling the job.
 
