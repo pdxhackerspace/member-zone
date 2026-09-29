@@ -19,6 +19,7 @@ class EmailTemplate
         .merge(parking)
         .merge(admin_dashboard)
         .merge(blocked_recipient)
+        .merge(AuditLogPreviewVariables.all)
     end
 
     def member

@@ -9,7 +9,7 @@ module Notifications
         category = NotificationCategory.for_mailer_action(mailer_action)
         return false unless category
 
-        return false unless category.reminder_key && NotificationCategory.opt_out_allowed?(category.key)
+        return false unless NotificationCategory.opt_out_allowed?(category.key)
 
         if email_based_category?(category)
           address = email.presence || user&.email

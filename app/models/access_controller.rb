@@ -1,5 +1,6 @@
 class AccessController < ApplicationRecord
   include SensitiveFields
+  include ParsedEnvironmentVariables
 
   encrypts_sensitive_string :access_token, :environment_variables
 
@@ -106,21 +107,5 @@ class AccessController < ApplicationRecord
       backup_status: status,
       last_backup_at: Time.current
     )
-  end
-
-  # Parse environment_variables text field into a hash
-  # Format: one KEY=VALUE per line, blank lines and comments (#) ignored
-  def parsed_environment_variables
-    return {} if environment_variables.blank?
-
-    environment_variables.each_line.with_object({}) do |line, hash|
-      line = line.strip
-      next if line.blank? || line.start_with?('#')
-
-      key, value = line.split('=', 2)
-      next if key.blank?
-
-      hash[key.strip] = (value || '').strip
-    end
   end
 end

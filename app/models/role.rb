@@ -58,6 +58,17 @@ class Role < ApplicationRecord
                      training.respond_requests]
     },
     {
+      name: 'Audit log administrator',
+      description: 'Configures audit log sources and alert rules, reads every log, and gets every alert.',
+      privileges: %w[audit_logs.manage audit_logs.view_all audit_logs.alerts_all]
+    },
+    {
+      name: 'Audit log reviewer',
+      description: 'Reads and explains the audit logs of a topic, and is alerted about them. ' \
+                   'Attach to the topic whose logs the holder should see.',
+      privileges: %w[audit_logs.view audit_logs.alerts]
+    },
+    {
       name: 'Communications editor',
       description: 'Maintains email templates and the outgoing mail queue.',
       # mail_log.view as well: approving a message without being able to confirm it sent

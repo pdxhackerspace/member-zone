@@ -4,7 +4,10 @@ class NotificationCategory
   CHANNELS = %w[email slack].freeze
   SOURCES = %w[email_link self_service admin].freeze
 
-  Entry = Data.define(:key, :name, :description, :group, :reminder_key, :mailer_actions)
+  # +opt_out+ marks a category a member may switch off although no reminder backs it, and
+  # +staff_privileges+ hides a category from members who could never receive it.
+  Entry = Data.define(:key, :name, :description, :group, :reminder_key, :mailer_actions, :opt_out,
+                      :staff_privileges)
 
   CATALOG = {
     # The lapse notice sits here rather than under membership_status so that one switch
@@ -111,6 +114,17 @@ class NotificationCategory
       group: 'Account',
       reminder_key: nil,
       mailer_actions: %w[member_invitation]
+    },
+    # Operational mail for staff, but unlike the admin digests it is optional: whoever holds an
+    # alert privilege can still turn it off, and the audit log itself keeps every match.
+    'audit_log_alerts' => {
+      name: 'Audit log alerts',
+      description: 'Emails when a new audit log entry matches an alert rule for a log you follow.',
+      group: 'Staff',
+      reminder_key: nil,
+      opt_out: true,
+      staff_privileges: %w[audit_logs.alerts_all audit_logs.alerts],
+      mailer_actions: %w[audit_log_alert]
     }
   }.freeze
 
@@ -135,8 +149,9 @@ class NotificationCategory
       key ? find(key) : nil
     end
 
-    def grouped_for_member
-      all.group_by(&:group)
+    # Staff-only categories show up only for accounts holding one of their privileges.
+    def grouped_for_member(user = nil)
+      all.select { |entry| visible_to?(entry, user) }.group_by(&:group)
     end
 
     def reminder_backed
@@ -151,7 +166,9 @@ class NotificationCategory
 
     def opt_out_allowed?(category_key)
       entry = find(category_key)
-      return false unless entry&.reminder_key
+      return false unless entry
+      return true if entry.opt_out
+      return false unless entry.reminder_key
 
       ReminderSetting.find_by(key: entry.reminder_key)&.allow_opt_out? == true
     end
@@ -169,8 +186,16 @@ class NotificationCategory
         description: attrs[:description],
         group: attrs[:group],
         reminder_key: attrs[:reminder_key],
-        mailer_actions: attrs[:mailer_actions].freeze
+        mailer_actions: attrs[:mailer_actions].freeze,
+        opt_out: attrs.fetch(:opt_out, false),
+        staff_privileges: attrs.fetch(:staff_privileges, []).freeze
       )
+    end
+
+    def visible_to?(entry, user)
+      return true if entry.staff_privileges.empty?
+
+      entry.staff_privileges.any? { |key| user&.can_for_any_topic?(key) }
     end
 
     def build_mailer_action_index

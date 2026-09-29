@@ -29,11 +29,11 @@ class PrivilegeTest < ActiveSupport::TestCase
     assert_predicate Privilege.find_by(key: 'training.topics.manage_links'), :topic_scoped?
   end
 
-  test 'topic scoped privileges are limited to training and documents' do
+  test 'topic scoped privileges are limited to training, documents and audit logs' do
     Privilege.seed_defaults!
 
-    assert_equal %w[training.documents.manage training.record training.respond_requests
-                    training.revoke training.subtopics.create training.subtopics.manage
+    assert_equal %w[audit_logs.alerts audit_logs.view training.documents.manage training.record
+                    training.respond_requests training.revoke training.subtopics.create training.subtopics.manage
                     training.topics.edit_details training.topics.manage_links],
                  Privilege.topic_scoped.order(:key).pluck(:key)
   end

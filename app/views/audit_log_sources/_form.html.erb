@@ -1,0 +1,73 @@
+<%= form_with model: @source do |f| %>
+  <% if @source.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @source.errors.full_messages.each do |msg| %><li><%= msg %></li><% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", required: true, placeholder: "e.g., Door controller syslog" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 2 %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :script_path, "Program", class: "form-label" %>
+    <%= f.text_field :script_path, class: "form-control font-monospace", required: true,
+                     placeholder: "/path/to/scripts/audit-log/door-syslog.py" %>
+    <div class="form-text">
+      Full path to an executable file with a shebang line (shell, Python and Ruby all work). By convention these live
+      in the <code>audit-log</code> subdirectory next to the access controller scripts.
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :script_arguments, "Arguments (optional)", class: "form-label" %>
+    <%= f.text_field :script_arguments, class: "form-control", placeholder: "e.g., --verbose" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :environment_variables, "Environment variables (optional)", class: "form-label" %>
+    <%= f.text_area :environment_variables, class: "form-control font-monospace", rows: 4,
+                    placeholder: "API_TOKEN=secret\nHOST=example.org" %>
+    <div class="form-text">
+      One per line as <code>KEY=value</code>; lines starting with <code>#</code> are ignored. Stored encrypted.
+      The program is also given <code>AUDIT_LOG_SOURCE</code> and <code>AUDIT_LOG_SINCE</code> (the time of the newest
+      entry already stored).
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <%= f.label :run_interval, "Run", class: "form-label" %>
+      <%= f.select :run_interval, AuditLogSource::INTERVAL_LABELS.invert, {}, class: "form-select" %>
+    </div>
+    <div class="col-md-8">
+      <%= f.label :training_topic_id, "Visible to holders of topic (optional)", class: "form-label" %>
+      <%= f.collection_select :training_topic_id, @training_topics, :id, :name,
+                              { include_blank: "Nobody by topic (only those who can read every log)" },
+                              class: "form-select" %>
+      <div class="form-text">
+        Members holding <em>Read and explain audit logs for a topic</em> through this topic (or its parent) can read
+        and be alerted about this log.
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-4 form-check">
+    <%= f.check_box :enabled, class: "form-check-input" %>
+    <%= f.label :enabled, "Enabled", class: "form-check-label" %>
+  </div>
+
+  <div class="d-flex gap-2">
+    <%= f.submit class: "btn btn-primary btn-sm" %>
+    <%= link_to "Cancel", (@source.persisted? ? audit_log_source_path(@source) : audit_log_sources_path),
+                class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+<% end %>

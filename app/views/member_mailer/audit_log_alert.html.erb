@@ -1,0 +1,14 @@
+<h1>Audit log alert: <%= @source.name %></h1>
+
+<p><%= pluralize(@match_count, 'new log entry') %> in <strong><%= @source.name %></strong> matched an alert rule.</p>
+
+<ul>
+  <% @entries.each do |entry| %>
+    <li>
+      <strong><%= l(entry.occurred_at, format: :long) %></strong>
+      <br><%= entry.message.truncate(500) %>
+    </li>
+  <% end %>
+</ul>
+
+<p><%= link_to 'Open this log in Member Zone', @audit_log_url %></p>
