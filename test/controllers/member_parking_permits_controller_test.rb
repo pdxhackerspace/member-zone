@@ -37,7 +37,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     notice = ParkingNotice.order(:created_at).last
     assert_equal 'permit', notice.notice_type
     assert_equal 'active', notice.status
-    assert_equal member.id, notice.user_id
+    assert notice.member?(member)
     assert_equal member.id, notice.issued_by_id
     assert_redirected_to user_path(member, tab: :parking)
   end
@@ -101,10 +101,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
   test 'member can close own active permit' do
     sign_in_as_member
     member = User.find_by(authentik_id: "local:#{local_accounts(:regular_member).id}")
-    permit = member.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: member,
-      expires_at: 3.days.from_now, description: 'Done early', location: 'Woodshop'
-    )
+    permit = member_permit_for(member)
 
     patch close_member_parking_permit_path(permit)
 
@@ -441,6 +438,38 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
+  test 'member_search hides private profiles' do
+    sign_in_as_member
+    private_member = users(:two)
+    private_member.update!(profile_visibility: 'private')
+
+    get member_search_member_parking_permits_path, params: { q: private_member.username[0, 2] },
+                                                   headers: { 'Accept' => 'application/json' }
+
+    assert_response :success
+    ids = response.parsed_body.pluck('id')
+    assert_not_includes ids, private_member.id
+  end
+
+  test 'member cannot add a private-profile member to their permit' do
+    sign_in_as_member
+    private_member = users(:two)
+    private_member.update!(profile_visibility: 'private')
+
+    post member_parking_permits_path, params: {
+      parking_notice: {
+        description: 'Solo project',
+        location: 'Woodshop',
+        expires_at: 3.days.from_now.strftime('%Y-%m-%dT%H:%M'),
+        member_ids: [private_member.id]
+      }
+    }
+
+    notice = ParkingNotice.order(:created_at).last
+    assert notice.member?(current_member)
+    assert_not notice.member?(private_member)
+  end
+
   private
 
   def current_member
@@ -448,17 +477,26 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def member_permit(status: 'active')
-    current_member.parking_notices.create!(
-      notice_type: 'permit', status: status, issued_by: current_member,
+    member_permit_for(current_member, status: status)
+  end
+
+  def member_permit_for(member, status: 'active')
+    notice = ParkingNotice.new(
+      notice_type: 'permit', status: status, issued_by: member,
       expires_at: 3.days.from_now, description: 'My item', location: 'Woodshop'
     )
+    notice.build_members_from_ids!([member.id])
+    notice.save!
+    notice
   end
 
   def member_ticket
-    ParkingNotice.create!(
-      notice_type: 'ticket', status: 'active', user: current_member, issued_by: current_member,
+    notice = ParkingNotice.create!(
+      notice_type: 'ticket', status: 'active', issued_by: users(:one),
       expires_at: 3.days.from_now, description: 'Enforcement', location: 'Main Area'
     )
+    notice.replace_members!([current_member.id])
+    notice
   end
 
   def sign_in_as_member

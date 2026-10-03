@@ -190,7 +190,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     set_reminder_cadence('parking_notices', start_offset_days: -3, interval_days: 7, max_reminders: 4)
     ReminderSetting.find_by!(key: 'parking_notices').update!(enabled: true)
     owner = users(:one)
-    notice = ParkingNotice.create!(
+    notice = create_parking_notice!(
       user: owner, issued_by: owner, notice_type: 'permit', status: 'active',
       expires_at: now - 20.days, description: 'Restarted permit', location: 'Main Area'
     )

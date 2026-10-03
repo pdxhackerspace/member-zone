@@ -13,6 +13,17 @@
   <% end %>
 
   <div class="mb-3">
+    <%= render 'parking_notices/member_picker',
+        field_name: 'parking_notice[member_ids][]',
+        label: 'Who else is on this permit?',
+        help_text: "They'll see this permit, can clear it, and get its reminders.",
+        required: false,
+        member_search_url: member_search_member_parking_permits_path,
+        fixed_members: [current_user],
+        selected_members: parking_notice.members.reject { |member| member.id == current_user.id } %>
+  </div>
+
+  <div class="mb-3">
     <%= f.label :description, class: 'form-label' %>
     <%= f.text_area :description, class: 'form-control', rows: 3, placeholder: 'Describe your project or item...' %>
   </div>

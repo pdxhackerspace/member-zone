@@ -274,8 +274,8 @@
                 <% phase = Reminders::ParkingNoticeEligibility.phase_for(notice) %>
                 <tr>
                   <td>
-                    <% if notice.user %>
-                      <%= link_to notice.user.display_name, user_path(notice.user), class: "text-decoration-none fw-medium" %>
+                    <% if notice.members.any? %>
+                      <%= parking_notice_members_display(notice, link: true) %>
                     <% else %>
                       <span class="text-secondary">—</span>
                     <% end %>

@@ -162,7 +162,7 @@ class PrivilegeRolloutPhase7Test < ActionDispatch::IntegrationTest
   end
 
   def phase7_notice(owner, requires_admin_clearance:)
-    ParkingNotice.create!(
+    create_parking_notice!(
       user: owner, issued_by: users(:two), notice_type: 'ticket', status: 'active',
       description: 'Phase 7 notice', location: 'Lot', expires_at: 1.day.from_now,
       requires_admin_clearance: requires_admin_clearance

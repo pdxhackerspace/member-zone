@@ -144,7 +144,7 @@ class ParkingNoticeReceiptPdf
     field('Expires', @notice.expires_at.strftime('%b %d, %Y %l:%M %p'))
     field('Issued by', @notice.issued_by&.display_name || '—')
 
-    field('Member', @notice.user.parking_member_label) if @notice.user.present?
+    field('Members', @notice.members_label) if @notice.members.any?
 
     return unless @notice.cleared?
 

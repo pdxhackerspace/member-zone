@@ -3,31 +3,37 @@ require 'test_helper'
 class ParkingNoticeTest < ActiveSupport::TestCase
   setup do
     @user = users(:one)
+    @other = users(:two)
     @admin = users(:one)
   end
 
-  test 'valid permit saves' do
+  def build_permit(**attrs)
     notice = ParkingNotice.new(
       notice_type: 'permit',
-      user: @user,
       issued_by: @admin,
       expires_at: 7.days.from_now,
-      description: 'Test project'
+      description: 'Test project',
+      **attrs
     )
-    assert notice.valid?
+    notice.build_members_from_ids!([@user.id])
+    notice
   end
 
-  test 'permit requires user' do
+  test 'valid permit saves' do
+    assert build_permit.valid?
+  end
+
+  test 'permit requires at least one member' do
     notice = ParkingNotice.new(
       notice_type: 'permit',
       issued_by: @admin,
       expires_at: 7.days.from_now
     )
     assert_not notice.valid?
-    assert_includes notice.errors[:user], "can't be blank"
+    assert_includes notice.errors[:members], 'must include at least one member'
   end
 
-  test 'ticket does not require user' do
+  test 'ticket does not require members' do
     notice = ParkingNotice.new(
       notice_type: 'ticket',
       issued_by: @admin,
@@ -37,33 +43,20 @@ class ParkingNoticeTest < ActiveSupport::TestCase
   end
 
   test 'notice_type must be valid' do
-    notice = ParkingNotice.new(
-      notice_type: 'warning',
-      user: @user,
-      issued_by: @admin,
-      expires_at: 7.days.from_now
-    )
+    notice = build_permit
+    notice.notice_type = 'warning'
     assert_not notice.valid?
     assert_includes notice.errors[:notice_type], 'is not included in the list'
   end
 
   test 'status must be valid' do
-    notice = ParkingNotice.new(
-      notice_type: 'permit',
-      status: 'invalid',
-      user: @user,
-      issued_by: @admin,
-      expires_at: 7.days.from_now
-    )
+    notice = build_permit(status: 'invalid')
     assert_not notice.valid?
   end
 
   test 'expires_at is required' do
-    notice = ParkingNotice.new(
-      notice_type: 'permit',
-      user: @user,
-      issued_by: @admin
-    )
+    notice = build_permit
+    notice.expires_at = nil
     assert_not notice.valid?
     assert_includes notice.errors[:expires_at], "can't be blank"
   end
@@ -147,40 +140,51 @@ class ParkingNoticeTest < ActiveSupport::TestCase
     assert_includes ParkingNotice.needing_expiration, active
   end
 
-  test 'for_user scope filters by user' do
+  test 'for_user scope filters by member' do
     user_notices = ParkingNotice.for_user(@user)
-    assert(user_notices.all? { |n| n.user_id == @user.id })
+    assert(user_notices.all? { |notice| notice.member?(@user) })
   end
 
-  test 'record_journal_entry! creates journal when user present' do
+  test 'replace_members! returns newly added members' do
     notice = parking_notices(:active_permit)
-    assert_difference 'Journal.count', 1 do
+    added = notice.replace_members!([@user.id, @other.id])
+    assert_equal [@other], added
+  end
+
+  test 'record_journal_entry! creates journal for each member' do
+    notice = parking_notices(:active_permit)
+    notice.replace_members!([@user.id, @other.id])
+
+    assert_difference 'Journal.count', 2 do
       notice.record_journal_entry!('parking_permit_issued', actor: @admin)
     end
 
-    journal = Journal.last
-    assert_equal @user, journal.user
-    assert_equal @admin, journal.actor_user
-    assert_equal 'parking_permit_issued', journal.action
-    assert journal.highlight?
+    recipients = Journal.order(:id).last(2).map(&:user)
+    assert_equal [@user, @other].sort_by(&:id), recipients.sort_by(&:id)
+    assert_equal @admin, Journal.order(:id).last.actor_user
+    assert Journal.order(:id).last.highlight?
   end
 
-  test 'record_journal_entry! does nothing without user' do
+  test 'record_journal_entry! does nothing without members' do
     notice = parking_notices(:anonymous_ticket)
     assert_no_difference 'Journal.count' do
       notice.record_journal_entry!('parking_ticket_issued')
     end
   end
 
-  # --- Admin-clearance permissions ---
-
-  test 'clearable_by? lets the owner clear their own active notice' do
+  test 'clearable_by? lets a member on the notice clear their active notice' do
     assert parking_notices(:active_permit).clearable_by?(@user)
   end
 
-  test 'clearable_by? blocks a non-owner who is not an admin' do
+  test 'clearable_by? blocks a non-member who is not an admin' do
     other = users(:two)
     assert_not parking_notices(:active_permit).clearable_by?(other)
+  end
+
+  test 'clearable_by? lets a co-member clear the notice' do
+    notice = parking_notices(:active_permit)
+    notice.replace_members!([@user.id, @other.id])
+    assert notice.clearable_by?(@other)
   end
 
   test 'clearable_by? blocks the owner when admin clearance is required' do
@@ -201,25 +205,22 @@ class ParkingNoticeTest < ActiveSupport::TestCase
     assert_not parking_notices(:cleared_permit).clearable_by?(@user)
   end
 
-  test 'clearable_by? lets the owner clear their own expired notice' do
+  test 'clearable_by? lets a member clear their own expired ticket' do
     expired = parking_notices(:expired_ticket)
-    assert expired.clearable_by?(expired.user)
+    assert expired.clearable_by?(expired.members.first)
   end
 
-  test 'clearable_by? blocks the owner clearing an expired notice when admin clearance is required' do
+  test 'clearable_by? blocks the member clearing an expired ticket when admin clearance is required' do
     expired = parking_notices(:expired_ticket)
     expired.update!(requires_admin_clearance: true)
-    assert_not expired.clearable_by?(expired.user)
+    assert_not expired.clearable_by?(expired.members.first)
   end
-
-  # --- History events ---
 
   test 'creating a notice logs an opened event' do
     notice = nil
     assert_difference 'ParkingNoticeEvent.count', 1 do
-      notice = ParkingNotice.create!(
-        notice_type: 'permit', user: @user, issued_by: @admin, expires_at: 7.days.from_now
-      )
+      notice = build_permit
+      notice.save!
     end
     event = notice.events.last
     assert_equal 'opened', event.event_type
@@ -265,8 +266,6 @@ class ParkingNoticeTest < ActiveSupport::TestCase
     assert_equal 'Spoke with the member', event.note
     assert_equal @admin, event.actor
   end
-
-  # --- Clearance requests ---
 
   test 'request_clearance! records the request and logs an event' do
     notice = parking_notices(:active_permit)
