@@ -118,7 +118,7 @@ class BackfillReminderDeliveriesTest < ActiveSupport::TestCase
 
   def create_parking_notice
     owner = create_user("parking-#{SecureRandom.hex(4)}@example.com")
-    ParkingNotice.create!(
+    create_parking_notice!(
       user: owner,
       issued_by: owner,
       notice_type: 'permit',

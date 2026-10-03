@@ -217,6 +217,14 @@ module ActiveSupport
       )
     end
 
+    def create_parking_notice!(user: nil, members: nil, **attributes)
+      holders = Array(members || user).compact
+      notice = ParkingNotice.new(attributes)
+      notice.build_members_from_ids!(holders.map { |holder| holder.is_a?(User) ? holder.id : holder }) if holders.any?
+      notice.save!
+      notice
+    end
+
     # Proves both halves of a privilege gate at once: the affordance is absent without the
     # privilege, present with it, and — when a request is supplied — the underlying action is
     # refused without it, so hiding is never the only thing protecting it.
