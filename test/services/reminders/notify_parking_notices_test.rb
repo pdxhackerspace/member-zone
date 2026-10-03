@@ -94,7 +94,7 @@ class NotifyParkingNoticesTest < ActiveSupport::TestCase
   test 'does not enqueue repeat mail for banned members' do
     @setting.update!(enabled: true)
     @notice.update!(status: 'expired', expires_at: @now - 1.hour, expiration_notice_sent_at: nil)
-    @notice.user.update_columns(membership_state: 'banned_member')
+    @notice.members.first.update_columns(membership_state: 'banned_member')
     clear_other_parking_notices!(@notice)
 
     travel_to @now do

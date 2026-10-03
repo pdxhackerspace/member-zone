@@ -60,7 +60,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'index shows member username not display name' do
-    user = @active_permit.user
+    user = @active_permit.members.first
     user.update!(slack_handle: 'parkedslack')
 
     get parking_notices_url
@@ -70,7 +70,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'index eager loads slack_user for member labels' do
-    user = @active_permit.user
+    user = @active_permit.members.first
     user.update!(slack_handle: nil)
     slack_users(:with_dept).update!(user: user)
 
@@ -81,7 +81,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'show displays member username not display name' do
-    user = @active_permit.user
+    user = @active_permit.members.first
     user.update!(slack_handle: 'showslack')
 
     get parking_notice_url(@active_permit)
@@ -92,7 +92,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'show eager loads slack_user for member label' do
-    user = @active_permit.user
+    user = @active_permit.members.first
     user.update!(slack_handle: nil)
     slack_users(:with_dept).update!(user: user)
 
@@ -127,7 +127,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
     get new_parking_notice_url(
       type: 'permit',
       parking_notice: {
-        user_id: user.id,
+        member_ids: [user.id],
         description: 'Repeat permit',
         expires_at: '2026-06-01T17:00',
         location: 'Woodshop',
@@ -136,8 +136,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
     )
 
     assert_response :success
-    assert_select 'input[name="parking_notice[user_id]"][value=?]', user.id.to_s
-    assert_select 'input#pn_member_search[value=?]', user.parking_member_label
+    assert_select "input[name='parking_notice[member_ids][]'][value=?]", user.id.to_s
     assert_select 'textarea[name="parking_notice[description]"]', text: 'Repeat permit'
     assert_select 'input[name="parking_notice[expires_at]"][value="2026-06-01T17:00"]'
     assert_select 'input[name="parking_notice[location]"][value="Woodshop"]'
@@ -151,13 +150,10 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
     get new_parking_notice_url(type: 'permit')
     assert_response :success
 
-    member_item_selector = '.pn-member-item[data-user-id=?][data-user-email=?][data-username=?]' \
-                           '[data-slack-handle=?][data-user-display=?]'
-    assert_select member_item_selector,
-                  user.id.to_s, user.email, user.username, 'searchslack', user.parking_member_label
-    assert_select ".pn-member-item[data-user-id='#{user.id}']", text: /#{Regexp.escape(user.username)}/
-    assert_select ".pn-member-item[data-user-id='#{user.id}']", text: /@searchslack/
-    assert_select ".pn-member-item[data-user-id='#{user.id}']", text: /#{Regexp.escape(user.email)}/, count: 0
+    row = "[data-member-picker-target='result'][data-user-id='#{user.id}']"
+    assert_select row, text: /#{Regexp.escape(user.username)}/
+    assert_select row, text: /@searchslack/
+    assert_select "#{row} .text-11", text: /#{Regexp.escape(user.email)}/
   end
 
   test 'member picker eager loads slack_user associations' do
@@ -189,14 +185,37 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
       post parking_notices_url, params: {
         parking_notice: {
           notice_type: 'permit',
-          user_id: user.id,
+          member_ids: [user.id],
           description: 'Test permit',
           location: 'Woodshop',
           expires_at: 7.days.from_now
         }
       }
     end
-    assert_redirected_to parking_notice_path(ParkingNotice.last)
+    notice = ParkingNotice.last
+    assert notice.member?(user)
+    assert_redirected_to parking_notice_path(notice)
+  end
+
+  test 'create saves a permit with multiple members' do
+    first = users(:one)
+    second = users(:two)
+
+    assert_difference 'ParkingNotice.count', 1 do
+      post parking_notices_url, params: {
+        parking_notice: {
+          notice_type: 'permit',
+          member_ids: [first.id, second.id],
+          description: 'Shared bench',
+          location: 'Woodshop',
+          expires_at: 7.days.from_now
+        }
+      }
+    end
+
+    notice = ParkingNotice.last
+    assert notice.member?(first)
+    assert notice.member?(second)
   end
 
   test 'create can save and start another permit with matching fields' do
@@ -208,7 +227,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
         create_another_permit: 'Save and Create Another Permit',
         parking_notice: {
           notice_type: 'permit',
-          user_id: user.id,
+          member_ids: [user.id],
           description: 'Repeat permit',
           expires_at: expires_at,
           location: 'Woodshop',
@@ -222,7 +241,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal new_parking_notice_path, location.path
     assert_equal 'permit', redirect_params['type']
-    assert_equal user.id.to_s, redirect_params.dig('parking_notice', 'user_id')
+    assert_equal [user.id.to_s], Array(redirect_params.dig('parking_notice', 'member_ids'))
     assert_equal 'Repeat permit', redirect_params.dig('parking_notice', 'description')
     assert_equal expires_at, redirect_params.dig('parking_notice', 'expires_at')
     assert_equal 'Woodshop', redirect_params.dig('parking_notice', 'location')
@@ -254,7 +273,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
           print_create_another_permit: 'Save, Print and Create Another Permit',
           parking_notice: {
             notice_type: 'permit',
-            user_id: user.id,
+            member_ids: [user.id],
             description: 'Repeat printed permit',
             expires_at: expires_at,
             location: 'Woodshop',
@@ -272,7 +291,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal new_parking_notice_path, location.path
     assert_equal 'permit', redirect_params['type']
-    assert_equal user.id.to_s, redirect_params.dig('parking_notice', 'user_id')
+    assert_equal [user.id.to_s], Array(redirect_params.dig('parking_notice', 'member_ids'))
     assert_equal 'Repeat printed permit', redirect_params.dig('parking_notice', 'description')
     assert_equal expires_at, redirect_params.dig('parking_notice', 'expires_at')
     assert_equal 'Woodshop', redirect_params.dig('parking_notice', 'location')
@@ -295,7 +314,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
           print_create_another_permit: 'Save, Print and Create Another Permit',
           parking_notice: {
             notice_type: 'permit',
-            user_id: user.id,
+            member_ids: [user.id],
             description: 'Repeat unprinted permit',
             expires_at: expires_at,
             location: 'Woodshop',
@@ -310,7 +329,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal new_parking_notice_path, location.path
     assert_equal 'permit', redirect_params['type']
-    assert_equal user.id.to_s, redirect_params.dig('parking_notice', 'user_id')
+    assert_equal [user.id.to_s], Array(redirect_params.dig('parking_notice', 'member_ids'))
     assert_equal 'Repeat unprinted permit', redirect_params.dig('parking_notice', 'description')
     assert_equal expires_at, redirect_params.dig('parking_notice', 'expires_at')
     assert_equal 'Woodshop', redirect_params.dig('parking_notice', 'location')
@@ -335,7 +354,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
           print_create_another_permit: 'Save, Print and Create Another Permit',
           parking_notice: {
             notice_type: 'permit',
-            user_id: user.id,
+            member_ids: [user.id],
             description: 'Repeat failed print permit',
             expires_at: expires_at,
             location: 'Woodshop',
@@ -352,7 +371,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal new_parking_notice_path, location.path
     assert_equal 'permit', redirect_params['type']
-    assert_equal user.id.to_s, redirect_params.dig('parking_notice', 'user_id')
+    assert_equal [user.id.to_s], Array(redirect_params.dig('parking_notice', 'member_ids'))
     assert_equal 'Repeat failed print permit', redirect_params.dig('parking_notice', 'description')
     assert_equal expires_at, redirect_params.dig('parking_notice', 'expires_at')
     assert_equal 'Woodshop', redirect_params.dig('parking_notice', 'location')
@@ -435,7 +454,7 @@ class ParkingNoticesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'clear returns to the list passed as return_to' do
-    return_to = user_path(@active_permit.user, tab: :parking)
+    return_to = user_path(@active_permit.members.first, tab: :parking)
 
     post clear_parking_notice_url(@active_permit, return_to: return_to)
 

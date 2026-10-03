@@ -27,6 +27,8 @@ The **Send now** button runs the reminder immediately against everyone the caden
 
 Every parking permit and ticket email ends with a link to the notice it is about, so the member can open it, add a note, or clear it without hunting through their profile. The link is the `{{parking_notice_url}}` variable, and it points at the member's own view of the notice rather than the admin page.
 
+A permit or ticket can list **multiple members**. Everyone on the notice sees it on their parking tab, can clear it (unless it requires admin clearance), and receives the issued and reminder emails. When creating a permit, members can add other active members whose profiles are visible to them (search by username). Staff can add anyone when creating or editing a notice. Newly added members receive the issued email when they are put on an existing notice.
+
 ### Slack signup reminder
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.

@@ -43,7 +43,7 @@ class ParkingNoticeExpirationJobTest < ActiveJob::TestCase
 
     journal = Journal.last
     assert_equal 'parking_notice_expired', journal.action
-    assert_equal notice.user, journal.user
+    assert_equal notice.members.first, journal.user
   end
 
   test 'enqueues expiration email for notice with user' do

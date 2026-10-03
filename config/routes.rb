@@ -83,6 +83,9 @@ Rails.application.routes.draw do
   post '/training/record', to: 'trainings#create_bulk'
   get '/training/:id',  to: 'training_catalog#show',  as: :training_catalog_topic, constraints: { id: /\d+/ }
   resources :member_parking_permits, only: %i[new create show edit update] do
+    collection do
+      get :member_search
+    end
     member do
       patch :close
       post :request_clearance
