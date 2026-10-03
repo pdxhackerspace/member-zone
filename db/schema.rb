@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -255,6 +255,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
   end
 
   create_table "audit_log_entries", force: :cascade do |t|
+    t.datetime "alert_checked_at"
     t.datetime "alerted_at"
     t.bigint "audit_log_source_id", null: false
     t.datetime "created_at", null: false
@@ -270,6 +271,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
     t.index ["audit_log_source_id", "fingerprint"], name: "index_audit_log_entries_on_audit_log_source_id_and_fingerprint", unique: true
     t.index ["audit_log_source_id", "occurred_at"], name: "index_audit_log_entries_on_audit_log_source_id_and_occurred_at"
     t.index ["audit_log_source_id"], name: "index_audit_log_entries_on_audit_log_source_id"
+    t.index ["audit_log_source_id"], name: "index_audit_log_entries_unchecked", where: "(alert_checked_at IS NULL)"
     t.index ["explained_by_id"], name: "index_audit_log_entries_on_explained_by_id"
     t.index ["message"], name: "index_audit_log_entries_on_message_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["occurred_at"], name: "index_audit_log_entries_on_occurred_at"
