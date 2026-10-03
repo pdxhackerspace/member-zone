@@ -94,7 +94,10 @@ export default class extends Controller {
     this.searchTarget.dispatchEvent(new Event("input", { bubbles: true }))
     if (this.hasResultsContainerTarget) {
       this.resultsContainerTarget.classList.add("d-none")
-      this.resultsContainerTarget.replaceChildren()
+      // Server search builds rows in JS; admin live-filter keeps its roster in the DOM.
+      if (this.searchUrlValue) {
+        this.resultsContainerTarget.replaceChildren()
+      }
     }
     if (this.hasNoResultsTarget) {
       this.noResultsTarget.classList.add("d-none")

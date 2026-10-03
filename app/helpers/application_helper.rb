@@ -138,5 +138,4 @@ module ApplicationHelper
       final: 'Final warning'
     }.fetch(phase, phase.to_s.humanize)
   end
-
 end
