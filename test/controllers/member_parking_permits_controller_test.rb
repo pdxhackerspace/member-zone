@@ -79,7 +79,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     sign_in_as_member
     travel_to Time.zone.local(2026, 10, 5, 8, 0, 0) do
       # Calendar day + 5pm would land after the true two-week limit from now.
-      too_late = (Time.current + 14.days).change(hour: 17, min: 0)
+      too_late = 14.days.from_now.change(hour: 17, min: 0)
 
       assert_no_difference 'ParkingNotice.count' do
         post member_parking_permits_path, params: {
