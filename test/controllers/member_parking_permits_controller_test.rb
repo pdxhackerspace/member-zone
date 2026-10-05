@@ -75,22 +75,46 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/must be within 2 weeks/i, response.body)
   end
 
-  test 'member cannot extend permit beyond 2 weeks' do
+  test 'member cannot create permit with two week quick pick time past the max window' do
     sign_in_as_member
-    permit = member_permit
+    travel_to Time.zone.local(2026, 10, 5, 8, 0, 0) do
+      # Calendar day + 5pm would land after the true two-week limit from now.
+      too_late = (Time.current + 14.days).change(hour: 17, min: 0)
 
-    assert_no_changes -> { permit.reload.expires_at } do
-      patch member_parking_permit_path(permit), params: {
-        parking_notice: {
-          description: permit.description,
-          location: permit.location,
-          expires_at: 1.month.from_now.strftime('%Y-%m-%dT%H:%M')
+      assert_no_difference 'ParkingNotice.count' do
+        post member_parking_permits_path, params: {
+          parking_notice: {
+            description: 'Late afternoon pick',
+            location: 'Woodshop',
+            expires_at: too_late.strftime('%Y-%m-%dT%H:%M')
+          }
         }
-      }
-    end
+      end
 
-    assert_response :unprocessable_content
-    assert_match(/must be within 2 weeks/i, response.body)
+      assert_response :unprocessable_content
+      assert_match(/must be within 2 weeks/i, response.body)
+    end
+  end
+
+  test 'member cannot extend permit beyond 2 weeks from creation' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 10, 1, 10, 0, 0) do
+      permit = member_permit
+      travel 8.days
+
+      assert_no_changes -> { permit.reload.expires_at } do
+        patch member_parking_permit_path(permit), params: {
+          parking_notice: {
+            description: permit.description,
+            location: permit.location,
+            expires_at: (permit.created_at + 15.days).strftime('%Y-%m-%dT%H:%M')
+          }
+        }
+      end
+
+      assert_response :unprocessable_content
+      assert_match(/must be within 2 weeks/i, response.body)
+    end
   end
 
   test 'anonymous user cannot access member permit form' do

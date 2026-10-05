@@ -184,9 +184,13 @@ class MemberParkingPermitsController < AuthenticatedController
   def validate_member_permit_duration
     return if @parking_notice.expires_at.blank?
 
-    max_expires_at = Time.current + MAX_MEMBER_PERMIT_DURATION
-    return if @parking_notice.expires_at <= max_expires_at
+    return if @parking_notice.expires_at <= member_permit_max_expires_at
 
     @parking_notice.errors.add(:expires_at, 'must be within 2 weeks')
+  end
+
+  def member_permit_max_expires_at
+    anchor = @parking_notice.created_at || Time.current
+    anchor + MAX_MEMBER_PERMIT_DURATION
   end
 end
