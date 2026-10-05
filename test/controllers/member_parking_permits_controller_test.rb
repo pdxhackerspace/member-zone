@@ -169,6 +169,26 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'input[name="parking_notice[expires_at]"][max]', false
   end
 
+  test 'failed update with rejected extension keeps input max constraint' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 10, 1, 10, 0, 0) do
+      permit = member_permit
+      cap = 2.weeks.after(permit.created_at)
+      beyond = cap + 1.day
+
+      patch member_parking_permit_path(permit), params: {
+        parking_notice: {
+          description: permit.description,
+          location: permit.location,
+          expires_at: beyond.strftime('%Y-%m-%dT%H:%M')
+        }
+      }
+
+      assert_response :unprocessable_content
+      assert_select 'input[name="parking_notice[expires_at]"][max=?]', cap.strftime('%Y-%m-%dT%H:%M')
+    end
+  end
+
   test 'anonymous user cannot access member permit form' do
     get new_member_parking_permit_path
     assert_redirected_to login_path
