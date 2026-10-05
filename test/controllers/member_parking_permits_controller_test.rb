@@ -107,7 +107,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
           parking_notice: {
             description: permit.description,
             location: permit.location,
-            expires_at: (permit.created_at + 15.days).strftime('%Y-%m-%dT%H:%M')
+            expires_at: 15.days.after(permit.created_at).strftime('%Y-%m-%dT%H:%M')
           }
         }
       end
@@ -115,6 +115,25 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
       assert_response :unprocessable_content
       assert_match(/must be within 2 weeks/i, response.body)
     end
+  end
+
+  test 'member can update permit when expiration exceeds self-service cap if unchanged' do
+    sign_in_as_member
+    permit = travel_to(Time.zone.local(2026, 1, 1, 10, 0, 0)) { member_permit_for(current_member) }
+
+    permit.update_columns(created_at: 20.days.ago, expires_at: 10.days.from_now)
+    expires_param = permit.expires_at.strftime('%Y-%m-%dT%H:%M')
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: {
+        description: 'Updated description',
+        location: permit.location,
+        expires_at: expires_param
+      }
+    }
+
+    assert_redirected_to user_path(current_member, tab: :parking)
+    assert_equal 'Updated description', permit.reload.description
   end
 
   test 'anonymous user cannot access member permit form' do

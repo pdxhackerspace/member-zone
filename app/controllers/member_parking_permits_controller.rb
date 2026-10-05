@@ -183,14 +183,29 @@ class MemberParkingPermitsController < AuthenticatedController
 
   def validate_member_permit_duration
     return if @parking_notice.expires_at.blank?
+    # Staff extensions and legacy permits may expire after the self-service cap;
+    # members may edit other fields without touching expiration.
+    return if @parking_notice.persisted? && !member_changed_expires_at?
 
     return if @parking_notice.expires_at <= member_permit_max_expires_at
 
     @parking_notice.errors.add(:expires_at, 'must be within 2 weeks')
   end
 
+  def member_changed_expires_at?
+    new_at = @parking_notice.expires_at
+    old_at = @parking_notice.expires_at_in_database
+    return true if old_at.nil?
+
+    member_expires_at_minute(new_at) != member_expires_at_minute(old_at)
+  end
+
+  def member_expires_at_minute(time)
+    time.in_time_zone.change(sec: 0, usec: 0)
+  end
+
   def member_permit_max_expires_at
-    anchor = @parking_notice.created_at || Time.current
+    anchor = @parking_notice.persisted? ? @parking_notice.created_at : Time.current
     anchor + MAX_MEMBER_PERMIT_DURATION
   end
 end
