@@ -136,6 +136,39 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'Updated description', permit.reload.description
   end
 
+  test 'failed create form caps expiration at self-service limit not invalid value' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 6, 1, 12, 0, 0) do
+      assert_no_difference 'ParkingNotice.count' do
+        post member_parking_permits_path, params: {
+          parking_notice: {
+            description: 'Too long',
+            location: 'Woodshop',
+            expires_at: 3.weeks.from_now.strftime('%Y-%m-%dT%H:%M')
+          }
+        }
+      end
+
+      cap = 2.weeks.from_now.strftime('%Y-%m-%dT%H:%M')
+      assert_response :unprocessable_content
+      assert_select '[data-quick-expire-max-at-value=?]', cap
+      assert_select 'input[name="parking_notice[expires_at]"][max=?]', cap
+    end
+  end
+
+  test 'grandfathered permit edit uses self-service cap for quick-expire only' do
+    sign_in_as_member
+    permit = travel_to(Time.zone.local(2026, 1, 1, 10, 0, 0)) { member_permit_for(current_member) }
+    permit.update_columns(created_at: 20.days.ago, expires_at: 10.days.from_now)
+
+    get edit_member_parking_permit_path(permit)
+
+    cap = 2.weeks.after(permit.created_at).strftime('%Y-%m-%dT%H:%M')
+    assert_response :success
+    assert_select '[data-quick-expire-max-at-value=?]', cap
+    assert_select 'input[name="parking_notice[expires_at]"][max]', false
+  end
+
   test 'anonymous user cannot access member permit form' do
     get new_member_parking_permit_path
     assert_redirected_to login_path
