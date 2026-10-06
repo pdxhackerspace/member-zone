@@ -62,6 +62,7 @@ Set these variables in your shell, `.env`, or Docker Compose environment:
 | `RECHARGE_API_KEY` | Recharge API access token |
 | `RECHARGE_API_BASE_URL` | Optional override (defaults to `https://api.rechargeapps.com`) |
 | `RECHARGE_TRANSACTIONS_LOOKBACK_DAYS` | Days of Recharge history to pull during sync (default 30) |
+| `CREDENTIAL_SCRIPTS_DIR` | Optional extra directory of credential provider programs (beside `scripts/credentials/`) — see [docs/credentials.md](docs/credentials.md) |
 | `DATABASE_FIELD_ENCRYPTION_KEY` | Key for encrypting personal data and credentials at rest — see [docs/encrypted-fields.md](docs/encrypted-fields.md) |
 | `EMAIL_LOOKUP_HMAC_KEY` | Key for deriving the email lookup digests that make encrypted addresses searchable |
 
@@ -272,6 +273,14 @@ rails 'audit_logs:run[Door log]'       # run now and store
 ```
 
 `docs/audit-logs.md` describes the program contract, output format, alerts and the five `audit_logs.*` privileges. A new `Audit log administrator` role bundles the global ones; `Audit log reviewer` is meant to be attached to the topic whose logs its holders should read.
+
+## Credentials
+
+Members can request API keys, app passwords and similar credentials from external systems under **Your credentials**; administrators configure the systems under **Settings → Credential providers**. Each provider is an executable in `scripts/credentials/` (or the directory named by `CREDENTIAL_SCRIPTS_DIR`) that speaks a small JSON protocol. MemberZone shows each secret once, keeps only its first and last four characters, revokes credentials when a member stops being active, and monitors each provider's health. `docs/credentials.md` describes the protocol, what is stored, the pause, expiry and rotation behaviour, the rake tasks and an example program. Nothing ships in `scripts/credentials/`.
+
+```bash
+rails credentials:reconcile_preview   # dry run: what the daily reconcile would do
+```
 
 ## Roles and Privileges
 

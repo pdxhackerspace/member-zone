@@ -25,6 +25,10 @@ module QueuedMailMailerArgs
       when 'training_requested'
         [user, extra_args.slice(:training_topic, :requester_name, :requester_email, :requester_slack,
                                 :share_contact_info, :recipient_role, :trainer_names, :to)]
+      when 'credential_expiring_soon', 'credential_expired'
+        [user, extra_args.slice(:credential_name, :credential_expires_at)]
+      when 'credentials_revoked'
+        [user, extra_args.slice(:credential_names, :credential_reason)]
       when 'login_link_sent'
         [user, extra_args.slice(:login_url)]
       else

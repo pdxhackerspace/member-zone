@@ -217,6 +217,80 @@ module ActiveSupport
       )
     end
 
+    CREDENTIAL_FIXTURE_DIR = Rails.root.join('test/fixtures/files/credentials').freeze
+
+    def credential_script(name)
+      CREDENTIAL_FIXTURE_DIR.join(name).to_s
+    end
+
+    # A scratch directory the fixture programs record their calls in (see _common.sh). Removed
+    # after the test.
+    def credential_state_dir
+      @credential_state_dir ||= Dir.mktmpdir('credential-state')
+    end
+
+    # Every line the fixture programs logged: the arguments of each call, in order.
+    def credential_calls
+      path = File.join(credential_state_dir, 'calls.log')
+      File.exist?(path) ? File.readlines(path, chomp: true) : []
+    end
+
+    # What a fixture program was last given on stdin for +action+, parsed.
+    def credential_stdin(action)
+      ::JSON.parse(File.read(File.join(credential_state_dir, "#{action}.stdin")))
+    end
+
+    teardown { FileUtils.rm_rf(@credential_state_dir) if @credential_state_dir }
+
+    # A provider backed by a real fixture program. By default it has asked the program to
+    # describe itself and been marked healthy, so it is ready to issue; pass describe: false
+    # or health: nil to leave either undone. +env+ becomes its environment variables.
+    def create_credential_provider(script: 'oauth.sh', env: {}, describe: true, health: 'healthy', **attributes)
+      lines = env.map { |key, value| "#{key}=#{value}" }
+      lines.unshift("STATE_DIR=#{credential_state_dir}") unless env.key?(:STATE_DIR) || env.key?('STATE_DIR')
+      provider = CredentialProvider.create!(
+        { name: "Provider #{SecureRandom.hex(4)}", script_path: credential_script(script),
+          environment_variables: lines.join("\n") }.merge(attributes)
+      )
+      if describe
+        Credentials::Describe.call(provider)
+        # Setting up is not what a test is about; keep its record of calls to what the test makes.
+        FileUtils.rm_f(File.join(credential_state_dir, 'calls.log'))
+      end
+      provider.record_health!(health, nil) if health
+      provider.reload
+    end
+
+    # A credential that has already been issued, without running a program.
+    def create_credential(provider:, user:, status: 'active', **attributes)
+      Credential.create!(
+        { credential_provider: provider, user: user, status: status, label: 'laptop',
+          external_id: "ext-#{SecureRandom.hex(6)}", issued_at: Time.current,
+          field_hints: { 'client_id' => { 'value' => 'client-1' },
+                         'client_secret' => { 'prefix' => 'abcd', 'suffix' => 'wxyz' } } }.merge(attributes)
+      )
+    end
+
+    # A member who can be issued credentials: active, trained in nothing in particular.
+    def create_member(name: 'Credential Member')
+      User.create!(full_name: name, email: "member-#{SecureRandom.hex(4)}@example.com",
+                   username: "member#{SecureRandom.hex(4)}", authentik_id: "cred-#{SecureRandom.hex(6)}",
+                   membership_state: 'current_member')
+    end
+
+    # Fails when +secret+ appears anywhere in the database: every column of every table, found
+    # by asking Postgres for each row as text. Encrypted columns hold ciphertext, so a hit means
+    # the value was written somewhere it should never have been.
+    def assert_secret_not_stored(secret, message = nil)
+      connection = ActiveRecord::Base.connection
+      leaks = connection.tables.select do |table|
+        quoted = connection.quote_table_name(table)
+        query = "SELECT 1 FROM #{quoted} WHERE strpos(#{quoted}::text, ?) > 0 LIMIT 1"
+        connection.select_value(ActiveRecord::Base.sanitize_sql_array([query, secret]))
+      end
+      assert_empty leaks, message || "the secret was stored in: #{leaks.join(', ')}"
+    end
+
     # Proves both halves of a privilege gate at once: the affordance is absent without the
     # privilege, present with it, and — when a request is supplied — the underlying action is
     # refused without it, so hiding is never the only thing protecting it.
