@@ -1,0 +1,138 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0"><%= @provider.name %></h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="status-dot status-<%= @provider.health_dot_class %>"></span>
+      <%= @provider.health_label %><% if @provider.health_message.present? %>: <%= @provider.health_message %><% end %> ·
+      <span class="text-body"><%= @live_count %></span> live <%= 'credential'.pluralize(@live_count) %>
+      <% unless @provider.enabled? %>· Disabled<% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= button_to "Check health", check_health_credential_provider_path(@provider), method: :post,
+                  class: "btn btn-outline-secondary btn-sm", data: { turbo: false } %>
+    <%= button_to "Refresh schema", refresh_schema_credential_provider_path(@provider), method: :post,
+                  class: "btn btn-outline-secondary btn-sm", data: { turbo: false } %>
+    <%= link_to "Edit", edit_credential_provider_path(@provider), class: "btn btn-outline-secondary btn-sm" %>
+    <%= link_to "All providers", credential_providers_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<% if @provider.schema_error.present? %>
+  <div class="alert alert-warning text-13">
+    The program could not be read: <%= @provider.schema_error %>
+  </div>
+<% end %>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="h-section-label mb-2">What it issues</div>
+    <div class="card shadow-sm border-0 mb-3">
+      <% if @provider.schema_fields.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead><tr><th>Field</th><th>Key</th><th>Kept</th></tr></thead>
+            <tbody>
+              <% @provider.schema_fields.each do |field| %>
+                <tr>
+                  <td><%= field['label'] %></td>
+                  <td><code><%= field['key'] %></code></td>
+                  <td class="text-secondary">
+                    <%= field['secret'] ? 'First and last four characters' : 'Whole value' %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body border-top text-12 text-secondary">
+          Actions: <%= @provider.schema_actions.join(', ') %>.
+          <% unless @provider.supports_pause? %>
+            This program cannot pause, so pausing a member's key access revokes their credentials.
+          <% end %>
+          <% if @provider.schema_fetched_at %>Read <%= l(@provider.schema_fetched_at, format: :short) %>.<% end %>
+        </div>
+      <% else %>
+        <div class="card-body text-secondary text-13">
+          The program has not described itself yet. Use <em>Refresh schema</em> once it is configured.
+        </div>
+      <% end %>
+    </div>
+
+    <div class="h-section-label mb-2">Recent runs</div>
+    <div class="card shadow-sm border-0">
+      <% if @runs.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead><tr><th>Started</th><th>Action</th><th>Status</th><th class="num">Time</th><th>Output</th></tr></thead>
+            <tbody>
+              <% @runs.each do |run| %>
+                <tr>
+                  <td class="text-nowrap"><%= l(run.created_at, format: :short) %></td>
+                  <td><%= run.action %></td>
+                  <td>
+                    <span class="status-dot status-<%= run.status_dot_class %>"></span>
+                    <%= run.status.humanize %><% if run.exit_code && run.exit_code != 0 %> (exit <%= run.exit_code %>)<% end %>
+                  </td>
+                  <td class="num text-secondary"><%= run.duration_ms ? "#{run.duration_ms} ms" : '' %></td>
+                  <td class="text-secondary font-monospace text-12"><%= run.output.to_s.truncate(200) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="card-body text-secondary text-13">This provider has not run yet.</div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Configuration</div>
+        <dl class="mb-0 text-13">
+          <dt class="text-secondary fw-normal">Program</dt>
+          <dd><code class="text-break"><%= @provider.script_path %> <%= @provider.script_arguments %></code></dd>
+          <dt class="text-secondary fw-normal">Environment variables</dt>
+          <dd><%= @provider.parsed_environment_variables.keys.presence&.join(', ') || 'None' %></dd>
+          <dt class="text-secondary fw-normal">Who can request</dt>
+          <dd><%= @provider.self_service? ? 'Members, and administrators for them' : 'Administrators only' %></dd>
+          <dt class="text-secondary fw-normal">Required training</dt>
+          <dd><%= @provider.required_training_topics.map(&:name).to_sentence.presence || 'None' %></dd>
+          <dt class="text-secondary fw-normal">Most per member</dt>
+          <dd><%= @provider.max_per_member %></dd>
+          <% if @provider.description.present? %>
+            <dt class="text-secondary fw-normal">Description</dt>
+            <dd><%= @provider.description %></dd>
+          <% end %>
+        </dl>
+      </div>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Manage</div>
+        <div class="d-flex flex-wrap gap-2">
+          <%= button_to @provider.enabled? ? "Disable" : "Enable", toggle_credential_provider_path(@provider),
+                        method: :post, class: "btn btn-outline-secondary btn-sm" %>
+          <% if @live_count.positive? %>
+            <%= button_to "Revoke all", revoke_all_credential_provider_path(@provider), method: :post,
+                          class: "btn btn-outline-danger btn-sm",
+                          data: { turbo_confirm: "Revoke all #{@live_count} live credentials from '#{@provider.name}'? Members are told by email." } %>
+          <% end %>
+          <% if @credential_count.zero? %>
+            <%= button_to "Delete", credential_provider_path(@provider), method: :delete,
+                          class: "btn btn-outline-danger btn-sm",
+                          data: { turbo_confirm: "Delete '#{@provider.name}'?" } %>
+          <% end %>
+        </div>
+        <% if @credential_count.positive? %>
+          <div class="text-12 text-secondary mt-2">
+            A provider that has issued credentials cannot be deleted, because the records are kept. Disable it to
+            stop new requests.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

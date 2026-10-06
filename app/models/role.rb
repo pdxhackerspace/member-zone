@@ -69,6 +69,12 @@ class Role < ApplicationRecord
       privileges: %w[audit_logs.view audit_logs.alerts]
     },
     {
+      name: 'Credentials administrator',
+      description: 'Configures credential providers and issues, rotates and revokes credentials for members.',
+      privileges: %w[credentials.manage_providers credentials.view_all credentials.issue_for_members
+                     credentials.revoke]
+    },
+    {
       name: 'Communications editor',
       description: 'Maintains email templates and the outgoing mail queue.',
       # mail_log.view as well: approving a message without being able to confirm it sent

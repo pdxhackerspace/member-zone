@@ -165,6 +165,28 @@ The run history on the source's page shows each run's status, how many entries w
 
 Alert emails can be turned off under **Notifications** (the *Audit log alerts* row appears only for people who receive them). See `docs/audit-logs.md` for how programs are written.
 
+## Credentials
+
+### Requesting a credential (members)
+
+**Your credentials** on your dashboard lists the API keys and app passwords issued to you, and the systems you can request one from. Each system shows why you cannot request one if that is the case (for example, training you still need, or that you already have the most allowed).
+
+1. Choose a system and, if you like, say what it is for ("laptop CLI").
+2. **Request credential.** The next page shows the new secret **once**. Copy it somewhere safe before leaving; we keep only its first and last four characters, so we cannot show it again. If you did not save it, revoke it and request a new one.
+3. Afterwards the list shows each credential as `abcd…wxyz` (things that are not secret, like a client ID, are shown whole), its status and when it expires.
+
+**Replace** issues a new credential and revokes the old one in one step. **Revoke** switches one off at once.
+
+Your credentials are revoked automatically when your membership stops being active. If your key access is paused they are paused too, or revoked when the system cannot pause them. Reactivating your membership does not bring them back; request new ones. We email you a week before a credential expires, when it expires, and when we revoke any. You can turn these emails off under **Notifications** (*Credential notices*).
+
+### Administering credentials
+
+- **Settings → Credential providers** (needs *Configure credential providers*). **New provider**: choose the program from the list, add arguments and environment variables (API tokens, stored encrypted and never shown again — leave the box blank when editing to keep them), optionally require training topics (a member needs all of them), set the most per member, and choose whether members can request their own. Saving asks the program what it issues. The provider's page shows the schema, health, recent runs and the buttons **Check health**, **Refresh schema**, **Disable**, **Revoke all** and **Delete** (only for a provider that has never issued anything).
+- **Admin → Credentials** (needs *View every issued credential*) lists every credential with filters for provider, status, member and "expiring in 14 days". **Revoke** needs *Revoke any member's credentials*. **Issue for member** and **Rotate** need *Issue and rotate credentials for members*: enter the member's full email address; you will see the secret once and must give it to them yourself. You cannot issue or rotate while viewing as a member.
+- Providers and revocations that need attention appear on the settings page, the admin dashboard and the urgent digest. A revocation that fails is retried daily, backing off up to a day.
+
+See `docs/credentials.md` for how programs are written, and the `Credentials administrator` role for the four `credentials.*` privileges.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.

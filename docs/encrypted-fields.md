@@ -91,6 +91,7 @@ addresses, phone numbers, and profile details beyond the columns alongside them.
 | `AiProvider` | `api_key` | — |
 | `AiOllamaProfile` | `api_key`, `provider_api_key_override` | — |
 | `AccessController` | `access_token`, `environment_variables` | — |
+| `CredentialProvider` | `environment_variables` | — |
 | `RfidReader` | `key` | `key_lookup_digest` |
 
 `RfidReader` is the one field that does not use the `encrypts_sensitive_*` declarations. Its

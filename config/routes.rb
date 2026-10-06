@@ -430,6 +430,23 @@ Rails.application.routes.draw do
     resources :audit_log_alert_rules, only: %i[create update destroy]
   end
 
+  resources :credential_providers do
+    member do
+      post :toggle
+      post :check_health
+      post :refresh_schema
+      post :revoke_all
+    end
+  end
+
+  resources :credentials, only: %i[index new create] do
+    member do
+      post :revoke
+      post :rotate
+    end
+  end
+  resources :issued_credentials, only: :index
+
   resources :access_controllers do
     member do
       post :toggle

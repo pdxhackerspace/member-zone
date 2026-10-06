@@ -186,6 +186,27 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Credentials - provider health every ten minutes; expiry and reconciliation after
+  # Membership::TickJob has settled member standing at 4 AM.
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Provider Health - Every 10 minutes',
+    cron: '*/10 * * * *',
+    class: 'Credentials::HealthCheckJob',
+    active_job: true
+  )
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Expiry - Daily at 4:20am',
+    cron: '20 4 * * *',
+    class: 'Credentials::ExpireJob',
+    active_job: true
+  )
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Reconcile - Daily at 4:30am',
+    cron: '30 4 * * *',
+    class: 'Credentials::ReconcileJob',
+    active_job: true
+  )
+
   # Member Geocoding - Hourly
   Sidekiq::Cron::Job.create(
     name: 'Member Geocoding - Hourly',

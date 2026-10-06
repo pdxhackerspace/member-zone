@@ -2,6 +2,7 @@ class User < ApplicationRecord
   include SensitiveFields
   include MembershipState
   include BuildingAccessTraining
+  include CredentialLifecycle
 
   encrypts_sensitive_string :email, :mailing_address, :phone_number
   encrypts_sensitive_string_array :extra_emails
