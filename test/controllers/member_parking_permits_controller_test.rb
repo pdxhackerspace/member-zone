@@ -17,6 +17,8 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/New Parking Permit/i, response.body)
     assert_expiration_quick_buttons
+    # The member is always on their own permit, so the picker must not claim it is empty.
+    assert_select '[data-member-picker-fixed-count-value="1"]'
   end
 
   test 'member can create own parking permit' do

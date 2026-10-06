@@ -16,7 +16,10 @@ export default class extends Controller {
   static values = {
     fieldName: String,
     searchUrl: String,
-    searchMinLength: { type: Number, default: 1 }
+    searchMinLength: { type: Number, default: 1 },
+    // Members shown outside the picker who always belong to the selection (the
+    // signed-in member on their own permit), so the list is never "empty".
+    fixedCount: { type: Number, default: 0 }
   }
 
   connect() {
@@ -84,7 +87,7 @@ export default class extends Controller {
       row.querySelector("[data-member-added]")?.classList.toggle("d-none", !added)
     })
 
-    this.emptyTarget.classList.toggle("d-none", selected.size > 0)
+    this.emptyTarget.classList.toggle("d-none", selected.size + this.fixedCountValue > 0)
   }
 
   _resetSearch() {
