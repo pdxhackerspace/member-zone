@@ -1,7 +1,6 @@
 active_permit:
   notice_type: permit
   status: active
-  user: one
   issued_by: one
   description: Large woodworking project on table
   location: Woodshop
@@ -11,7 +10,6 @@ active_permit:
 expired_ticket:
   notice_type: ticket
   status: expired
-  user: two
   issued_by: one
   description: Unattended electronics project
   location: Electronics Lab
@@ -20,7 +18,6 @@ expired_ticket:
 cleared_permit:
   notice_type: permit
   status: cleared
-  user: one
   issued_by: one
   description: Finished laser project
   location: Main Area

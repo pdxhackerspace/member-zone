@@ -217,6 +217,14 @@ module ActiveSupport
       )
     end
 
+    def create_parking_notice!(user: nil, members: nil, **attributes)
+      holders = Array(members || user).compact
+      notice = ParkingNotice.new(attributes)
+      notice.build_members_from_ids!(holders.map { |holder| holder.is_a?(User) ? holder.id : holder }) if holders.any?
+      notice.save!
+      notice
+    end
+
     CREDENTIAL_FIXTURE_DIR = Rails.root.join('test/fixtures/files/credentials').freeze
 
     def credential_script(name)

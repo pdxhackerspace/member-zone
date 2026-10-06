@@ -829,6 +829,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.index ["parking_notice_id"], name: "index_parking_notice_events_on_parking_notice_id"
   end
 
+  create_table "parking_notice_members", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "parking_notice_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["parking_notice_id", "user_id"], name: "index_parking_notice_members_on_parking_notice_id_and_user_id", unique: true
+    t.index ["parking_notice_id"], name: "index_parking_notice_members_on_parking_notice_id"
+    t.index ["user_id"], name: "index_parking_notice_members_on_user_id"
+  end
+
   create_table "parking_notices", force: :cascade do |t|
     t.datetime "clearance_requested_at"
     t.bigint "clearance_requested_by_id"
@@ -849,7 +859,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.boolean "requires_admin_clearance", default: false, null: false
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
-    t.bigint "user_id"
     t.index ["clearance_requested_at"], name: "index_parking_notices_on_clearance_requested_at"
     t.index ["clearance_requested_by_id"], name: "index_parking_notices_on_clearance_requested_by_id"
     t.index ["cleared_by_id"], name: "index_parking_notices_on_cleared_by_id"
@@ -860,7 +869,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.index ["pre_expiration_reminder_sent_at"], name: "index_parking_notices_on_pre_expiration_reminder_sent_at"
     t.index ["requires_admin_clearance"], name: "index_parking_notices_on_requires_admin_clearance"
     t.index ["status"], name: "index_parking_notices_on_status"
-    t.index ["user_id"], name: "index_parking_notices_on_user_id"
   end
 
   create_table "payment_events", force: :cascade do |t|
@@ -1436,7 +1444,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
   add_foreign_key "notification_opt_outs", "users"
   add_foreign_key "parking_notice_events", "parking_notices"
   add_foreign_key "parking_notice_events", "users", column: "actor_id"
-  add_foreign_key "parking_notices", "users"
+  add_foreign_key "parking_notice_members", "parking_notices"
+  add_foreign_key "parking_notice_members", "users"
   add_foreign_key "parking_notices", "users", column: "clearance_requested_by_id"
   add_foreign_key "parking_notices", "users", column: "cleared_by_id"
   add_foreign_key "parking_notices", "users", column: "issued_by_id"

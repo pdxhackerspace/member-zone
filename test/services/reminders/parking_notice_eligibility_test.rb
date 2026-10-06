@@ -6,7 +6,7 @@ module Reminders
       @now = Time.zone.local(2026, 8, 21, 7, 0, 0)
       @user = users(:one)
       @notice = parking_notices(:active_permit)
-      @notice.update!(user: @user, expires_at: @now + 2.days, status: 'active')
+      @notice.update!(expires_at: @now + 2.days, status: 'active')
       set_reminder_cadence('parking_notices', start_offset_days: -3, interval_days: 7, max_reminders: 4)
     end
 

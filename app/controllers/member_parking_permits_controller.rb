@@ -1,4 +1,5 @@
 class MemberParkingPermitsController < AuthenticatedController
+  include ParkingNoticeMemberParams
   include ParkingNoticePrinting
 
   MAX_MEMBER_PERMIT_DURATION = 2.weeks
@@ -22,15 +23,16 @@ class MemberParkingPermitsController < AuthenticatedController
   def edit; end
 
   def create
-    @parking_notice = current_user.parking_notices.build(member_parking_permit_params)
+    @parking_notice = ParkingNotice.new(member_parking_permit_params)
     @parking_notice.notice_type = 'permit'
     @parking_notice.issued_by = current_user
     @parking_notice.status = 'active'
+    @parking_notice.build_members_from_ids!(resolve_member_permit_member_ids(member_ids_param, current_user))
     validate_member_permit_duration
 
     if @parking_notice.errors.empty? && @parking_notice.save
       @parking_notice.record_journal_entry!('parking_permit_issued', actor: current_user)
-      @parking_notice.enqueue_notification!(@parking_notice.issued_template_key)
+      @parking_notice.notify_issued!
       redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit created successfully.'
     else
       render :new, status: :unprocessable_content
@@ -42,11 +44,38 @@ class MemberParkingPermitsController < AuthenticatedController
     @parking_notice.assign_attributes(member_parking_permit_params)
     validate_member_permit_duration
 
-    if @parking_notice.errors.empty? && @parking_notice.save
-      redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit updated.'
+    if @parking_notice.errors.empty?
+      newly_added = []
+      begin
+        ParkingNotice.transaction do
+          @parking_notice.save!
+          if params[:parking_notice]&.key?(:member_ids)
+            member_ids = resolve_member_permit_member_ids(member_ids_param, current_user)
+            newly_added = @parking_notice.replace_members!(member_ids)
+          end
+        end
+        @parking_notice.notify_issued!(newly_added) if newly_added.any?
+        redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit updated.'
+      rescue ActiveRecord::RecordInvalid
+        render :edit, status: :unprocessable_content
+      end
     else
       render :edit, status: :unprocessable_content
     end
+  end
+
+  def member_search
+    query = params[:q].to_s.strip
+    users = if query.length >= 1
+              member_pickable_for_member(current_user)
+                .where('username ILIKE ?', "#{User.sanitize_sql_like(query)}%")
+                .order(:username)
+                .limit(10)
+            else
+              User.none
+            end
+
+    render json: users.pluck(:id, :username).map { |id, username| { id: id, username: username } }
   end
 
   # Members may clear their own active or expired notices unless admin
@@ -128,7 +157,7 @@ class MemberParkingPermitsController < AuthenticatedController
   end
 
   def set_owned_notice
-    @parking_notice = current_user.parking_notices.find(params[:id])
+    @parking_notice = ParkingNotice.for_user(current_user).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     redirect_to user_path(current_user, tab: :parking), alert: 'That parking notice is not available.'
   end
@@ -148,12 +177,35 @@ class MemberParkingPermitsController < AuthenticatedController
     )
   end
 
+  def member_ids_param
+    params.dig(:parking_notice, :member_ids)
+  end
+
   def validate_member_permit_duration
     return if @parking_notice.expires_at.blank?
+    # Staff extensions and legacy permits may expire after the self-service cap;
+    # members may edit other fields without touching expiration.
+    return if @parking_notice.persisted? && !member_changed_expires_at?
 
-    max_expires_at = Time.current + MAX_MEMBER_PERMIT_DURATION
-    return if @parking_notice.expires_at <= max_expires_at
+    return if @parking_notice.expires_at <= member_permit_max_expires_at
 
     @parking_notice.errors.add(:expires_at, 'must be within 2 weeks')
+  end
+
+  def member_changed_expires_at?
+    new_at = @parking_notice.expires_at
+    old_at = @parking_notice.expires_at_in_database
+    return true if old_at.nil?
+
+    member_expires_at_minute(new_at) != member_expires_at_minute(old_at)
+  end
+
+  def member_expires_at_minute(time)
+    time.in_time_zone.change(sec: 0, usec: 0)
+  end
+
+  def member_permit_max_expires_at
+    anchor = @parking_notice.persisted? ? @parking_notice.created_at : Time.current
+    anchor + MAX_MEMBER_PERMIT_DURATION
   end
 end

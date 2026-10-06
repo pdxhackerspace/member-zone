@@ -169,19 +169,19 @@ class UserProfileVisibilityTest < ActionDispatch::IntegrationTest
       dues_due_at: 3.days.from_now
     )
 
-    ParkingNotice.create!(
+    create_parking_notice!(
+      user: @member_with_account,
       notice_type: 'permit',
       status: 'active',
-      user: @member_with_account,
       issued_by: @members_user,
       description: 'Active member permit',
       location: 'Woodshop',
       expires_at: 5.days.from_now
     )
-    ParkingNotice.create!(
+    create_parking_notice!(
+      user: @member_with_account,
       notice_type: 'ticket',
       status: 'expired',
-      user: @member_with_account,
       issued_by: @members_user,
       description: 'Expired ticket',
       location: 'Electronics',

@@ -1,5 +1,6 @@
 class ParkingNoticesController < AuthenticatedController
   include Pagy::Method
+  include ParkingNoticeMemberParams
   include ParkingNoticePrinting
 
   before_action -> { require_privilege!(:'parking.manage_notices') }
@@ -9,7 +10,7 @@ class ParkingNoticesController < AuthenticatedController
   before_action :require_clearance_authority!, only: :clear
 
   def index
-    @parking_notices = ParkingNotice.includes(:issued_by, user: :slack_user).newest_first
+    @parking_notices = ParkingNotice.includes(:issued_by, members: :slack_user).newest_first
 
     @parking_notices = @parking_notices.where(notice_type: params[:type]) if params[:type].present?
     @parking_notices = @parking_notices.where(status: params[:status]) if params[:status].present?
@@ -34,7 +35,7 @@ class ParkingNoticesController < AuthenticatedController
       notice_type: params[:type].presence || 'permit',
       expires_at: 7.days.from_now
     )
-    @parking_notice.assign_attributes(parking_notice_prefill_params) if params[:parking_notice].present?
+    apply_prefill_members!(@parking_notice)
     load_form_data
   end
 
@@ -46,12 +47,13 @@ class ParkingNoticesController < AuthenticatedController
     @parking_notice = ParkingNotice.new(parking_notice_params)
     @parking_notice.issued_by = current_user
     @parking_notice.event_actor = current_user
+    @parking_notice.build_members_from_ids!(resolve_admin_member_ids(member_ids_param))
 
     if @parking_notice.save
       journal_action = @parking_notice.permit? ? 'parking_permit_issued' : 'parking_ticket_issued'
 
       @parking_notice.record_journal_entry!(journal_action, actor: current_user)
-      @parking_notice.enqueue_notification!(@parking_notice.issued_template_key)
+      @parking_notice.notify_issued!
 
       if print_and_create_another_permit?
         redirect_after_print_and_create_another_permit
@@ -74,13 +76,19 @@ class ParkingNoticesController < AuthenticatedController
 
   def update
     @parking_notice.event_actor = current_user
-    if @parking_notice.update(parking_notice_params)
-      redirect_to parking_notice_path(@parking_notice),
-                  notice: "Parking #{@parking_notice.notice_type} updated successfully."
-    else
-      load_form_data
-      render :edit, status: :unprocessable_content
+    newly_added = []
+    ParkingNotice.transaction do
+      @parking_notice.update!(parking_notice_params)
+      if params[:parking_notice]&.key?(:member_ids)
+        newly_added = @parking_notice.replace_members!(resolve_admin_member_ids(member_ids_param))
+      end
     end
+    @parking_notice.notify_issued!(newly_added) if newly_added.any?
+    redirect_to parking_notice_path(@parking_notice),
+                notice: "Parking #{@parking_notice.notice_type} updated successfully."
+  rescue ActiveRecord::RecordInvalid
+    load_form_data
+    render :edit, status: :unprocessable_content
   end
 
   def clear
@@ -163,7 +171,7 @@ class ParkingNoticesController < AuthenticatedController
   end
 
   def set_parking_notice
-    @parking_notice = ParkingNotice.includes(user: :slack_user).find(params[:id])
+    @parking_notice = ParkingNotice.includes(members: :slack_user).find(params[:id])
   end
 
   def load_form_data
@@ -173,7 +181,7 @@ class ParkingNoticesController < AuthenticatedController
 
   def parking_notice_params
     params.expect(
-      parking_notice: [:notice_type, :user_id, :description, :location,
+      parking_notice: [:notice_type, :description, :location,
                        :location_detail, :expires_at, :notes, :requires_admin_clearance,
                        { photos: [] }]
     )
@@ -181,8 +189,20 @@ class ParkingNoticesController < AuthenticatedController
 
   def parking_notice_prefill_params
     params.expect(
-      parking_notice: %i[user_id description expires_at location location_detail]
+      parking_notice: [:description, :expires_at, :location, :location_detail, { member_ids: [] }]
     )
+  end
+
+  def member_ids_param
+    params.dig(:parking_notice, :member_ids)
+  end
+
+  def apply_prefill_members!(notice)
+    return if params[:parking_notice].blank?
+
+    prefill = parking_notice_prefill_params
+    notice.assign_attributes(prefill.except(:member_ids))
+    notice.build_members_from_ids!(resolve_admin_member_ids(prefill[:member_ids])) if prefill[:member_ids].present?
   end
 
   def create_another_permit?

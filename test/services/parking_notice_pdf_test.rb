@@ -11,10 +11,11 @@ class ParkingNoticePdfTest < ActiveSupport::TestCase
   end
 
   test 'renders PDF when member has slack handle' do
-    @notice.user.update!(slack_handle: 'permitslack')
+    @notice.members.first.update!(slack_handle: 'permitslack')
 
     pdf = ParkingNoticePdf.new(@notice)
     assert pdf.document.render.bytesize.positive?
-    assert_equal "#{@notice.user.username} @permitslack", @notice.user.parking_member_label
+    member = @notice.members.first
+    assert_equal "#{member.username} @permitslack", member.parking_member_label
   end
 end

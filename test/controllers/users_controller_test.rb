@@ -574,8 +574,8 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test 'admin parking tab shows print actions for permits and tickets' do
     printer = Printer.create!(name: 'Front Desk', cups_printer_name: 'front_desk')
     permit = parking_notices(:active_permit)
-    ticket = ParkingNotice.create!(
-      notice_type: 'ticket', status: 'active', user: @user, issued_by: @user,
+    ticket = create_parking_notice!(
+      user: @user, notice_type: 'ticket', status: 'active', issued_by: @user,
       expires_at: 3.days.from_now, description: 'Ticket on member profile', location: 'Main Area'
     )
 
@@ -590,12 +590,12 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     sign_in_as_regular_member
     member = User.find_by!(authentik_id: "local:#{local_accounts(:regular_member).id}")
     printer = Printer.create!(name: 'Front Desk', cups_printer_name: 'front_desk')
-    permit = member.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: member,
+    permit = create_parking_notice!(
+      user: member, notice_type: 'permit', status: 'active', issued_by: member,
       expires_at: 3.days.from_now, description: 'Member permit', location: 'Woodshop'
     )
-    ticket = ParkingNotice.create!(
-      notice_type: 'ticket', status: 'active', user: member, issued_by: users(:one),
+    ticket = create_parking_notice!(
+      user: member, notice_type: 'ticket', status: 'active', issued_by: users(:one),
       expires_at: 3.days.from_now, description: 'Member ticket', location: 'Main Area'
     )
 
@@ -650,8 +650,8 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     sign_in_as_regular_member
     member = User.find_by!(authentik_id: "local:#{local_accounts(:regular_member).id}")
     Printer.create!(name: 'Front Desk', cups_printer_name: 'front_desk')
-    expired = ParkingNotice.create!(
-      notice_type: 'ticket', status: 'expired', user: member, issued_by: users(:one),
+    expired = create_parking_notice!(
+      user: member, notice_type: 'ticket', status: 'expired', issued_by: users(:one),
       expires_at: 2.days.ago, description: 'Expired lot ticket', location: 'Parking Lot'
     )
 
@@ -697,16 +697,16 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
 
   # One notice in each status for exercising the member parking tab filters.
   def create_member_parking_notices(member)
-    member.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: member,
+    create_parking_notice!(
+      user: member, notice_type: 'permit', status: 'active', issued_by: member,
       expires_at: 3.days.from_now, description: 'Active woodshop permit', location: 'Woodshop'
     )
-    ParkingNotice.create!(
-      notice_type: 'ticket', status: 'expired', user: member, issued_by: users(:one),
+    create_parking_notice!(
+      user: member, notice_type: 'ticket', status: 'expired', issued_by: users(:one),
       expires_at: 2.days.ago, description: 'Expired lot ticket', location: 'Parking Lot'
     )
-    member.parking_notices.create!(
-      notice_type: 'permit', status: 'cleared', issued_by: member,
+    create_parking_notice!(
+      user: member, notice_type: 'permit', status: 'cleared', issued_by: member,
       expires_at: 10.days.ago, cleared_at: 8.days.ago, cleared_by: member,
       description: 'Cleared laser permit', location: 'Main Area'
     )

@@ -55,6 +55,13 @@
   <p class="text-secondary mb-3">This notice must be cleared by an admin. Use "Request clearance" to ask the team to clear it.</p>
 <% end %>
 
+<% other_members = @parking_notice.members.reject { |member| member.id == current_user.id } %>
+<% if other_members.any? %>
+  <p class="text-13 text-secondary mb-3">
+    Shared with <%= safe_join(other_members.map(&:username), ', ') %>.
+  </p>
+<% end %>
+
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body">
     <dl class="row mb-0">

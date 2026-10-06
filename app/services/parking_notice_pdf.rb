@@ -45,7 +45,7 @@ class ParkingNoticePdf
     data = [
       ['Type:', @notice.notice_type_display],
       ['Status:', @notice.status_display],
-      ['Member:', @notice.user&.parking_member_label || 'Not assigned'],
+      ['Members:', @notice.members_label.presence || 'Not assigned'],
       ['Location:', @notice.location_display.presence || 'Not specified'],
       ['Issued by:', @notice.issued_by&.display_name || 'Unknown'],
       ['Issued on:', @notice.created_at.strftime('%B %d, %Y at %l:%M %p')],
