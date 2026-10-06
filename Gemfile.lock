@@ -532,7 +532,7 @@ DEPENDENCIES
   selenium-webdriver
   sentry-rails (~> 7.1)
   sentry-ruby (~> 7.0)
-  sentry-sidekiq (~> 7.0)
+  sentry-sidekiq (~> 7.1)
   sidekiq (~> 8.1)
   sidekiq-cron (~> 2.4)
   sprockets-rails
