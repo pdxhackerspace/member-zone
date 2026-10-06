@@ -98,8 +98,20 @@ module Credentials
       outcome = Invocation.call(provider, 'health')
 
       assert_not outcome.ok?
-      assert_match(/Could not run/, outcome.error)
+      assert_equal Invocation::NOT_IN_CATALOG, outcome.error
       assert_equal 'failed', outcome.run.status
+    end
+
+    test 'a program that has left the catalog is not run' do
+      provider = create_credential_provider(describe: false)
+      outside = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+      provider.update_columns(script_path: outside)
+
+      outcome = Invocation.call(provider, 'health')
+
+      assert_not outcome.ok?
+      assert_equal Invocation::NOT_IN_CATALOG, outcome.error
+      assert_empty credential_calls
     end
 
     test 'the provider environment values are blanked out of stderr and the error' do

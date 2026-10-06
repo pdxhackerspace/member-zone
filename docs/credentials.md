@@ -30,6 +30,11 @@ A provider's program must resolve (after following symlinks) to an executable fi
 A file without an execute bit, a path that climbs out with `..`, and a symlink pointing outside
 an allowed directory are all refused.
 
+The check runs when a provider's program is chosen, and again before every run. A provider whose
+program has since been removed, lost its execute bit, or left the allowed directories can still be
+disabled or edited, but its program is not run: each action fails with "Program is no longer an
+executable in a credential script directory" until it is pointed at one that is.
+
 ## The protocol
 
 A program is run as `PROGRAM ACTION [arguments...]`. The arguments are the provider's
@@ -141,7 +146,7 @@ Revoking something that is already gone should exit 0. `reason` is a short word 
 | For a **non-secret** field: the whole value | The secret itself, anywhere |
 | For a **secret** field of 12 or more characters: its first 4 and last 4 characters | Any hint of a secret shorter than 12 characters |
 | The program's `external_id`, expiry, status and timestamps | stdout of any `issue` call |
-| stderr of each run, with environment values and issued strings blanked out | Provider environment values in logs, journals or the UI |
+| stderr of each run, and the provider's health message, with environment values and issued strings blanked out (values under 5 characters, like `true`, are left alone) | Provider environment values in logs, journals or the UI |
 
 The provider's environment variables are encrypted at rest (see
 [docs/encrypted-fields.md](encrypted-fields.md)) and are never shown again after saving: the edit
@@ -174,7 +179,12 @@ All of these must hold, and each failure is shown to the member with its reason:
 - the member is an active member and key access is not paused
 - the member holds **every** training topic the provider requires
 - the member is under the provider's *most per member* limit (pending, active and paused count)
-- for a member asking for themselves: the provider allows self-service
+- for a member asking for themselves: the provider allows self-service. Someone who holds
+  *Issue and rotate credentials for members* (or an administrator) is not bound by this, including
+  for their own credentials, so administrator-only providers are usable by the people who run them.
+
+Standing is checked twice: before the program runs, and again once it returns. A member banned,
+lapsed or paused while their credential was being issued is not shown it; it is revoked at once.
 
 ## Standing, pause, inactivity, expiry, rotation
 
@@ -190,7 +200,8 @@ All of these must hold, and each failure is shown to the member with its reason:
 - **Rotation** (**Replace** on a credential): issues a new credential with the same label, then
   revokes the old one with reason `rotated`, so there is never a gap. The two are linked. It works
   at the per-member limit. If the old one cannot be revoked yet, the new one is still shown, with a
-  warning, and the revoke is retried.
+  warning, and the revoke is retried. A credential with a replacement already on the way cannot be
+  rotated again, so two Replace clicks at once leave one new credential, not two.
 - A change of standing is acted on within moments by `Credentials::MemberSyncJob` (enqueued when
   `active` or `key_access_paused` changes). `Credentials::ReconcileJob` catches anything it misses.
 

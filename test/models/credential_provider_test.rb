@@ -35,6 +35,14 @@ class CredentialProviderTest < ActiveSupport::TestCase
     assert_not CredentialProvider.new(name: 'P', script_path: "#{CREDENTIAL_FIXTURE_DIR}/../../../../bin/sh").valid?
   end
 
+  test 'a stored program that has left the catalog does not block other changes' do
+    provider = create_credential_provider(describe: false)
+    provider.update_columns(script_path: credential_script('not_executable.sh'))
+
+    assert provider.update(enabled: false, name: 'Retired'), provider.errors.full_messages.to_sentence
+    assert_not provider.update(script_path: '/bin/sh')
+  end
+
   test 'max_per_member must be a sensible whole number' do
     [0, -1, 101, 1.5].each do |bad|
       assert_not CredentialProvider.new(name: 'P', script_path: credential_script('oauth.sh'),

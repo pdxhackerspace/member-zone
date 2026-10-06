@@ -66,6 +66,12 @@ class CredentialLifecycleTest < ActiveJob::TestCase
     assert_enqueued_with(job: Credentials::MemberSyncJob, args: [@member.id]) { @member.ban! }
   end
 
+  test 'a credential still being issued is enough to enqueue' do
+    @credential.update!(status: 'pending')
+
+    assert_enqueued_with(job: Credentials::MemberSyncJob, args: [@member.id]) { @member.ban! }
+  end
+
   test 'end to end, banning a member revokes their credentials through the real program' do
     perform_enqueued_jobs(only: Credentials::MemberSyncJob) { @member.ban! }
 

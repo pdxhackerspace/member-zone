@@ -21,6 +21,13 @@ module Credentials
       assert_equal 'upstream is down', provider.reload.health_message
     end
 
+    test 'environment values in a healthy report are blanked out before they are stored' do
+      provider = create_credential_provider(env: { API_KEY: 'live-key-0123456789', HEALTH_ECHOES_KEY: '1' })
+
+      assert_equal 'healthy', HealthCheck.call(provider)
+      assert_equal 'checked with [REDACTED]', provider.reload.health_message
+    end
+
     test 'a failing exit is unhealthy' do
       provider = create_credential_provider(script: 'exits_3.sh')
 

@@ -7,7 +7,9 @@ case "$action" in
   describe) describe_oauth ;;
   health)
     not_configured_check
-    if [ -n "$UNHEALTHY" ]; then printf '{"ok":false,"message":"upstream is down"}\n'; else printf '{"ok":true,"message":"all good"}\n'; fi
+    if [ -n "$UNHEALTHY" ]; then printf '{"ok":false,"message":"upstream is down"}\n'
+    elif [ -n "$HEALTH_ECHOES_KEY" ]; then printf '{"ok":true,"message":"checked with %s"}\n' "$API_KEY"
+    else printf '{"ok":true,"message":"all good"}\n'; fi
     ;;
   issue) not_configured_check; fail_if "$FAIL_ISSUE"; issue_oauth ;;
   revoke) not_configured_check; fail_if "$FAIL_REVOKE" ;;

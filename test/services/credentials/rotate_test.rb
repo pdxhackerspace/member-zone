@@ -41,6 +41,38 @@ module Credentials
       assert_secret_not_stored(SECRET)
     end
 
+    test 'a credential that already has a replacement on the way is not rotated again' do
+      create_credential(provider: @provider, user: @member, status: 'pending', rotated_from: @old,
+                        external_id: nil)
+
+      result = Rotate.call(@old, by: @member, request_id: SecureRandom.uuid)
+
+      assert_not_predicate result, :ok?
+      assert_equal 'This credential is already being replaced.', result.error
+      assert_empty credential_calls
+      assert_equal 'active', @old.reload.status
+    end
+
+    test 'two rotations of one credential submitted together leave one live replacement' do
+      stale_copy = Credential.find(@old.id)
+      first = Rotate.call(@old, by: @member, request_id: SecureRandom.uuid)
+      assert_predicate first, :ok?
+
+      # The second request loaded the credential before the first finished, so its copy still
+      # reads active; the check under the member lock is what stops it.
+      second = Rotate.call(stale_copy, by: @member, request_id: SecureRandom.uuid)
+
+      assert_not_predicate second, :ok?
+      assert_equal 1, @member.credentials.where(credential_provider: @provider).live.count
+      assert_equal(1, credential_calls.count { |line| line.start_with?('issue') })
+    end
+
+    test 'a replacement that failed does not stop a later rotation' do
+      create_credential(provider: @provider, user: @member, status: 'failed', rotated_from: @old, external_id: nil)
+
+      assert_predicate Rotate.call(@old, by: @member, request_id: SecureRandom.uuid), :ok?
+    end
+
     test 'the old credential is told why it was revoked' do
       Rotate.call(@old, by: @member)
 

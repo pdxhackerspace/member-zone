@@ -67,6 +67,25 @@ module Credentials
     end
 
     def denial_reason
+      rotation_denial_reason || provider_denial_reason
+    end
+
+    # Runs under the member lock, so of two rotations of one credential submitted together
+    # only the first gets a pending replacement; the second sees it and stops here, rather
+    # than both leaving the original out of the limit count and both succeeding.
+    def rotation_denial_reason
+      return nil unless @rotated_from
+      return 'This credential is already being replaced.' if replacement_in_progress?
+      return 'This credential cannot be rotated.' unless @rotated_from.reload.active?
+
+      nil
+    end
+
+    def replacement_in_progress?
+      Credential.where(rotated_from: @rotated_from).counting_toward_limit.exists?
+    end
+
+    def provider_denial_reason
       if @self_service
         @provider.self_service_denial_reason(@user, replacing: @rotated_from)
       else
@@ -93,10 +112,32 @@ module Credentials
                          issued_at: Time.current,
                          field_hints: FieldHints.call(issued[:fields], @provider.schema_fields))
       credential.journal!('credential_issued', actor: @issued_by, extra: journal_extra)
+      return withdrawn(credential) unless still_in_standing?
+
       Result.new(ok: true, credential: credential, fields: issued[:fields])
     rescue ActiveRecord::ActiveRecordError => e
       cleanup(credential, issued[:external_id])
       failure(GENERIC_FAILURE, credential: credential, detail: e.class.name)
+    end
+
+    # Standing was checked before the program ran, but a member banned, lapsed or paused while
+    # it was running would otherwise walk away with a working credential: the save hook that
+    # syncs credentials saw only this pending row. Re-read the member now and bring every
+    # credential of theirs into line before deciding whether to show this one.
+    def still_in_standing?
+      @user.reload
+      @user.active? && !@user.key_access_paused?
+    end
+
+    # This one is revoked first, then MemberSync brings the member's others into line. Left to
+    # MemberSync it would be paused where the provider can pause, but a credential the member
+    # was never shown is no use to them paused.
+    def withdrawn(credential)
+      reason = @user.active? ? 'key_access_paused' : 'member_inactive'
+      Revoke.call(credential, reason: reason)
+      MemberSync.call(@user)
+      failure(GENERIC_FAILURE, credential: credential.reload,
+                               detail: 'Member standing changed while the credential was being issued')
     end
 
     def abandon(credential, outcome)

@@ -593,6 +593,67 @@ class CredentialsControllerTest < ActionDispatch::IntegrationTest
     assert_equal admin, target.credentials.last.issued_by
   end
 
+  test 'someone with issue_for_members can issue an administrator-only credential to themselves' do
+    me = sign_in_as_plain_member
+    grant_privileges(me, 'credentials.issue_for_members')
+    sign_in_as_plain_member
+    provider = create_credential_provider(name: 'Admin only', self_service: false)
+
+    get credentials_path
+    assert_select 'a[href=?]', new_credential_path(provider_id: provider.id)
+
+    get new_credential_path(provider_id: provider.id)
+    assert_response :success
+
+    request_credential(provider: provider)
+
+    assert_response :success
+    assert_includes response.body, SECRET
+    assert_equal me, me.credentials.last.user
+  end
+
+  test 'an administrator can issue an administrator-only credential to themselves' do
+    admin = sign_in_as_admin
+    # The local admin account is not a member until given a standing; issuing needs one.
+    admin.update_columns(membership_state: 'current_member', active: true)
+    provider = create_credential_provider(self_service: false)
+
+    request_credential(provider: provider)
+
+    assert_response :success
+    assert_equal admin, admin.credentials.last.user
+  end
+
+  test 'someone with issue_for_members can rotate their own administrator-only credential' do
+    me = sign_in_as_plain_member
+    grant_privileges(me, 'credentials.issue_for_members')
+    sign_in_as_plain_member
+    provider = create_credential_provider(self_service: false)
+    mine = create_credential(provider: provider, user: me)
+
+    get credentials_path
+    assert_select 'form[action=?]', rotate_credential_path(mine)
+
+    post rotate_credential_path(mine), params: { request_id: SecureRandom.uuid }
+
+    assert_response :success
+    assert_includes response.body, SECRET
+    assert_equal 'revoked', mine.reload.status
+  end
+
+  test 'a plain member is still not offered an administrator-only provider' do
+    sign_in_as_plain_member
+    provider = create_credential_provider(name: 'Admin only', self_service: false)
+
+    get credentials_path
+    assert_select 'a[href=?]', new_credential_path(provider_id: provider.id), count: 0
+
+    assert_no_difference -> { Credential.count } do
+      request_credential(provider: provider)
+    end
+    assert_response :redirect
+  end
+
   test 'issuing for a member who is not eligible is refused with the reason' do
     sign_in_as_admin
     target = create_member

@@ -447,6 +447,30 @@ class CredentialProvidersControllerTest < ActionDispatch::IntegrationTest
     assert @provider.reload.enabled?
   end
 
+  test 'a provider whose program has left the catalog can still be disabled and edited' do
+    stale = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+    @provider.update_columns(script_path: stale)
+    sign_in_manager
+
+    post toggle_credential_provider_path(@provider)
+    assert_not @provider.reload.enabled?
+
+    patch credential_provider_path(@provider),
+          params: { credential_provider: { name: 'Renamed', script_path: stale } }
+    assert_equal 'Renamed', @provider.reload.name
+    assert_equal stale, @provider.script_path
+  end
+
+  test 'moving a provider to a program outside the catalog is still refused' do
+    sign_in_manager
+
+    outside = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+    patch credential_provider_path(@provider), params: { credential_provider: { script_path: outside } }
+
+    assert_response :unprocessable_content
+    assert_equal credential_script('oauth.sh'), @provider.reload.script_path
+  end
+
   test 'check health runs now and reports' do
     @provider.update_columns(health_status: 'unknown')
     sign_in_manager

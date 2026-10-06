@@ -13,6 +13,17 @@ module Credentials
       Issue.call(provider: provider, user: user, issued_by: issued_by, **)
     end
 
+    # Runs +change+ while the provider's program is running, as another request would.
+    def while_the_program_runs(change)
+      original = ScriptRunner.method(:call)
+      ScriptRunner.define_singleton_method(:call) do |*args, **kwargs|
+        original.call(*args, **kwargs).tap { change.call }
+      end
+      yield
+    ensure
+      ScriptRunner.define_singleton_method(:call, original)
+    end
+
     test 'issues a credential: pending first, active after, with the fields in memory only' do
       result = issue(label: 'laptop CLI', request_id: SecureRandom.uuid)
 
@@ -227,6 +238,35 @@ module Credentials
       assert_predicate result, :ok?
       assert_equal 'key_0123456789abcdef0123', result.fields['api_key']
       assert_equal({ 'prefix' => 'key_', 'suffix' => '0123' }, result.credential.reload.field_hints['api_key'])
+    end
+
+    test 'a member banned while the program runs is not shown the secret and the credential is revoked' do
+      result = while_the_program_runs(-> { User.find(@member.id).ban! }) { issue }
+
+      assert_not result.ok?
+      assert_nil result.fields
+      assert_equal 'revoked', result.credential.status
+      assert_equal 'member_inactive', result.credential.revocation_reason
+      assert_equal(%w[issue revoke], credential_calls.map { |line| line.split.first })
+    end
+
+    test 'a member paused while the program runs has the credential revoked, not paused' do
+      result = while_the_program_runs(-> { User.find(@member.id).pause_key_access! }) { issue }
+
+      assert_not result.ok?
+      assert_nil result.fields
+      assert @provider.supports_pause?
+      assert_equal 'revoked', result.credential.status
+      assert_equal 'key_access_paused', result.credential.revocation_reason
+      assert_not_includes credential_calls.map { |line| line.split.first }, 'pause'
+    end
+
+    test 'when that revoke fails the credential stays revoke_failed for the reconcile job' do
+      provider = create_credential_provider(env: { FAIL_REVOKE: '1' })
+      result = while_the_program_runs(-> { User.find(@member.id).ban! }) { issue(provider: provider) }
+
+      assert_not result.ok?
+      assert_equal 'revoke_failed', result.credential.status
     end
 
     test 'a repeated request id is refused without issuing a second credential' do

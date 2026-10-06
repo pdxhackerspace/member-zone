@@ -6,6 +6,7 @@
 #   EXPIRES_AT      an expires_at to report from issue
 #   NO_PAUSE        leave pause and resume out of describe
 #   UNHEALTHY       health reports ok:false
+#   HEALTH_ECHOES_KEY  health reports ok:true with $API_KEY in its message
 #   NOT_CONFIGURED  exit 2 for every action but describe
 #   FAIL_ISSUE / FAIL_REVOKE / FAIL_PAUSE / FAIL_RESUME   exit 1 for that action
 

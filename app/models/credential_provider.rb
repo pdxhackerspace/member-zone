@@ -26,7 +26,9 @@ class CredentialProvider < ApplicationRecord
   validates :script_path, presence: true
   validates :health_status, inclusion: { in: HEALTH_STATUSES }
   validates :max_per_member, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: 100 }
-  validate :script_path_in_catalog
+  # Only when the path is being set: a program that has since left the catalog must not stop
+  # the provider being disabled or edited. Credentials::Invocation refuses to run it instead.
+  validate :script_path_in_catalog, if: :will_save_change_to_script_path?
 
   scope :enabled, -> { where(enabled: true) }
   scope :ordered, -> { order(:name) }

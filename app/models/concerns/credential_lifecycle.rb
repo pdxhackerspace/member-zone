@@ -23,7 +23,9 @@ module CredentialLifecycle
 
   def sync_credentials_on_standing_change
     return unless saved_change_to_active? || saved_change_to_key_access_paused?
-    return unless credentials.exists?(status: %w[active paused])
+    # Pending too: Credentials::Issue re-checks standing when its program returns, but a job
+    # queued now covers a member whose credential lands just after that check.
+    return unless credentials.exists?(status: %w[pending active paused])
 
     Credentials::MemberSyncJob.perform_later(id)
   end

@@ -1,10 +1,10 @@
 module Credentials
   # Blanks out values that must not reach the run log: the provider's environment variables
   # (its API keys) and, for an issue, the secrets just issued. Values shorter than
-  # MINIMUM_LENGTH are left alone — redacting "1" or "true" would shred the text without
-  # protecting anything.
+  # MINIMUM_LENGTH are left alone — redacting "1", "true" or "none" would shred the text
+  # without protecting anything.
   class Redactor
-    MINIMUM_LENGTH = 4
+    MINIMUM_LENGTH = 5
     REPLACEMENT = '[REDACTED]'.freeze
 
     def initialize(values)

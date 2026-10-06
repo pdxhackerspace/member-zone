@@ -13,8 +13,8 @@ class CredentialsController < AuthenticatedController
   def index
     @credentials = current_user.credentials.where.not(status: %w[pending failed])
                                .includes(:credential_provider).newest_first
-    @providers = CredentialProvider.enabled.self_service.ordered
-    @denials = @providers.index_with { |provider| provider.self_service_denial_reason(current_user) }
+    @providers = requestable_providers
+    @denials = @providers.index_with { |provider| denial_reason_for(provider, current_user) }
   end
 
   def new
@@ -24,7 +24,7 @@ class CredentialsController < AuthenticatedController
   def create
     result = Credentials::Issue.call(provider: @provider, user: @member, issued_by: current_user,
                                      label: params[:label], request_id: params[:request_id],
-                                     self_service: @member == current_user)
+                                     self_service: self_service_request?(@member))
     respond_to_issue(result)
   end
 
@@ -43,7 +43,8 @@ class CredentialsController < AuthenticatedController
   def rotate
     return deny unless can_rotate?
 
-    result = Credentials::Rotate.call(@credential, by: current_user, request_id: params[:request_id])
+    result = Credentials::Rotate.call(@credential, by: current_user, request_id: params[:request_id],
+                                                   self_service: self_service_request?(@credential.user))
     respond_to_issue(result)
   end
 
@@ -87,11 +88,29 @@ class CredentialsController < AuthenticatedController
   end
 
   def denial_reason
-    if @member == current_user
-      @provider.self_service_denial_reason(@member)
+    denial_reason_for(@provider, @member)
+  end
+
+  def denial_reason_for(provider, member)
+    if self_service_request?(member)
+      provider.self_service_denial_reason(member)
     else
-      @provider.issue_denial_reason(@member)
+      provider.issue_denial_reason(member)
     end
+  end
+
+  # A member acting for themselves is bound by the provider's self-service rule. Someone who
+  # may issue on members' behalf is not, including when the member is themselves — otherwise
+  # an administrator could never hold a credential from an administrator-only provider.
+  def self_service_request?(member)
+    member == current_user && !can?(:'credentials.issue_for_members')
+  end
+
+  # What the signed-in member can see to request: self-service providers, plus the
+  # administrator-only ones for someone who may issue them.
+  def requestable_providers
+    providers = CredentialProvider.enabled.ordered
+    can?(:'credentials.issue_for_members') ? providers : providers.self_service
   end
 
   def target_member

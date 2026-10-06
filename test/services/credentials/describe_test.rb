@@ -52,7 +52,7 @@ module Credentials
       assert_not outcome.ok?
       provider.reload
       assert provider.schema_ready?, 'the previous schema stays in use'
-      assert_match(/Could not run/, provider.schema_error)
+      assert_equal Invocation::NOT_IN_CATALOG, provider.schema_error
     end
 
     test 'a later successful describe clears the error' do

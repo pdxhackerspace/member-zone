@@ -7,6 +7,7 @@ module Credentials
   class Invocation
     NOT_CONFIGURED_EXIT = 2
     OUTPUT_LIMIT = 20_000
+    NOT_IN_CATALOG = 'Program is no longer an executable in a credential script directory'.freeze
 
     Outcome = Struct.new(:ok, :value, :error, :not_configured, :run, :stdout, keyword_init: true) do
       alias_method :ok?, :ok
@@ -26,6 +27,8 @@ module Credentials
 
     def call
       run = start_run
+      return finish_run(run, Outcome.new(ok: false, error: NOT_IN_CATALOG), nil) unless program_allowed?
+
       result = ScriptRunner.call(@provider, @action, input: @input, timeout: @timeout)
       outcome = interpret(result) { |stdout| block_given? ? yield(stdout) : true }
       finish_run(run, outcome, result)
@@ -34,6 +37,12 @@ module Credentials
     end
 
     private
+
+    # The path was checked when it was saved, but the file may have moved, lost its execute
+    # bit, or the directory list may have changed since.
+    def program_allowed?
+      ScriptCatalog.allowed?(@provider.script_path.to_s.strip)
+    end
 
     def interpret(result)
       unless result.success?
