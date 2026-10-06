@@ -15,6 +15,7 @@ class TrainingTopic < ApplicationRecord
   has_many :documents, through: :document_training_topics
   has_many :application_groups, dependent: :destroy
   has_many :topic_roles, class_name: 'TrainingTopicRole', dependent: :destroy
+  has_many :credential_provider_training_topics, dependent: :restrict_with_error
   has_many :roles, through: :topic_roles
 
   validates :name, presence: true, uniqueness: true

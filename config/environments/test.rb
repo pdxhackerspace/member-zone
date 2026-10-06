@@ -63,6 +63,9 @@ Rails.application.configure do
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
 
+  # Credential provider programs for tests are real executables under test/fixtures/files/credentials.
+  config.x.credential_script_directories = [Rails.root.join('test/fixtures/files/credentials')]
+
   # Use inline adapter for tests (no background processing needed)
   config.active_job.queue_adapter = :test
 end

@@ -72,7 +72,8 @@ module AdminDashboard
         authentik_item,
         mailer_item,
         ai_ollama_item,
-        printers_item
+        printers_item,
+        credentials_item
       ].compact
     end
 
@@ -148,6 +149,29 @@ module AdminDashboard
         unhealthy_printers.map { |printer| "#{printer.name}: #{printer.last_health_error}" }.join('; ').truncate(300),
         printers_path
       )
+    end
+
+    def credentials_item
+      count = CredentialProvider.attention_count
+      return nil if count.zero?
+
+      item(
+        :credentials,
+        "Credentials: #{count} #{'issue'.pluralize(count)} to look at",
+        credentials_detail,
+        credential_providers_path
+      )
+    end
+
+    def credentials_detail
+      details = []
+      unhealthy = CredentialProvider.needing_attention.count
+      failed = Credential.revoke_failed.count
+      stuck = Credential.stale_pending.count
+      details << "#{unhealthy} unhealthy provider(s)" if unhealthy.positive?
+      details << "#{failed} revocation(s) failing" if failed.positive?
+      details << "#{stuck} issue(s) never finished" if stuck.positive?
+      details.join(', ')
     end
 
     def unread_messages_count
