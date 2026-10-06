@@ -68,7 +68,7 @@ gem 'rqrcode', '~> 3.2'
 gem 'bcrypt', '~> 3.1'
 
 # Error tracking
-gem 'sentry-rails', '~> 7.0'
+gem 'sentry-rails', '~> 7.1'
 gem 'sentry-ruby', '~> 7.0'
 gem 'sentry-sidekiq', '~> 7.0'
 gem 'stackprof'
