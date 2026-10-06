@@ -21,6 +21,7 @@ module AuditLogs
         run.update!(status: 'failed', output: "Command failed: #{e.class}: #{e.message}")
         @source.update!(run_status: 'failed')
       end
+      deliver_alerts(run)
       run
     end
 
@@ -37,7 +38,17 @@ module AuditLogs
       run.update!(status: status, exit_code: result.exit_code, entries_added: added.size,
                   output: result.stderr.to_s.strip.presence&.truncate(20_000))
       @source.update!(run_status: status, last_entry_at: latest_entry_time(added, started_at))
-      Alerter.call(@source, added) if added.any?
+    end
+
+    # Alerting is not part of the program's run, so a failure here neither fails the run nor
+    # loses the alerts: whatever has not been checked yet is offered again next time, whether it
+    # came from this run or an earlier one.
+    def deliver_alerts(run)
+      Alerter.call(@source, @source.audit_log_entries.where(alert_checked_at: nil).order(:occurred_at, :id))
+    rescue StandardError => e
+      ErrorReporting.report(e, context: { job: 'audit_log_alerts', audit_log_source_id: @source.id })
+      note = "Alerting failed and will be retried on the next run: #{e.class}: #{e.message}"
+      run.update!(output: [run.output, note].compact_blank.join("\n"))
     end
 
     def store(stdout, started_at)

@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'tmpdir'
 
 module AuditLogs
   class ScriptRunnerTest < ActiveSupport::TestCase
@@ -94,6 +95,56 @@ module AuditLogs
     test 'a program without an executable bit raises rather than being guessed at' do
       source = create_audit_log_source(script: 'not_executable.sh')
       assert_raises(Errno::EACCES) { ScriptRunner.call(source) }
+    end
+
+    # --- Never through a shell ---
+
+    def copy_fixture_to(directory, name)
+      path = File.join(directory, name)
+      FileUtils.cp(audit_log_script('json_lines.sh'), path)
+      FileUtils.chmod(0o755, path)
+      path
+    end
+
+    test 'a program path containing spaces is run as one path' do
+      Dir.mktmpdir('audit log dir') do |directory|
+        source = create_audit_log_source(script_path: copy_fixture_to(directory, 'my program.sh'))
+
+        result = ScriptRunner.call(source)
+
+        assert_predicate result, :success?, result.stderr
+        assert_includes result.stdout, 'door opened'
+      end
+    end
+
+    test 'shell metacharacters in a program path are not interpreted' do
+      marker = "audit_log_shell_marker_#{SecureRandom.hex(4)}"
+      Dir.mktmpdir do |directory|
+        source = create_audit_log_source(script_path: copy_fixture_to(directory, "run; touch #{marker}"))
+
+        result = ScriptRunner.call(source)
+
+        assert_predicate result, :success?, result.stderr
+        assert_not File.exist?(marker), 'the path was handed to a shell'
+      end
+    ensure
+      FileUtils.rm_f(marker)
+    end
+
+    test 'a path with a glob or expansion character runs literally' do
+      Dir.mktmpdir do |directory|
+        source = create_audit_log_source(script_path: copy_fixture_to(directory, 'a$HOME*.sh'))
+
+        assert_predicate ScriptRunner.call(source), :success?
+      end
+    end
+
+    test 'a program with no arguments is still not run through a shell' do
+      Dir.mktmpdir do |directory|
+        source = create_audit_log_source(script_path: copy_fixture_to(directory, 'one&two.sh'), script_arguments: nil)
+
+        assert_predicate ScriptRunner.call(source), :success?
+      end
     end
   end
 end
