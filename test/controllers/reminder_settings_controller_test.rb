@@ -190,7 +190,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     set_reminder_cadence('parking_notices', start_offset_days: -3, interval_days: 7, max_reminders: 4)
     ReminderSetting.find_by!(key: 'parking_notices').update!(enabled: true)
     owner = users(:one)
-    notice = ParkingNotice.create!(
+    notice = create_parking_notice!(
       user: owner, issued_by: owner, notice_type: 'permit', status: 'active',
       expires_at: now - 20.days, description: 'Restarted permit', location: 'Main Area'
     )
@@ -496,7 +496,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
   test 'show lists blank parking permits due a details reminder' do
     member = users(:one)
-    ParkingNotice.create!(notice_type: 'permit', status: 'active', user: member, issued_by: member,
+    ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [member], issued_by: member,
                           webhook_device: WebhookDevice.create!(name: 'Front door kiosk'),
                           expires_at: 12.days.from_now, details_requested_at: 2.days.ago)
 

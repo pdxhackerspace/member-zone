@@ -74,7 +74,7 @@ class DeviceWebhooksControllerTest < ActionDispatch::IntegrationTest
     assert notice.permit?
     assert notice.active?
     assert notice.awaiting_details?
-    assert_equal @member, notice.user
+    assert_equal [@member], notice.members.to_a
     assert_equal @device, notice.webhook_device
     assert_in_delta 2.weeks.from_now, notice.expires_at, 5.seconds
     assert ParkingPermitLink.exists?(parking_notice: notice, purpose: 'complete_permit')

@@ -39,8 +39,8 @@ class ParkingPermitLink < ApplicationRecord
     create!(purpose: 'create_permit', user: user, webhook_device: webhook_device, expires_at: now + LIFETIME)
   end
 
-  def self.issue_for_blank_permit!(parking_notice, now: Time.current)
-    create!(purpose: 'complete_permit', parking_notice: parking_notice, user: parking_notice.user,
+  def self.issue_for_blank_permit!(parking_notice, user:, now: Time.current)
+    create!(purpose: 'complete_permit', parking_notice: parking_notice, user: user,
             webhook_device: parking_notice.webhook_device, expires_at: now + LIFETIME)
   end
 

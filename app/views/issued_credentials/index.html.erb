@@ -1,0 +1,119 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Issued credentials</h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="text-body"><%= @total_count %></span> total ·
+      <span class="text-success"><%= @live_count %></span> live
+      <% if @member %>· for <%= link_to @member.display_name, user_path(@member) %><% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <% if can?(:'credentials.manage_providers') %>
+      <%= link_to "Providers", credential_providers_path, class: "btn btn-outline-secondary btn-sm" %>
+    <% end %>
+  </div>
+</div>
+
+<% if can?(:'credentials.issue_for_members') %>
+  <%= form_with url: new_credential_path, method: :get,
+                class: "d-flex flex-wrap align-items-center gap-2 mb-3" do %>
+    <%= select_tag :provider_id, options_for_select(@providers.select(&:enabled?).map { |p| [p.name, p.id] }),
+                   class: "form-select form-select-sm", style: "max-width: 220px;", "aria-label": "Provider" %>
+    <%= email_field_tag :member_email, nil, class: "form-control form-control-sm", style: "max-width: 260px;",
+                        placeholder: "Member's full email address", "aria-label": "Member email", required: true %>
+    <%= submit_tag "Issue for member", name: nil, class: "btn btn-outline-secondary btn-sm" %>
+  <% end %>
+<% end %>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+  <%= render 'shared/filter_chip', label: 'All', count: @total_count,
+             path: issued_credentials_path, active: !@provider && !@status && !@expiring && !@member %>
+  <% @providers.each do |provider| %>
+    <%= render 'shared/filter_chip', label: provider.name, count: provider.credentials.where.not(status: 'pending').count,
+               path: issued_credentials_path(provider_id: provider.id), active: @provider&.id == provider.id %>
+  <% end %>
+  <span class="text-secondary">·</span>
+  <%= render 'shared/filter_chip', label: 'Expiring in 14 days', count: @expiring_count, variant: 'warning',
+             path: issued_credentials_path(expiring: (@expiring ? nil : 1), provider_id: @provider&.id,
+                                           status: @status, user_id: @member&.id),
+             active: @expiring %>
+  <%= render 'shared/filter_chip', label: 'Revocation failed', count: @attention_count, variant: 'danger',
+             path: issued_credentials_path(status: 'revoke_failed'), active: @status == 'revoke_failed' %>
+</div>
+
+<%= form_with url: issued_credentials_path, method: :get, class: "d-flex flex-wrap align-items-center gap-2 mb-3" do %>
+  <%= hidden_field_tag :provider_id, @provider.id if @provider %>
+  <%= hidden_field_tag :user_id, @member.id if @member %>
+  <%= select_tag :status, options_for_select(Credential::STATUSES.excluding('pending').map { |s| [s.humanize, s] }, @status),
+                 include_blank: 'Any status', class: "form-select form-select-sm", style: "max-width: 180px;",
+                 "aria-label": "Status" %>
+  <%= submit_tag "Filter", name: nil, class: "btn btn-outline-secondary btn-sm" %>
+  <% if @provider || @status || @expiring || @member %>
+    <%= link_to "Clear filters", issued_credentials_path, class: "text-12" %>
+  <% end %>
+<% end %>
+
+<% if @credentials.any? %>
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Member</th>
+            <th scope="col">Provider</th>
+            <th scope="col">Label</th>
+            <th scope="col">Status</th>
+            <th scope="col">Issued</th>
+            <th scope="col">Expires</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @credentials.each do |credential| %>
+            <tr class="<%= 'text-secondary' unless credential.live? %>">
+              <td><%= link_to credential.user.display_name, user_path(credential.user), class: "text-decoration-none" %></td>
+              <td><%= credential.credential_provider.name %></td>
+              <td class="text-secondary"><%= credential.label %></td>
+              <td>
+                <span class="status-dot status-<%= credential.status_dot_class %>"></span>
+                <%= credential.status_label %>
+                <% if credential.revoke_failed? %>
+                  <span class="text-12 text-secondary">(<%= credential.revoke_attempts %> <%= 'attempt'.pluralize(credential.revoke_attempts) %>)</span>
+                <% end %>
+                <% if credential.issued_by && credential.issued_by != credential.user %>
+                  <div class="text-12 text-secondary">Issued by <%= credential.issued_by.display_name %></div>
+                <% end %>
+              </td>
+              <td class="text-secondary"><%= credential.issued_at ? l(credential.issued_at.to_date, format: :short) : '' %></td>
+              <td class="text-secondary">
+                <% if credential.expires_at %>
+                  <span class="<%= 'text-warning' if credential.expiring_soon? %>"><%= l(credential.expires_at.to_date, format: :short) %></span>
+                <% end %>
+              </td>
+              <td class="text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                  <% if credential.rotatable? && can?(:'credentials.issue_for_members') %>
+                    <%= button_to "Rotate", rotate_credential_path(credential), method: :post,
+                                  params: { request_id: SecureRandom.uuid }, form: { data: { turbo: false } },
+                                  class: "btn btn-outline-secondary btn-sm",
+                                  data: { confirm: "Issue a replacement and revoke this credential? You will see the new secret once." } %>
+                  <% end %>
+                  <% if credential.revocable? && can?(:'credentials.revoke') %>
+                    <%= button_to "Revoke", revoke_credential_path(credential), method: :post,
+                                  class: "btn btn-outline-danger btn-sm",
+                                  data: { turbo_confirm: "Revoke this credential for #{credential.user.display_name}?" } %>
+                  <% end %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <%= render 'shared/pagination', pagy: @pagy %>
+<% else %>
+  <div class="card shadow-sm border-0">
+    <div class="card-body text-center py-5 text-secondary">No credentials match.</div>
+  </div>
+<% end %>

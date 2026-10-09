@@ -1,0 +1,99 @@
+<%# locals: field_name:, label:, help_text: nil, required: false, users: nil, member_search_url: nil,
+             selected_members: [], fixed_members: [], min_search_length: nil %>
+<% users ||= [] %>
+<% selected_members ||= [] %>
+<% fixed_members ||= [] %>
+<% member_search_url = local_assigns[:member_search_url] %>
+<% min_search_length ||= member_search_url.present? ? 1 : 2 %>
+<% controllers = member_search_url.present? ? 'member-picker' : 'live-filter member-picker' %>
+<% picker_id = local_assigns.fetch(:picker_id, "parking_member_picker_#{SecureRandom.hex(4)}") %>
+
+<div id="<%= picker_id %>"
+     data-controller="<%= controllers %>"
+     data-live-filter-min-length-value="<%= min_search_length %>"
+     data-member-picker-field-name-value="<%= field_name %>"
+     data-member-picker-fixed-count-value="<%= fixed_members.size %>"
+     <% if member_search_url.present? %>
+       data-member-picker-search-url-value="<%= member_search_url %>"
+       data-member-picker-search-min-length-value="<%= min_search_length %>"
+     <% end %>>
+  <%= label_tag nil, class: 'form-label' do %>
+    <%= label %>
+    <% if required %><span class="text-danger">*</span><% end %>
+  <% end %>
+  <% if help_text.present? %>
+    <div class="form-text mb-2"><%= help_text %></div>
+  <% end %>
+
+  <% if fixed_members.any? %>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <% fixed_members.each do |member| %>
+        <span class="badge text-bg-secondary"><%= member.username %></span>
+      <% end %>
+    </div>
+  <% end %>
+  <div class="d-flex flex-wrap gap-2 mb-2" data-member-picker-target="selected"></div>
+  <div class="text-13 text-secondary mb-2 <%= 'd-none' if selected_members.any? || fixed_members.any? %>"
+       data-member-picker-target="empty">
+    No members selected.
+  </div>
+
+  <div data-member-picker-target="inputs">
+    <input type="hidden" name="<%= field_name %>" value="">
+    <% selected_members.each do |member| %>
+      <input type="hidden"
+             name="<%= field_name %>"
+             value="<%= member.id %>"
+             data-user-name="<%= member.username %>">
+    <% end %>
+  </div>
+
+  <input type="text" class="form-control"
+         placeholder="<%= member_search_url.present? ? 'Search by username...' : 'Type to search by name, email, or username...' %>"
+         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+         data-live-filter-target="input"
+         data-member-picker-target="search"
+         data-action="<%= member_search_url.present? ? 'input->member-picker#queryServer' : 'input->live-filter#filter keyup->live-filter#filter' %>">
+
+  <div class="mt-2 d-none border rounded"
+       style="max-height: 280px; overflow-y: auto;"
+       data-live-filter-target="resultsContainer"
+       data-member-picker-target="resultsContainer">
+    <% unless member_search_url.present? %>
+      <% users.each do |user| %>
+        <div class="search-result-item d-none p-2 border-bottom d-flex justify-content-between align-items-center"
+             role="button"
+             data-live-filter-target="item"
+             data-member-picker-target="result"
+             data-user-id="<%= user.id %>"
+             data-search-text="<%= parking_notice_member_search_text(user) %>"
+             data-action="click->member-picker#add"
+             data-member-picker-id-param="<%= user.id %>"
+             data-member-picker-name-param="<%= user.parking_member_label %>">
+          <div>
+            <div class="fw-medium text-13"><%= user.parking_member_label %></div>
+            <% if user.email.present? %>
+              <div class="text-11 text-secondary"><%= user.email %></div>
+            <% end %>
+          </div>
+          <span class="badge text-bg-success-subtle d-none" data-member-added>
+            <i class="bi bi-check"></i> Added
+          </span>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="mt-2 p-3 text-center text-secondary border rounded text-13 d-none"
+       data-live-filter-target="noResults"
+       data-member-picker-target="noResults">
+    No members found matching your search.
+  </div>
+
+  <template data-member-picker-target="template">
+    <span class="badge text-bg-secondary d-inline-flex align-items-center gap-1" data-user-id="">
+      <span data-member-name></span>
+      <button type="button" class="btn-close" style="font-size: 0.6rem;" aria-label="Remove"
+              data-action="member-picker#remove"></button>
+    </span>
+  </template>
+</div>

@@ -19,13 +19,6 @@ module Notifications
       )
     end
 
-    def parking_notice_scope_excluding_opt_outs(relation, reminder_key, channel: 'email')
-      category = category_for_reminder(reminder_key)
-      return relation unless category && NotificationCategory.opt_out_allowed?(category)
-
-      relation.where.not(user_id: NotificationOptOut.opted_out_user_ids(category: category, channel: channel))
-    end
-
     def category_for_reminder(reminder_key)
       NotificationCategory.reminder_backed.find { |entry| entry.reminder_key == reminder_key.to_s }&.key
     end

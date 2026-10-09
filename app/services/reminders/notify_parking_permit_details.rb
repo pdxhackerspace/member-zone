@@ -23,14 +23,18 @@ module Reminders
       notice.with_lock do
         return unless ParkingPermitDetailsEligibility.due?(notice, now: @now)
 
-        link = ParkingPermitLink.issue_for_blank_permit!(notice, now: @now)
-        MemberMailer.parking_permit_details_reminder(
-          notice.user, **ParkingPermits::DeviceIssuer.link_mail_args(link), parking_notice_id: notice.id
-        ).deliver_later
+        ParkingPermitDetailsEligibility.recipients(notice).each { |member| send_reminder(notice, member) }
         ParkingPermitDetailsEligibility.record_delivery!(notice, at: @now)
       end
     rescue StandardError => e
       Rails.logger.error("[NotifyParkingPermitDetails] notice_id=#{notice.id} failed: #{e.class}: #{e.message}")
+    end
+
+    def send_reminder(notice, member)
+      link = ParkingPermitLink.issue_for_blank_permit!(notice, user: member, now: @now)
+      MemberMailer.parking_permit_details_reminder(
+        member, **ParkingPermits::DeviceIssuer.link_mail_args(link), parking_notice_id: notice.id
+      ).deliver_later
     end
   end
 end

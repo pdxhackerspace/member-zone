@@ -66,7 +66,7 @@ module ParkingPermits
     def issue_blank(user)
       notice, link = ParkingNotice.transaction do
         notice = create_blank_permit!(user)
-        [notice, (ParkingPermitLink.issue_for_blank_permit!(notice, now: @now) if user.email.present?)]
+        [notice, (ParkingPermitLink.issue_for_blank_permit!(notice, user: user, now: @now) if user.email.present?)]
       end
 
       notice.record_journal_entry!('parking_permit_issued')
@@ -79,7 +79,7 @@ module ParkingPermits
 
     def create_blank_permit!(user)
       notice = ParkingNotice.create!(
-        notice_type: 'permit', status: 'active', user: user, issued_by: user, webhook_device: @device,
+        notice_type: 'permit', status: 'active', members: [user], issued_by: user, webhook_device: @device,
         expires_at: @now + ParkingNotice::MAX_SELF_SERVICE_DURATION, details_requested_at: @now
       )
       notice.log_event!('note', note: "Blank permit issued by #{@device.name}.")

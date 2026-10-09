@@ -38,7 +38,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
     notice = link.reload.parking_notice
     assert_redirected_to parking_permit_form_path(token: link.token)
     assert link.submitted?
-    assert_equal @member, notice.user
+    assert_equal [@member], notice.members.to_a
     assert_equal @member, notice.issued_by
     assert_equal @device, notice.webhook_device
     assert_equal 'Woodshop', notice.location
@@ -66,7 +66,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
   test 'completing a blank permit records the details and keeps the expiry' do
     notice = blank_permit
     expires_at = notice.expires_at
-    link = ParkingPermitLink.issue_for_blank_permit!(notice)
+    link = ParkingPermitLink.issue_for_blank_permit!(notice, user: @member)
 
     patch parking_permit_form_path(token: link.token),
           params: { parking_notice: permit_params(expires_at: 1.day.from_now.strftime('%Y-%m-%dT%H:%M')) }
@@ -80,7 +80,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
 
   test 'prints the permit while the link is live' do
     notice = blank_permit
-    link = ParkingPermitLink.issue_for_blank_permit!(notice)
+    link = ParkingPermitLink.issue_for_blank_permit!(notice, user: @member)
 
     get parking_permit_form_pdf_path(token: link.token)
 
@@ -104,7 +104,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def blank_permit
-    ParkingNotice.create!(notice_type: 'permit', status: 'active', user: @member, issued_by: @member,
+    ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [@member], issued_by: @member,
                           webhook_device: @device, expires_at: 2.weeks.from_now,
                           details_requested_at: Time.current)
   end

@@ -255,6 +255,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
   end
 
   create_table "audit_log_entries", force: :cascade do |t|
+    t.datetime "alert_checked_at"
     t.datetime "alerted_at"
     t.bigint "audit_log_source_id", null: false
     t.datetime "created_at", null: false
@@ -270,6 +271,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.index ["audit_log_source_id", "fingerprint"], name: "index_audit_log_entries_on_audit_log_source_id_and_fingerprint", unique: true
     t.index ["audit_log_source_id", "occurred_at"], name: "index_audit_log_entries_on_audit_log_source_id_and_occurred_at"
     t.index ["audit_log_source_id"], name: "index_audit_log_entries_on_audit_log_source_id"
+    t.index ["audit_log_source_id"], name: "index_audit_log_entries_unchecked", where: "(alert_checked_at IS NULL)"
     t.index ["explained_by_id"], name: "index_audit_log_entries_on_explained_by_id"
     t.index ["message"], name: "index_audit_log_entries_on_message_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["occurred_at"], name: "index_audit_log_entries_on_occurred_at"
@@ -341,6 +343,84 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.index ["paid_on"], name: "index_cash_payments_on_paid_on", order: :desc
     t.index ["recorded_by_id"], name: "index_cash_payments_on_recorded_by_id"
     t.index ["user_id"], name: "index_cash_payments_on_user_id"
+  end
+
+  create_table "credential_provider_training_topics", force: :cascade do |t|
+    t.bigint "credential_provider_id", null: false
+    t.bigint "training_topic_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["credential_provider_id", "training_topic_id"], name: "idx_cp_training_topics_unique", unique: true
+    t.index ["credential_provider_id"], name: "idx_cp_training_topics_on_provider"
+    t.index ["training_topic_id"], name: "idx_cp_training_topics_on_topic"
+  end
+
+  create_table "credential_providers", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.string "script_path", null: false
+    t.string "script_arguments"
+    t.text "environment_variables"
+    t.boolean "enabled", default: true, null: false
+    t.boolean "self_service", default: true, null: false
+    t.integer "max_per_member", default: 5, null: false
+    t.jsonb "schema", default: {}, null: false
+    t.datetime "schema_fetched_at"
+    t.text "schema_error"
+    t.string "health_status", default: "unknown", null: false
+    t.text "health_message"
+    t.datetime "last_health_check_at"
+    t.datetime "last_healthy_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled", "health_status"], name: "index_credential_providers_on_enabled_and_health_status"
+    t.index ["name"], name: "index_credential_providers_on_name", unique: true
+  end
+
+  create_table "credential_runs", force: :cascade do |t|
+    t.bigint "credential_provider_id", null: false
+    t.bigint "credential_id"
+    t.string "action", null: false
+    t.string "command_line"
+    t.string "status", default: "running", null: false
+    t.integer "exit_code"
+    t.text "output"
+    t.integer "duration_ms"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["credential_id"], name: "index_credential_runs_on_credential_id"
+    t.index ["credential_provider_id", "created_at"], name: "index_credential_runs_on_credential_provider_id_and_created_at"
+  end
+
+  create_table "credentials", force: :cascade do |t|
+    t.bigint "credential_provider_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "issued_by_id"
+    t.bigint "revoked_by_id"
+    t.bigint "rotated_from_id"
+    t.string "label"
+    t.uuid "request_id", null: false
+    t.string "external_id"
+    t.jsonb "field_hints", default: {}, null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "issued_at"
+    t.datetime "expires_at"
+    t.datetime "expiry_warning_sent_at"
+    t.datetime "paused_at"
+    t.datetime "revoked_at"
+    t.string "revocation_reason"
+    t.integer "revoke_attempts", default: 0, null: false
+    t.datetime "last_revoke_error_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["credential_provider_id", "external_id"], name: "index_credentials_on_credential_provider_id_and_external_id"
+    t.index ["credential_provider_id", "status"], name: "index_credentials_on_credential_provider_id_and_status"
+    t.index ["issued_by_id"], name: "index_credentials_on_issued_by_id"
+    t.index ["request_id"], name: "index_credentials_on_request_id", unique: true
+    t.index ["revoked_by_id"], name: "index_credentials_on_revoked_by_id"
+    t.index ["rotated_from_id"], name: "index_credentials_on_rotated_from_id"
+    t.index ["status", "expires_at"], name: "index_credentials_on_status_and_expires_at"
+    t.index ["user_id", "status"], name: "index_credentials_on_user_id_and_status"
   end
 
   create_table "default_settings", force: :cascade do |t|
@@ -751,6 +831,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.index ["parking_notice_id"], name: "index_parking_notice_events_on_parking_notice_id"
   end
 
+  create_table "parking_notice_members", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "parking_notice_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["parking_notice_id", "user_id"], name: "index_parking_notice_members_on_parking_notice_id_and_user_id", unique: true
+    t.index ["parking_notice_id"], name: "index_parking_notice_members_on_parking_notice_id"
+    t.index ["user_id"], name: "index_parking_notice_members_on_user_id"
+  end
+
   create_table "parking_notices", force: :cascade do |t|
     t.datetime "clearance_requested_at"
     t.bigint "clearance_requested_by_id"
@@ -771,7 +861,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.boolean "requires_admin_clearance", default: false, null: false
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
-    t.bigint "user_id"
     t.bigint "webhook_device_id"
     t.datetime "details_requested_at"
     t.datetime "details_completed_at"
@@ -787,7 +876,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.index ["pre_expiration_reminder_sent_at"], name: "index_parking_notices_on_pre_expiration_reminder_sent_at"
     t.index ["requires_admin_clearance"], name: "index_parking_notices_on_requires_admin_clearance"
     t.index ["status"], name: "index_parking_notices_on_status"
-    t.index ["user_id"], name: "index_parking_notices_on_user_id"
     t.index ["webhook_device_id"], name: "index_parking_notices_on_webhook_device_id"
   end
 
@@ -1357,6 +1445,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
   add_foreign_key "cash_payments", "membership_plans"
   add_foreign_key "cash_payments", "users"
   add_foreign_key "cash_payments", "users", column: "recorded_by_id"
+  add_foreign_key "credential_provider_training_topics", "credential_providers", on_delete: :cascade
+  add_foreign_key "credential_provider_training_topics", "training_topics"
+  add_foreign_key "credential_runs", "credential_providers", on_delete: :cascade
+  add_foreign_key "credential_runs", "credentials", on_delete: :nullify
+  add_foreign_key "credentials", "credential_providers"
+  add_foreign_key "credentials", "credentials", column: "rotated_from_id", on_delete: :nullify
+  add_foreign_key "credentials", "users"
+  add_foreign_key "credentials", "users", column: "issued_by_id", on_delete: :nullify
+  add_foreign_key "credentials", "users", column: "revoked_by_id", on_delete: :nullify
   add_foreign_key "document_training_topics", "documents"
   add_foreign_key "document_training_topics", "training_topics"
   add_foreign_key "incident_report_links", "incident_reports"
@@ -1387,7 +1484,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
   add_foreign_key "notification_opt_outs", "users"
   add_foreign_key "parking_notice_events", "parking_notices"
   add_foreign_key "parking_notice_events", "users", column: "actor_id"
-  add_foreign_key "parking_notices", "users"
+  add_foreign_key "parking_notice_members", "parking_notices"
+  add_foreign_key "parking_notice_members", "users"
   add_foreign_key "parking_notices", "users", column: "clearance_requested_by_id"
   add_foreign_key "parking_notices", "users", column: "cleared_by_id"
   add_foreign_key "parking_notices", "users", column: "issued_by_id"

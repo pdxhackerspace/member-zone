@@ -1,7 +1,3 @@
-<style>
-  .pn-member-item:hover { background-color: var(--bs-tertiary-bg); }
-</style>
-
 <%= form_with model: parking_notice, local: true do |f| %>
   <% if parking_notice.errors.any? %>
     <div class="alert alert-danger">
@@ -18,49 +14,14 @@
 
   <div class="row">
     <div class="col-md-6">
-      <%# Member selection with live search %>
       <div class="mb-3">
-        <%= f.label :user_id, 'Member', class: 'form-label' %>
-        <% if parking_notice.permit? %>
-          <span class="text-danger">*</span>
-        <% end %>
-        <%= f.hidden_field :user_id, id: 'parking_notice_user_id' %>
-        <div class="position-relative">
-          <input type="text" id="pn_member_search" class="form-control"
-                 placeholder="<%= parking_notice.permit? ? 'Search for a member...' : '(Optional) Search for a member...' %>"
-                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                 value="<%= parking_notice.user&.parking_member_label %>">
-          <% if parking_notice.user.present? %>
-            <button type="button" id="pn_member_clear" class="btn btn-sm btn-link position-absolute top-50 end-0 translate-middle-y text-muted pe-2" title="Clear">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          <% else %>
-            <button type="button" id="pn_member_clear" class="btn btn-sm btn-link position-absolute top-50 end-0 translate-middle-y text-muted pe-2 d-none" title="Clear">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          <% end %>
-          <div id="pn_member_results" class="position-absolute w-100 bg-body border rounded shadow-sm mt-1" style="max-height: 250px; overflow-y: auto; z-index: 1050; display: none;">
-            <% @users.each do |user| %>
-              <div class="pn-member-item p-2 border-bottom"
-                   data-user-id="<%= user.id %>"
-                   data-user-name="<%= user.display_name.downcase %>"
-                   data-user-email="<%= user.email.to_s.downcase %>"
-                   data-username="<%= user.username.to_s.downcase %>"
-                   data-user-display="<%= user.parking_member_label %>"
-                   data-slack-handle="<%= (user.slack_handle.presence || user.slack_user&.username).to_s.downcase %>"
-                   role="button" style="cursor: pointer;">
-                <%= user.username %>
-                <% slack_handle = user.slack_handle.presence || user.slack_user&.username %>
-                <% if slack_handle.present? %>
-                  <span class="text-muted small ms-1">@<%= slack_handle %></span>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-          <div id="pn_member_no_results" class="position-absolute w-100 bg-body border rounded shadow-sm mt-1 p-3 text-center text-muted" style="z-index: 1050; display: none;">
-            No members found.
-          </div>
-        </div>
+        <%= render 'parking_notices/member_picker',
+            field_name: 'parking_notice[member_ids][]',
+            label: 'Members',
+            help_text: parking_notice.ticket? ? 'Optional. Every listed member can view, clear, and receive reminders.' : 'Every listed member can view, clear, and receive reminders.',
+            required: parking_notice.permit?,
+            users: @users,
+            selected_members: parking_notice.members.to_a %>
       </div>
 
       <%# Description %>
@@ -185,99 +146,6 @@
           if (locationField) locationField.value = this.dataset.room;
         });
       });
-
-      // Member live search (same pattern as _link_user_modal)
-      var memberSearch = document.getElementById('pn_member_search');
-      var memberResults = document.getElementById('pn_member_results');
-      var memberNoResults = document.getElementById('pn_member_no_results');
-      var memberHidden = document.getElementById('parking_notice_user_id');
-      var memberClear = document.getElementById('pn_member_clear');
-
-      if (memberSearch && memberResults && memberHidden) {
-        function filterMembers() {
-          var term = memberSearch.value.toLowerCase().trim().replace(/^@+/, '');
-          if (term.length === 0) {
-            memberResults.style.display = 'none';
-            if (memberNoResults) memberNoResults.style.display = 'none';
-            return;
-          }
-
-          var items = memberResults.querySelectorAll('.pn-member-item');
-          var visibleCount = 0;
-          items.forEach(function(item) {
-            var display = (item.getAttribute('data-user-display') || '').toLowerCase();
-            var name = item.getAttribute('data-user-name') || '';
-            var email = item.getAttribute('data-user-email') || '';
-            var username = item.getAttribute('data-username') || '';
-            var slackHandle = item.getAttribute('data-slack-handle') || '';
-            var haystack = display + ' ' + name + ' ' + email + ' ' + username + ' ' + slackHandle;
-            if (slackHandle) haystack += ' @' + slackHandle;
-            if (haystack.includes(term)) {
-              item.style.display = '';
-              visibleCount++;
-            } else {
-              item.style.display = 'none';
-            }
-          });
-
-          if (visibleCount > 0) {
-            memberResults.style.display = '';
-            if (memberNoResults) memberNoResults.style.display = 'none';
-          } else {
-            memberResults.style.display = 'none';
-            if (memberNoResults) memberNoResults.style.display = '';
-          }
-        }
-
-        function selectMember(item) {
-          memberHidden.value = item.getAttribute('data-user-id');
-          memberSearch.value = item.getAttribute('data-user-display');
-          memberResults.style.display = 'none';
-          if (memberNoResults) memberNoResults.style.display = 'none';
-          if (memberClear) memberClear.classList.remove('d-none');
-        }
-
-        function clearMember() {
-          memberHidden.value = '';
-          memberSearch.value = '';
-          if (memberClear) memberClear.classList.add('d-none');
-          memberResults.style.display = 'none';
-          if (memberNoResults) memberNoResults.style.display = 'none';
-        }
-
-        memberSearch.addEventListener('input', function() {
-          if (memberSearch.value.trim().length === 0) {
-            memberHidden.value = '';
-            if (memberClear) memberClear.classList.add('d-none');
-          } else if (memberHidden.value) {
-            var selected = memberResults.querySelector('.pn-member-item[data-user-id="' + memberHidden.value + '"]');
-            if (selected && memberSearch.value !== selected.getAttribute('data-user-display')) {
-              memberHidden.value = '';
-              if (memberClear) memberClear.classList.add('d-none');
-            }
-          }
-          filterMembers();
-        });
-        memberSearch.addEventListener('focus', function() {
-          if (memberSearch.value.trim().length > 0 && !memberHidden.value) filterMembers();
-        });
-
-        memberResults.querySelectorAll('.pn-member-item').forEach(function(item) {
-          item.addEventListener('click', function() { selectMember(item); });
-        });
-
-        if (memberClear) {
-          memberClear.addEventListener('click', clearMember);
-        }
-
-        document.addEventListener('click', function(e) {
-          if (!memberSearch.contains(e.target) && !memberResults.contains(e.target) &&
-              !(memberClear && memberClear.contains(e.target))) {
-            memberResults.style.display = 'none';
-            if (memberNoResults) memberNoResults.style.display = 'none';
-          }
-        });
-      }
 
       var cameraBtn = document.getElementById('photo-camera-btn');
       if (cameraBtn && 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {

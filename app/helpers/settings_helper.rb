@@ -135,6 +135,9 @@ module SettingsHelper
       { category: 'System', title: 'Audit log sources', privilege: :'audit_logs.manage',
         desc: 'Programs that feed the audit log, their schedules, and alert rules.',
         path: audit_log_sources_path },
+      { category: 'System', title: 'Credential providers', privilege: :'credentials.manage_providers',
+        desc: 'Programs that issue API keys and app passwords to members, and their health.',
+        path: credential_providers_path, attention_count: settings_attention_counts[:credential_providers] },
       # Roles hand out privileges, so managing them stays with administrators until the
       # no-escalation containment in User#may_confer? is proven under privilege gates.
       { category: 'System', title: 'Roles',

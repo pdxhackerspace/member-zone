@@ -53,6 +53,7 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     users messages profile_setup member_parking_permits user_links search
     training_catalog training_requests documents rag membership_plans trainings
     training_topics training_topic_links settings login_links notification_preferences
+    credentials
   ].freeze
 
   test 'every routed action is authenticated, admin gated, or privilege gated' do

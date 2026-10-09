@@ -20,6 +20,7 @@ class EmailTemplate
         .merge(admin_dashboard)
         .merge(blocked_recipient)
         .merge(AuditLogPreviewVariables.all)
+        .merge(CredentialPreviewVariables.all)
         .merge(ParkingPermitDevicePreviewVariables.all)
     end
 

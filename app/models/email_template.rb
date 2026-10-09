@@ -55,10 +55,27 @@ class EmailTemplate < ApplicationRecord
     '{{audit_match_count}}' => 'Number of new entries that matched an alert rule (audit log alerts only)',
     '{{audit_matches_html}}' => 'HTML list of the matching entries (audit log alerts only)',
     '{{audit_matches_text}}' => 'Plain-text list of the matching entries (audit log alerts only)',
-    '{{audit_log_url}}' => 'Link to this source in the audit log (audit log alerts only)'
+    '{{audit_log_url}}' => 'Link to this source in the audit log (audit log alerts only)',
+    '{{credential_name}}' => 'Provider and label of the credential (credential emails only)',
+    '{{credential_expires_at}}' => 'Date the credential expires (credential expiry emails only)',
+    '{{credential_names_html}}' => 'HTML list of the credentials that were revoked (credentials revoked only)',
+    '{{credential_names_text}}' => 'Plain-text list of the credentials that were revoked (credentials revoked only)',
+    '{{credential_reason}}' => 'Why the credentials were revoked, e.g. "your membership is no longer active" ' \
+                               '(credentials revoked only)',
+    '{{credentials_url}}' => 'Link to the member\'s credentials page (credential emails only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
+    'credential_expiring_soon' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{credential_name}} {{credential_expires_at}} {{credentials_url}}
+    ],
+    'credential_expired' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{credential_name}} {{credential_expires_at}} {{credentials_url}}
+    ],
+    'credentials_revoked' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{credential_names_html}} {{credential_names_text}}
+      {{credential_reason}} {{credentials_url}}
+    ],
     'audit_log_alert' => %w[
       {{member_name}}
       {{organization_name}}
@@ -488,6 +505,78 @@ class EmailTemplate < ApplicationRecord
         {{audit_matches_text}}
 
         Open this log in Member Zone: {{audit_log_url}}
+      TEXT
+    },
+    'credential_expiring_soon' => {
+      name: 'Credential Expiring Soon',
+      description: 'Sent a week before an issued credential (API key, app password) expires',
+      subject: '{{organization_name}}: Your credential expires soon',
+      body_html: <<~HTML,
+        <h1>Your credential expires soon</h1>
+        <p>Hello {{member_name}},</p>
+        <p>Your credential <strong>{{credential_name}}</strong> expires on {{credential_expires_at}}.</p>
+        <p>To keep working without interruption, request a replacement before then.</p>
+        <p><a href="{{credentials_url}}">Open your credentials</a></p>
+      HTML
+      body_text: <<~TEXT
+        Your credential expires soon
+
+        Hello {{member_name}},
+
+        Your credential {{credential_name}} expires on {{credential_expires_at}}.
+
+        To keep working without interruption, request a replacement before then.
+
+        Open your credentials: {{credentials_url}}
+      TEXT
+    },
+    'credential_expired' => {
+      name: 'Credential Expired',
+      description: 'Sent when an issued credential (API key, app password) has expired',
+      subject: '{{organization_name}}: Your credential has expired',
+      body_html: <<~HTML,
+        <h1>Your credential has expired</h1>
+        <p>Hello {{member_name}},</p>
+        <p>Your credential <strong>{{credential_name}}</strong> expired on {{credential_expires_at}} and no longer works.</p>
+        <p>If you still need it, you can request a new one.</p>
+        <p><a href="{{credentials_url}}">Open your credentials</a></p>
+      HTML
+      body_text: <<~TEXT
+        Your credential has expired
+
+        Hello {{member_name}},
+
+        Your credential {{credential_name}} expired on {{credential_expires_at}} and no longer works.
+
+        If you still need it, you can request a new one.
+
+        Open your credentials: {{credentials_url}}
+      TEXT
+    },
+    'credentials_revoked' => {
+      name: 'Credentials Revoked',
+      description: 'Sent when a member\'s credentials are revoked automatically, e.g. because their membership lapsed',
+      subject: '{{organization_name}}: Your credentials were revoked',
+      body_html: <<~HTML,
+        <h1>Your credentials were revoked</h1>
+        <p>Hello {{member_name}},</p>
+        <p>We revoked the following credentials because {{credential_reason}}:</p>
+        {{credential_names_html}}
+        <p>They no longer work. Revoked credentials cannot be restored; once you are able to, you can request new ones.</p>
+        <p><a href="{{credentials_url}}">Open your credentials</a></p>
+      HTML
+      body_text: <<~TEXT
+        Your credentials were revoked
+
+        Hello {{member_name}},
+
+        We revoked the following credentials because {{credential_reason}}:
+
+        {{credential_names_text}}
+
+        They no longer work. Revoked credentials cannot be restored; once you are able to, you can request new ones.
+
+        Open your credentials: {{credentials_url}}
       TEXT
     },
     'training_requested' => {

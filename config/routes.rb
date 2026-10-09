@@ -90,6 +90,9 @@ Rails.application.routes.draw do
   post '/training/record', to: 'trainings#create_bulk'
   get '/training/:id',  to: 'training_catalog#show',  as: :training_catalog_topic, constraints: { id: /\d+/ }
   resources :member_parking_permits, only: %i[new create show edit update] do
+    collection do
+      get :member_search
+    end
     member do
       patch :close
       post :request_clearance
@@ -433,6 +436,23 @@ Rails.application.routes.draw do
     end
     resources :audit_log_alert_rules, only: %i[create update destroy]
   end
+
+  resources :credential_providers do
+    member do
+      post :toggle
+      post :check_health
+      post :refresh_schema
+      post :revoke_all
+    end
+  end
+
+  resources :credentials, only: %i[index new create] do
+    member do
+      post :revoke
+      post :rotate
+    end
+  end
+  resources :issued_credentials, only: :index
 
   resources :access_controllers do
     member do

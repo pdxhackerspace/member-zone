@@ -48,7 +48,7 @@ class ParkingPermitFormsController < ApplicationController
   end
 
   def default_new_permit
-    ParkingNotice.new(notice_type: 'permit', user: @link.user, expires_at: 7.days.from_now)
+    ParkingNotice.new(notice_type: 'permit', expires_at: 7.days.from_now)
   end
 
   def permit_params

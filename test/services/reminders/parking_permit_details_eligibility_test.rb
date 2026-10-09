@@ -69,7 +69,7 @@ class ParkingPermitDetailsEligibilityTest < ActiveSupport::TestCase
   private
 
   def blank_permit(issued_at:)
-    ParkingNotice.create!(notice_type: 'permit', status: 'active', user: @member, issued_by: @member,
+    ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [@member], issued_by: @member,
                           webhook_device: @device, expires_at: issued_at + 2.weeks,
                           details_requested_at: issued_at)
   end

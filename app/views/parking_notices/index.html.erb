@@ -55,7 +55,7 @@
         <thead class="table-light">
           <tr>
             <th>Type</th>
-            <th>Member</th>
+            <th>Members</th>
             <th>Location</th>
             <th>Description</th>
             <th>Expires</th>
@@ -72,8 +72,8 @@
                 </span>
               </td>
               <td>
-                <% if notice.user.present? %>
-                  <%= link_to notice.user.parking_member_label, user_path(notice.user) %>
+                <% if notice.members.any? %>
+                  <%= parking_notice_members_display(notice, link: true) %>
                 <% else %>
                   <span class="text-muted">Unknown</span>
                 <% end %>

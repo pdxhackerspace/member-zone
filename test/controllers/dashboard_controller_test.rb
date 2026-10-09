@@ -73,12 +73,12 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test 'admin home parking tab shows print for permits but not tickets' do
     admin_user = User.by_email(local_accounts(:active_admin).email).first!
     printer = Printer.create!(name: 'Front Desk', cups_printer_name: 'front_desk')
-    permit = admin_user.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: admin_user,
+    permit = create_parking_notice!(
+      user: admin_user, notice_type: 'permit', status: 'active', issued_by: admin_user,
       expires_at: 3.days.from_now, description: 'Home permit', location: 'Woodshop'
     )
-    ticket = ParkingNotice.create!(
-      notice_type: 'ticket', status: 'active', user: admin_user, issued_by: admin_user,
+    ticket = create_parking_notice!(
+      user: admin_user, notice_type: 'ticket', status: 'active', issued_by: admin_user,
       expires_at: 3.days.from_now, description: 'Home ticket', location: 'Main Area'
     )
 
@@ -91,12 +91,12 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
   test 'home parking tab defaults to active notices with stacking filter pills' do
     admin_user = User.by_email(local_accounts(:active_admin).email).first!
-    admin_user.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: admin_user,
+    create_parking_notice!(
+      user: admin_user, notice_type: 'permit', status: 'active', issued_by: admin_user,
       expires_at: 3.days.from_now, description: 'Active home permit', location: 'Woodshop'
     )
-    ParkingNotice.create!(
-      notice_type: 'ticket', status: 'expired', user: admin_user, issued_by: admin_user,
+    create_parking_notice!(
+      user: admin_user, notice_type: 'ticket', status: 'expired', issued_by: admin_user,
       expires_at: 2.days.ago, description: 'Expired home ticket', location: 'Main Area'
     )
 
@@ -117,8 +117,8 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test 'home parking tab hides print for expired permits' do
     admin_user = User.by_email(local_accounts(:active_admin).email).first!
     Printer.create!(name: 'Front Desk', cups_printer_name: 'front_desk')
-    expired_permit = admin_user.parking_notices.create!(
-      notice_type: 'permit', status: 'expired', issued_by: admin_user,
+    expired_permit = create_parking_notice!(
+      user: admin_user, notice_type: 'permit', status: 'expired', issued_by: admin_user,
       expires_at: 2.days.ago, description: 'Expired home permit', location: 'Woodshop'
     )
 

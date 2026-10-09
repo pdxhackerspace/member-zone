@@ -111,6 +111,14 @@ class NotificationCategory
       reminder_key: nil,
       mailer_actions: %w[message_received]
     },
+    'credentials' => {
+      name: 'Credential notices',
+      description: 'Warnings before your API keys and app passwords expire, and notices when they are revoked.',
+      group: 'Account',
+      reminder_key: nil,
+      opt_out: true,
+      mailer_actions: %w[credential_expiring_soon credential_expired credentials_revoked]
+    },
     'account_security' => {
       name: 'Account security',
       description: 'Login links and related account access emails.',

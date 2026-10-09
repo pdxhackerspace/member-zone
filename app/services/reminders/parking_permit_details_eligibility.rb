@@ -1,25 +1,16 @@
 module Reminders
-  # Members who took a blank parking permit from an access control device and have not recorded
-  # what they parked or where.
+  # Blank parking permits an access control device issued whose details nobody has recorded yet.
   #
   # The cadence counts from the day the device issued the permit. It stops as soon as the permit
   # has a description and location — however they got there — or stops being active, so a member
-  # who clears their project early hears nothing more.
+  # who clears their project early hears nothing more. Every member on the permit who can be
+  # emailed is reminded, each with a link of their own.
   class ParkingPermitDetailsEligibility
     extend Cadence
 
     REMINDER_KEY = 'parking_permit_details'.freeze
     ANCHOR_SQL = 'parking_notices.details_requested_at'.freeze
-
-    DELIVERABLE_USER_SQL = <<~SQL.squish
-      EXISTS (
-        SELECT 1 FROM users
-        WHERE users.id = parking_notices.user_id
-          AND users.email IS NOT NULL
-          AND users.email ~ '\\S'
-          AND users.membership_state NOT IN (#{MembershipState::TERMINAL_STATES.map { |s| "'#{s}'" }.join(', ')})
-      )
-    SQL
+    TERMINAL_MEMBERSHIP_STATES_SQL = MembershipState::TERMINAL_STATES.map { |state| "'#{state}'" }.join(', ').freeze
 
     def self.reminder_key
       REMINDER_KEY
@@ -31,7 +22,7 @@ module Reminders
 
     def self.due(now: Time.current)
       ids = candidates(now: now).select { |notice| due?(notice, now: now) }.map(&:id)
-      ParkingNotice.where(id: ids).includes(:user, :webhook_device).order(:details_requested_at)
+      ParkingNotice.where(id: ids).includes(:members, :webhook_device).order(:details_requested_at)
     end
 
     def self.count_due(now: Time.current)
@@ -44,27 +35,48 @@ module Reminders
 
     def self.due?(notice, now: Time.current)
       return false unless notice.permit? && notice.active? && notice.awaiting_details?
-      return false if notice.user.blank? || notice.user.email.blank?
-      return false if MailRecipientGuard.blocked?(notice.user)
+      return false if recipients(notice).empty?
 
       cadence_due?(notice, now: now)
     end
 
+    # The members on the permit this reminder can reach.
+    def self.recipients(notice)
+      notice.members.select { |member| deliverable?(member) }
+    end
+
+    def self.deliverable?(member)
+      return false if member.email.blank? || MailRecipientGuard.blocked?(member)
+      return false if MembershipState::TERMINAL_STATES.include?(member.membership_state)
+
+      !Notifications::DeliveryGate.blocked?(mailer_action: 'parking_permit_details_reminder', user: member)
+    end
+
     def self.candidates(now: Time.current)
       DeliveryScope.candidates(remindable_scope, key: REMINDER_KEY, anchor_sql: ANCHOR_SQL, now: now)
-                   .includes(:user)
+                   .includes(:members)
     end
 
     def self.remindable_scope
-      ParkingNotice.permits
-                   .active_notices
-                   .awaiting_details
-                   .where(DELIVERABLE_USER_SQL)
-                   .then do |scope|
-                     Notifications::EligibilityOptOuts.parking_notice_scope_excluding_opt_outs(scope, REMINDER_KEY)
-                   end
+      ParkingNotice.permits.active_notices.awaiting_details.where(deliverable_member_exists_sql)
     end
 
-    private_class_method :candidates, :remindable_scope
+    # Loose on purpose, like every candidate scope: opt-outs are left to deliverable?, which
+    # checks the member's own preferences exactly.
+    def self.deliverable_member_exists_sql
+      <<~SQL.squish
+        EXISTS (
+          SELECT 1
+          FROM parking_notice_members pnm
+          INNER JOIN users ON users.id = pnm.user_id
+          WHERE pnm.parking_notice_id = parking_notices.id
+            AND users.email IS NOT NULL
+            AND users.email ~ '\\S'
+            AND users.membership_state NOT IN (#{TERMINAL_MEMBERSHIP_STATES_SQL})
+        )
+      SQL
+    end
+
+    private_class_method :deliverable?, :candidates, :remindable_scope, :deliverable_member_exists_sql
   end
 end

@@ -60,12 +60,12 @@
     <div class="row">
       <div class="col-md-6">
         <dl>
-          <dt>Member</dt>
+          <dt>Members</dt>
           <dd>
-            <% if @parking_notice.user.present? %>
-              <%= link_to @parking_notice.user.parking_member_label, user_path(@parking_notice.user) %>
+            <% if @parking_notice.members.any? %>
+              <%= parking_notice_members_display(@parking_notice, link: true) %>
             <% else %>
-              <span class="text-muted">No member assigned</span>
+              <span class="text-muted">No members assigned</span>
             <% end %>
           </dd>
 

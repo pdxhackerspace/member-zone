@@ -7,6 +7,7 @@ class SettingsController < AuthenticatedController
     @settings_attention_counts = {
       access_controllers: access_controller_issue_count,
       ai_services: AiOllamaProfile.ordered.count(&:urgent_health_issue?),
+      credential_providers: CredentialProvider.attention_count,
       email_templates: EmailTemplate.needs_review.count,
       interests: Interest.needs_review.count,
       payment_processors: PaymentProcessor.enabled.where(sync_status: %w[degraded failing]).count,

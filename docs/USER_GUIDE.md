@@ -27,6 +27,8 @@ The **Send now** button runs the reminder immediately against everyone the caden
 
 Every parking permit and ticket email ends with a link to the notice it is about, so the member can open it, add a note, or clear it without hunting through their profile. The link is the `{{parking_notice_url}}` variable, and it points at the member's own view of the notice rather than the admin page.
 
+A permit or ticket can list **multiple members**. Everyone on the notice sees it on their parking tab, can clear it (unless it requires admin clearance), and receives the issued and reminder emails. When creating a permit, members can add other active members whose profiles are visible to them (search by username). Staff can add anyone when creating or editing a notice. Newly added members receive the issued email when they are put on an existing notice.
+
 ### Slack signup reminder
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.
@@ -183,6 +185,28 @@ Administrators (and anyone with *Configure audit log sources and alert rules*) u
 The run history on the source's page shows each run's status, how many entries were new, and anything the program wrote to its error output. A source that has entries cannot be deleted; disable it instead.
 
 Alert emails can be turned off under **Notifications** (the *Audit log alerts* row appears only for people who receive them). See `docs/audit-logs.md` for how programs are written.
+
+## Credentials
+
+### Requesting a credential (members)
+
+**Your credentials** on your dashboard lists the API keys and app passwords issued to you, and the systems you can request one from. Each system shows why you cannot request one if that is the case (for example, training you still need, or that you already have the most allowed).
+
+1. Choose a system and, if you like, say what it is for ("laptop CLI").
+2. **Request credential.** The next page shows the new secret **once**. Copy it somewhere safe before leaving; we keep only its first and last four characters, so we cannot show it again. If you did not save it, revoke it and request a new one.
+3. Afterwards the list shows each credential as `abcd…wxyz` (things that are not secret, like a client ID, are shown whole), its status and when it expires.
+
+**Replace** issues a new credential and revokes the old one in one step. **Revoke** switches one off at once.
+
+Your credentials are revoked automatically when your membership stops being active. If your key access is paused they are paused too, or revoked when the system cannot pause them. Reactivating your membership does not bring them back; request new ones. We email you a week before a credential expires, when it expires, and when we revoke any. You can turn these emails off under **Notifications** (*Credential notices*).
+
+### Administering credentials
+
+- **Settings → Credential providers** (needs *Configure credential providers*). **New provider**: choose the program from the list, add arguments and environment variables (API tokens, stored encrypted and never shown again — leave the box blank when editing to keep them), optionally require training topics (a member needs all of them), set the most per member, and choose whether members can request their own. Saving asks the program what it issues. The provider's page shows the schema, health, recent runs and the buttons **Check health**, **Refresh schema**, **Disable**, **Revoke all** and **Delete** (only for a provider that has never issued anything).
+- **Admin → Credentials** (needs *View every issued credential*) lists every credential with filters for provider, status, member and "expiring in 14 days". **Revoke** needs *Revoke any member's credentials*. **Issue for member** and **Rotate** need *Issue and rotate credentials for members*: enter the member's full email address; you will see the secret once and must give it to them yourself. You cannot issue or rotate while viewing as a member.
+- Providers and revocations that need attention appear on the settings page, the admin dashboard and the urgent digest. A revocation that fails is retried daily, backing off up to a day.
+
+See `docs/credentials.md` for how programs are written, and the `Credentials administrator` role for the four `credentials.*` privileges.
 
 ## Membership states
 

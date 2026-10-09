@@ -66,6 +66,14 @@
             <div class="action-card-desc">Reserve space for a project you're working on</div>
           <% end %>
         </div>
+        <% if user.credentials.exists? || CredentialProvider.enabled.self_service.exists? %>
+          <div class="col-md-6">
+            <%= link_to credentials_path, class: "action-card" do %>
+              <div class="action-card-title"><i class="bi bi-key me-1"></i>Your credentials</div>
+              <div class="action-card-desc">API keys and app passwords issued to you</div>
+            <% end %>
+          </div>
+        <% end %>
         <div class="col-md-6">
           <% if messages_count.positive? %>
             <%= link_to messages_path_for_action, class: "action-card" do %>

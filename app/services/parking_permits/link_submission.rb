@@ -22,7 +22,7 @@ module ParkingPermits
     private
 
     def create_permit
-      notice = ParkingNotice.new(@attributes.merge(notice_type: 'permit', status: 'active', user: @link.user,
+      notice = ParkingNotice.new(@attributes.merge(notice_type: 'permit', status: 'active', members: [@link.user],
                                                    issued_by: @link.user, webhook_device: @link.webhook_device))
       return notice unless valid_details?(notice) && valid_expiry?(notice)
 
@@ -31,7 +31,7 @@ module ParkingPermits
         @link.update!(parking_notice: notice, submitted_at: @now)
       end
       notice.record_journal_entry!('parking_permit_issued', actor: @link.user)
-      notice.enqueue_notification!(notice.issued_template_key)
+      notice.notify_issued!
       notice
     end
 
