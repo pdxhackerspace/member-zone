@@ -180,6 +180,12 @@ class CredentialProviderTest < ActiveSupport::TestCase
     assert_match(/Limit of 2 reached/, provider.issue_denial_reason(@member))
   end
 
+  test 'a credential whose revoke failed still counts toward the limit' do
+    provider = create_credential_provider(max_per_member: 1)
+    create_credential(provider: provider, user: @member, status: 'revoke_failed')
+    assert_match(/Limit of 1 reached/, provider.issue_denial_reason(@member))
+  end
+
   test 'the limit is per member' do
     provider = create_credential_provider(max_per_member: 1)
     create_credential(provider: provider, user: @member)

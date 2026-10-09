@@ -114,7 +114,7 @@ class CredentialTest < ActiveSupport::TestCase
     assert_equal [old_pending], Credential.stale_pending.where(user: @member).to_a
     assert_not_includes Credential.stale_pending, fresh_pending
     assert_not_includes Credential.live, revoked
-    assert_equal [active, paused, old_pending, fresh_pending].sort_by(&:id),
+    assert_equal [active, paused, failed, old_pending, fresh_pending].sort_by(&:id),
                  Credential.counting_toward_limit.where(user: @member).sort_by(&:id)
   end
 

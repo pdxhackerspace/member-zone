@@ -12,6 +12,8 @@
     </div>
   <% end %>
 
+  <% removable = parking_notice.members_removable_by?(current_user) %>
+  <% others = parking_notice.members.reject { |member| member.id == current_user.id } %>
   <div class="mb-3">
     <%= render 'parking_notices/member_picker',
         field_name: 'parking_notice[member_ids][]',
@@ -19,8 +21,8 @@
         help_text: "They'll see this permit, can clear it, and get its reminders.",
         required: false,
         member_search_url: member_search_member_parking_permits_path,
-        fixed_members: [current_user],
-        selected_members: parking_notice.members.reject { |member| member.id == current_user.id } %>
+        fixed_members: removable ? [current_user] : [current_user, *others],
+        selected_members: removable ? others : [] %>
   </div>
 
   <div class="mb-3">
