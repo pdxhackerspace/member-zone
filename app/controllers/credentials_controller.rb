@@ -120,7 +120,8 @@ class CredentialsController < AuthenticatedController
     member = find_requested_member
     return member if member
 
-    redirect_to issued_credentials_path, alert: 'No member found. Enter the full email address they signed up with.'
+    back = can?(:'credentials.view_all') ? issued_credentials_path : credentials_path
+    redirect_to back, alert: 'No member found. Enter the full email address they signed up with.'
   end
 
   def find_requested_member

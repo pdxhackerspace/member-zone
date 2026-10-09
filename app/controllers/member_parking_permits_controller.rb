@@ -50,7 +50,7 @@ class MemberParkingPermitsController < AuthenticatedController
         ParkingNotice.transaction do
           @parking_notice.save!
           if params[:parking_notice]&.key?(:member_ids)
-            member_ids = resolve_member_permit_member_ids(member_ids_param, current_user)
+            member_ids = resolve_member_permit_member_ids(member_ids_param, current_user, @parking_notice)
             newly_added = @parking_notice.replace_members!(member_ids)
           end
         end

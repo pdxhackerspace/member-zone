@@ -101,6 +101,11 @@ class ParkingNotice < ApplicationRecord
     end
   end
 
+  # Whoever issued a notice may take members off it; anyone else on it may only add.
+  def members_removable_by?(user)
+    new_record? || issued_by_id == user&.id
+  end
+
   def members_label
     members.map(&:parking_member_label).join(', ')
   end

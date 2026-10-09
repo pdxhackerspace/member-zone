@@ -13,8 +13,9 @@ class Credential < ApplicationRecord
   # Exist in the external system, so a member leaving must revoke them.
   LIVE_STATUSES = %w[active paused revoke_failed].freeze
 
-  # Count against the provider's per-member limit.
-  LIMIT_STATUSES = %w[pending active paused].freeze
+  # Count against the provider's per-member limit. A credential whose revoke failed still
+  # works at the provider, so it counts until it is actually revoked.
+  LIMIT_STATUSES = %w[pending active paused revoke_failed].freeze
 
   REVOCATION_REASONS = {
     'revoked_by_member' => 'Revoked by the member',

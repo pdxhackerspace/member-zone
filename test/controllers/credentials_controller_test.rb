@@ -674,6 +674,17 @@ class CredentialsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/No member found/, flash[:alert])
   end
 
+  test 'an unknown member email without view_all goes back to the credentials page' do
+    me = sign_in_as_plain_member
+    grant_privileges(me, 'credentials.issue_for_members')
+    sign_in_as_plain_member
+
+    get new_credential_path(provider_id: @provider.id, member_email: 'nobody@example.com')
+
+    assert_redirected_to credentials_path
+    assert_match(/No member found/, flash[:alert])
+  end
+
   test 'a member asking for their own id is not treated as issuing for someone else' do
     me = sign_in_as_plain_member
 

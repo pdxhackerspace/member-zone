@@ -568,6 +568,59 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_not notice.member?(private_member)
   end
 
+  test 'a member who did not issue a shared permit cannot remove anyone from it' do
+    sign_in_as_member
+    issuer = users(:two)
+    permit = member_permit_for(issuer)
+    permit.replace_members!([issuer.id, current_member.id])
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: 'Mine now', location: permit.location, member_ids: [''] }
+    }
+
+    assert_redirected_to user_path(current_member, tab: :parking)
+    assert_equal [issuer.id, current_member.id].sort, permit.reload.members.ids.sort
+  end
+
+  test 'the edit form shows a non-issuer the existing members as fixed' do
+    sign_in_as_member
+    issuer = users(:two)
+    permit = member_permit_for(issuer)
+    permit.replace_members!([issuer.id, current_member.id])
+
+    get edit_member_parking_permit_path(permit)
+
+    assert_select '[data-member-picker-fixed-count-value="2"]'
+    assert_select "input[type=hidden][name='parking_notice[member_ids][]'][value='#{issuer.id}']", count: 0
+  end
+
+  test 'the issuer can remove another member from their permit' do
+    sign_in_as_member
+    other = users(:two)
+    permit = member_permit
+    permit.replace_members!([current_member.id, other.id])
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: permit.description, location: permit.location, member_ids: [''] }
+    }
+
+    assert_equal [current_member.id], permit.reload.members.ids
+  end
+
+  test 'the issuer keeps a member already on the permit whose profile they cannot see' do
+    sign_in_as_member
+    private_member = users(:two)
+    permit = member_permit
+    permit.replace_members!([current_member.id, private_member.id])
+    private_member.update!(profile_visibility: 'private')
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: permit.description, location: permit.location, member_ids: [private_member.id] }
+    }
+
+    assert permit.reload.member?(private_member)
+  end
+
   private
 
   def current_member
