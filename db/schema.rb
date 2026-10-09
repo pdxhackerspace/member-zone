@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -772,9 +772,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id"
+    t.bigint "webhook_device_id"
+    t.datetime "details_requested_at"
+    t.datetime "details_completed_at"
     t.index ["clearance_requested_at"], name: "index_parking_notices_on_clearance_requested_at"
     t.index ["clearance_requested_by_id"], name: "index_parking_notices_on_clearance_requested_by_id"
     t.index ["cleared_by_id"], name: "index_parking_notices_on_cleared_by_id"
+    t.index ["details_completed_at"], name: "index_parking_notices_on_details_completed_at"
+    t.index ["details_requested_at"], name: "index_parking_notices_on_details_requested_at"
     t.index ["expiration_notice_sent_at"], name: "index_parking_notices_on_expiration_notice_sent_at"
     t.index ["expires_at"], name: "index_parking_notices_on_expires_at"
     t.index ["issued_by_id"], name: "index_parking_notices_on_issued_by_id"
@@ -783,6 +788,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
     t.index ["requires_admin_clearance"], name: "index_parking_notices_on_requires_admin_clearance"
     t.index ["status"], name: "index_parking_notices_on_status"
     t.index ["user_id"], name: "index_parking_notices_on_user_id"
+    t.index ["webhook_device_id"], name: "index_parking_notices_on_webhook_device_id"
+  end
+
+  create_table "parking_permit_links", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "webhook_device_id"
+    t.bigint "parking_notice_id"
+    t.string "purpose", null: false
+    t.string "token_digest", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "submitted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["expires_at"], name: "index_parking_permit_links_on_expires_at"
+    t.index ["parking_notice_id"], name: "index_parking_permit_links_on_parking_notice_id"
+    t.index ["token_digest"], name: "index_parking_permit_links_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_parking_permit_links_on_user_id"
+    t.index ["webhook_device_id"], name: "index_parking_permit_links_on_webhook_device_id"
   end
 
   create_table "payment_events", force: :cascade do |t|
@@ -1294,6 +1317,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
     t.index ["username"], name: "index_users_on_username", unique: true, where: "(username IS NOT NULL)"
   end
 
+  create_table "webhook_devices", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.boolean "enabled", default: true, null: false
+    t.string "token_digest", null: false
+    t.string "token_hint"
+    t.datetime "last_used_at"
+    t.string "last_used_ip"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_webhook_devices_on_enabled"
+    t.index ["name"], name: "index_webhook_devices_on_name", unique: true
+    t.index ["token_digest"], name: "index_webhook_devices_on_token_digest", unique: true
+  end
+
   add_foreign_key "access_controller_logs", "access_controllers"
   add_foreign_key "access_controller_type_training_topics", "access_controller_types"
   add_foreign_key "access_controller_type_training_topics", "training_topics"
@@ -1353,6 +1391,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130000) do
   add_foreign_key "parking_notices", "users", column: "clearance_requested_by_id"
   add_foreign_key "parking_notices", "users", column: "cleared_by_id"
   add_foreign_key "parking_notices", "users", column: "issued_by_id"
+  add_foreign_key "parking_notices", "webhook_devices", on_delete: :nullify
+  add_foreign_key "parking_permit_links", "parking_notices", on_delete: :cascade
+  add_foreign_key "parking_permit_links", "users"
+  add_foreign_key "parking_permit_links", "webhook_devices", on_delete: :nullify
   add_foreign_key "payment_events", "cash_payments"
   add_foreign_key "payment_events", "kofi_payments"
   add_foreign_key "payment_events", "paypal_payments"

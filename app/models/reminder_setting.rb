@@ -89,6 +89,24 @@ class ReminderSetting < ApplicationRecord
         parking_permit_final_reminder parking_ticket_final_reminder
       ]
     },
+    'parking_permit_details' => {
+      name: 'Blank parking permit reminder',
+      description: 'Reminder to members who took a blank parking permit from an access control device to fill ' \
+                   'in its details online. Each reminder carries a fresh 12-hour link. Stops once the permit ' \
+                   'says what was parked and where, or is no longer active.',
+      # Ships on: the device only hands out a blank permit because the member is expected to come
+      # back and fill it in, and without these nobody tells them.
+      enabled: true,
+      allow_opt_out: true,
+      anchor_description: 'the permit being issued',
+      start_offset_days: 1,
+      interval_days: 2,
+      max_reminders: 3,
+      # Sent straight to the member rather than through the mail queue — the link inside expires
+      # in hours, so it cannot sit waiting for review. The job records its own sends.
+      reminder_mailer_actions: [],
+      email_template_keys: %w[parking_permit_details_reminder]
+    },
     'lapsed_access' => {
       name: 'Lapsed member access reminder',
       description: 'Daily reminder to inactive members who badged in recently that their membership has lapsed ' \
@@ -108,8 +126,7 @@ class ReminderSetting < ApplicationRecord
       name: 'Stale application reminder',
       description: 'Reminder to directors that a membership application has been waiting for review. ' \
                    'Sent to reviewers rather than to the applicant.',
-      # The one reminder that ships switched on: a review queue nobody is told about is the
-      # problem it exists to prevent.
+      # Ships switched on: a review queue nobody is told about is the problem it exists to prevent.
       enabled: true,
       allow_opt_out: false,
       anchor_description: 'submission',
@@ -146,7 +163,7 @@ class ReminderSetting < ApplicationRecord
 
   # The reminder's settings, whether or not anybody has saved any. Rows are only created when
   # an admin first opens the Reminders page, so on a fresh install every reminder would
-  # otherwise read as missing — and the one reminder that ships enabled would quietly not run.
+  # otherwise read as missing — and the reminders that ship enabled would quietly not run.
   # The unsaved stand-in carries exactly the values seeding would have written.
   def self.for_key(key)
     key = key.to_s

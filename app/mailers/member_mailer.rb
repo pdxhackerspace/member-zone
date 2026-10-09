@@ -6,6 +6,12 @@ class MemberMailer < ApplicationMailer
 
   UrgentDigestItem = Data.define(:title, :detail, :url)
 
+  PARKING_PERMIT_DEVICE_SUBJECTS = {
+    'parking_permit_form_link' => 'Fill in your parking permit',
+    'parking_permit_blank_issued' => 'Your parking permit',
+    'parking_permit_details_reminder' => 'Please fill in your parking permit'
+  }.freeze
+
   # Sent when a new member application is submitted
   def application_received(user)
     @user = user
@@ -227,6 +233,20 @@ class MemberMailer < ApplicationMailer
 
   def parking_ticket_final_reminder(user, opts = {})
     send_parking_notice_mail('parking_ticket_final_reminder', user, opts)
+  end
+
+  # Device-issued parking permits. These carry a no-login link that expires in hours, so they are
+  # delivered directly rather than parked in the mail queue for review.
+  def parking_permit_form_link(user, opts = {})
+    send_parking_permit_device_mail('parking_permit_form_link', user, opts)
+  end
+
+  def parking_permit_blank_issued(user, opts = {})
+    send_parking_permit_device_mail('parking_permit_blank_issued', user, opts)
+  end
+
+  def parking_permit_details_reminder(user, opts = {})
+    send_parking_permit_device_mail('parking_permit_details_reminder', user, opts)
   end
 
   def application_email_verification(email, opts = {})
@@ -845,6 +865,29 @@ class MemberMailer < ApplicationMailer
   rescue ArgumentError, ActionController::UrlGenerationError
     base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
     "#{base}/queued_mails/#{queued_mail.id}"
+  end
+
+  def send_parking_permit_device_mail(template_key, user, opts)
+    @user = user
+    @organization = organization_name
+    @template_key = template_key
+    vars = parking_permit_device_vars(user, opts)
+    vars.each { |name, value| instance_variable_set(:"@#{name}", value) }
+    return if send_from_template(template_key, user, vars)
+
+    mail(to: @user.email, subject: "#{@organization}: #{PARKING_PERMIT_DEVICE_SUBJECTS[template_key]}",
+         template_name: 'parking_permit_device_notice')
+  end
+
+  def parking_permit_device_vars(user, opts)
+    opts = opts.to_h.symbolize_keys
+    {
+      permit_form_url: opts[:permit_form_url].to_s,
+      permit_form_expires_at: opts[:permit_form_expires_at].to_s,
+      permit_expires_at: opts[:permit_expires_at].to_s,
+      device_name: opts[:device_name].presence || 'an access control device',
+      parking_notice_url: self.class.parking_notice_url_for(user, opts[:parking_notice_id])
+    }
   end
 
   def send_parking_notice_mail(template_key, user, opts = {})

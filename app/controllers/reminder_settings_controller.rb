@@ -1,5 +1,6 @@
 class ReminderSettingsController < AdminController
   include Pagy::Method
+  include ParkingPermitDetailsReminderData
 
   PER_PAGE = 50
 
@@ -9,6 +10,7 @@ class ReminderSettingsController < AdminController
     'payment_overdue' => Reminders::NotifyPaymentOverdue,
     'orientation' => Reminders::NotifyOrientation,
     'parking_notices' => Reminders::NotifyParkingNotices,
+    'parking_permit_details' => Reminders::NotifyParkingPermitDetails,
     'lapsed_access' => Reminders::NotifyLapsedAccess,
     'staff_application' => MembershipApplications::NotifyDirectorsOfStaleApplications
   }.freeze
@@ -21,6 +23,7 @@ class ReminderSettingsController < AdminController
     'payment_overdue' => 'payment_past_due',
     'orientation' => 'orientation_reminder',
     'parking_notices' => 'parking_permit_expiring_soon',
+    'parking_permit_details' => 'parking_permit_details_reminder',
     'lapsed_access' => 'lapsed_access_reminder',
     'staff_application' => 'staff_application_reminder'
   }.freeze
@@ -96,6 +99,7 @@ class ReminderSettingsController < AdminController
       'payment_overdue' => payment_overdue_counts(payment_overdue),
       'orientation' => orientation_counts,
       'parking_notices' => parking_notice_counts,
+      'parking_permit_details' => parking_permit_details_counts,
       'lapsed_access' => lapsed_access_counts,
       'staff_application' => staff_application_counts
     }
@@ -173,6 +177,7 @@ class ReminderSettingsController < AdminController
     when 'payment_overdue' then load_payment_overdue_show_data
     when 'orientation' then load_orientation_show_data
     when 'parking_notices' then load_parking_notices_show_data
+    when 'parking_permit_details' then load_parking_permit_details_show_data
     when 'lapsed_access' then load_lapsed_access_show_data
     when 'staff_application' then load_staff_application_show_data
     end

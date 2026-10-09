@@ -58,7 +58,14 @@ Rails.application.routes.draw do
   get  "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#show", as: :applicant_notification_opt_out
   post "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#create"
 
+  # Device webhooks authenticate with a per-device token (Settings → Webhook Devices).
+  post "/webhooks/devices/parking_permits", to: "device_webhooks#parking_permit", as: :device_parking_permit_webhook
   post "/webhooks/:slug", to: "webhooks#receive", as: :webhook_receive
+
+  # No-login parking permit form reached from a device-issued email link.
+  get   "/parking_permit/:token", to: "parking_permit_forms#show", as: :parking_permit_form
+  patch "/parking_permit/:token", to: "parking_permit_forms#update"
+  get   "/parking_permit/:token/pdf", to: "parking_permit_forms#pdf", as: :parking_permit_form_pdf
 
   # Impersonation
   post "/impersonate/:user_id", to: "impersonations#create", as: :impersonate_user, constraints: { user_id: /[^\/]+/ }
@@ -437,6 +444,13 @@ Rails.application.routes.draw do
       post :sync_all
       post :toggle_sync_inactive
       get :recent_logs
+    end
+  end
+
+  resources :webhook_devices, path: "settings/webhook_devices" do
+    member do
+      post :toggle
+      post :regenerate_token
     end
   end
 

@@ -37,6 +37,7 @@ class User < ApplicationRecord
   has_many :reported_incidents, class_name: 'IncidentReport', foreign_key: 'reporter_id', dependent: :nullify
   has_and_belongs_to_many :incident_reports, join_table: 'incident_report_members'
   has_many :parking_notices, dependent: :nullify
+  has_many :parking_permit_links, dependent: :delete_all
   has_many :membership_applications, -> { newest_first }, dependent: :nullify, inverse_of: :user
   has_many :invitations, dependent: :nullify
   has_many :sent_invitations, class_name: 'Invitation', foreign_key: 'invited_by_id', dependent: :nullify

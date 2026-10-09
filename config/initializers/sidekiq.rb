@@ -127,6 +127,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Blank Parking Permit Details Reminder - Daily at 8:10am (cadence enforced per permit)
+  Sidekiq::Cron::Job.create(
+    name: 'Blank Parking Permit Details Reminder - Daily at 8:10am',
+    cron: '10 8 * * *',
+    class: 'ParkingPermitDetailsReminderJob',
+    active_job: true
+  )
+
   # Login Link Expiration - Daily at 8am
   Sidekiq::Cron::Job.create(
     name: 'Login Link Expiration - Daily at 8am',

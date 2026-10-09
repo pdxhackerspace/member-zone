@@ -1,13 +1,17 @@
 class ParkingNotice < ApplicationRecord
   NOTICE_TYPES = %w[permit ticket].freeze
   STATUSES = %w[active expired cleared].freeze
+  # The longest permit a member can give themselves, whether on their own or at a device.
+  MAX_SELF_SERVICE_DURATION = 2.weeks
 
   belongs_to :user, optional: true
   belongs_to :issued_by, class_name: 'User'
   belongs_to :cleared_by, class_name: 'User', optional: true
   belongs_to :clearance_requested_by, class_name: 'User', optional: true
+  belongs_to :webhook_device, optional: true
 
   has_many :events, class_name: 'ParkingNoticeEvent', dependent: :destroy
+  has_many :parking_permit_links, dependent: :delete_all
   has_many_attached :photos
 
   # Set by controllers so history events can record who triggered the change.
@@ -18,6 +22,7 @@ class ParkingNotice < ApplicationRecord
   validates :expires_at, presence: true
   validates :user, presence: true, if: :permit?
 
+  before_save :mark_details_completed, if: :awaiting_details?
   after_create :log_opened_event
   after_update :log_renewal_event, if: :renewal_logged?
 
@@ -32,6 +37,8 @@ class ParkingNotice < ApplicationRecord
   scope :ordered, -> { order(expires_at: :asc) }
   scope :newest_first, -> { order(created_at: :desc) }
   scope :for_user, ->(user) { where(user: user) }
+  # Blank permits a device issued whose details the member has not recorded yet.
+  scope :awaiting_details, -> { where.not(details_requested_at: nil).where(details_completed_at: nil) }
 
   def permit?
     notice_type == 'permit'
@@ -51,6 +58,15 @@ class ParkingNotice < ApplicationRecord
 
   def cleared?
     status == 'cleared'
+  end
+
+  # A blank permit issued by a device, still waiting for the member to say what and where.
+  def awaiting_details?
+    details_requested_at.present? && details_completed_at.blank?
+  end
+
+  def details_present?
+    description.present? && location.present?
   end
 
   def past_expiration?
@@ -200,6 +216,12 @@ class ParkingNotice < ApplicationRecord
   end
 
   private
+
+  # However the details arrive — the no-login link, the member's own edit page, an admin — a blank
+  # permit stops being blank once it says what was parked and where, and its reminders stop.
+  def mark_details_completed
+    self.details_completed_at = Time.current if details_present?
+  end
 
   def log_opened_event
     log_event!('opened', actor: event_actor || issued_by)

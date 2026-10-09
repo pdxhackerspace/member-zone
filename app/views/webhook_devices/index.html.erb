@@ -1,0 +1,60 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Webhook Devices</h1>
+    <p class="text-muted mb-0">Access control devices that may call Member Zone's device webhooks, such as issuing parking permits.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <%= link_to "New Device", new_webhook_device_path, class: "btn btn-primary" %>
+    <%= link_to "Back to Settings", settings_path, class: "btn btn-outline-secondary" %>
+  </div>
+</div>
+
+<% if @webhook_devices.any? %>
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead class="bg-body-tertiary">
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Token</th>
+            <th scope="col">Last used</th>
+            <th scope="col">Enabled</th>
+            <th scope="col" class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @webhook_devices.each do |device| %>
+            <tr class="<%= 'text-body-secondary opacity-75' unless device.enabled? %>">
+              <td>
+                <%= link_to device.name, webhook_device_path(device), class: "fw-semibold text-decoration-none" %>
+                <% if device.description.present? %>
+                  <br><span class="text-muted small"><%= truncate(device.description, length: 60) %></span>
+                <% end %>
+              </td>
+              <td><code>…<%= device.token_hint %></code></td>
+              <td>
+                <% if device.last_used_at %>
+                  <%= time_ago_in_words(device.last_used_at) %> ago
+                  <% if device.last_used_ip.present? %><br><small class="text-muted"><%= device.last_used_ip %></small><% end %>
+                <% else %>
+                  <span class="text-muted">Never</span>
+                <% end %>
+              </td>
+              <td><%= device.enabled? ? "Yes" : "No" %></td>
+              <td class="text-end">
+                <%= button_to (device.enabled? ? "Disable" : "Enable"), toggle_webhook_device_path(device),
+                      method: :post, class: "btn btn-sm btn-outline-secondary", form: { class: "d-inline" } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <div class="card shadow-sm border-0">
+    <div class="card-body text-center text-muted py-5">
+      No webhook devices yet. Add one to issue it a token.
+    </div>
+  </div>
+<% end %>
