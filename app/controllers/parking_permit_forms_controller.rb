@@ -12,14 +12,11 @@ class ParkingPermitFormsController < ApplicationController
   end
 
   def update
-    unless @link.editable?
+    @parking_notice = (ParkingPermits::LinkSubmission.call(@link, permit_params) if @link.editable?)
+    if @parking_notice.nil?
       redirect_to parking_permit_form_path(token: params[:token]),
                   alert: 'This link can no longer be used to change the permit.'
-      return
-    end
-
-    @parking_notice = ParkingPermits::LinkSubmission.call(@link, permit_params)
-    if @parking_notice.errors.empty?
+    elsif @parking_notice.errors.empty?
       redirect_to parking_permit_form_path(token: params[:token]), notice: 'Your parking permit is saved.'
     else
       render :show, status: :unprocessable_content
