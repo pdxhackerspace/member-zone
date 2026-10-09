@@ -1,6 +1,10 @@
 class ParkingNotice < ApplicationRecord
+  include ParkingNoticeDeviceDetails
+
   NOTICE_TYPES = %w[permit ticket].freeze
   STATUSES = %w[active expired cleared].freeze
+  # The longest permit a member can give themselves, whether on their own or at a device.
+  MAX_SELF_SERVICE_DURATION = 2.weeks
 
   belongs_to :issued_by, class_name: 'User'
   belongs_to :cleared_by, class_name: 'User', optional: true

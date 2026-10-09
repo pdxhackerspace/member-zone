@@ -2,7 +2,7 @@ class MemberParkingPermitsController < AuthenticatedController
   include ParkingNoticeMemberParams
   include ParkingNoticePrinting
 
-  MAX_MEMBER_PERMIT_DURATION = 2.weeks
+  MAX_MEMBER_PERMIT_DURATION = ParkingNotice::MAX_SELF_SERVICE_DURATION
 
   before_action :set_owned_notice, only: %i[show edit update close request_clearance add_note print_notice]
   before_action :require_owned_permit, only: %i[edit update print_notice]

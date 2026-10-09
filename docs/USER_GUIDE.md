@@ -131,13 +131,34 @@ Changing the interval or the maximum changes which days those four emails land o
 
 Each notice runs its own sequence, so clearing one has no effect on another. Giving a notice a new expiration date starts its sequence over from the warning.
 
+### Blank parking permit reminder
+
+Reminds members who took a **blank** parking permit from an access control device (see [Parking permits from access control devices](#parking-permits-from-access-control-devices)) to record what they parked and where. **Ships enabled**, because the device only hands out a blank permit on the understanding that the member fills it in later. Members can opt out.
+
+**Timing** counts from the moment the device issued the permit: 1 day, then every 2, up to 3 reminders. It stops as soon as the permit has a description and location — whether the member used the emailed link, edited it from their profile, or an admin filled it in — and stops if the permit is cleared or expires.
+
+Each reminder carries a **fresh 12-hour link** to the permit form, so these are sent directly rather than held in the outbound mail review queue, where review could outlast the link. **Email copy** is editable under Settings → Email templates (`Parking Permit Details Reminder`).
+
 ### Stale application reminder
 
-Tells directors that a membership application has been sitting unreviewed. **This is the one reminder that ships enabled** — a review queue nobody is told about is exactly the problem it exists to prevent.
+Tells directors that a membership application has been sitting unreviewed. **This reminder ships enabled** — a review queue nobody is told about is exactly the problem it exists to prevent.
 
 It goes to reviewers rather than to the applicant, so there is nobody to opt out and the card does not offer a **Members can opt out** switch.
 
 **Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
+
+## Parking permits from access control devices
+
+Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. Each device needs a token, issued under **Settings → Webhook devices** (requires the *Manage access controllers* privilege). The token is shown **once**, when the device is created or its token is regenerated; copy it into the device's configuration then. Regenerating or disabling a device stops its old token working immediately, and the device page shows when and from where it last called.
+
+The device calls `POST /webhooks/devices/parking_permits` with its token in an `Authorization: Bearer …` header (or an `X-Device-Token` header, or a `token` parameter), identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
+
+- **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
+- **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.
+
+The device gets back JSON with the member's name and, for a blank permit, its id and expiry — enough to print a blank permit with the name on it. The form link itself only ever goes to the member's inbox. Banned and deceased members are refused, as are members with no email address when the mode is `link`.
+
+Permits issued this way show up on the member's profile like any other, and record which device issued them.
 
 ## Member notification preferences
 

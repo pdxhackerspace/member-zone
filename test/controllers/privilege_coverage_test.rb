@@ -26,7 +26,11 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     'login_links' => %w[request_link authenticate],
     'slack_account_links' => %w[new callback],
     # Signature/allowlist verified inside the action rather than by a filter.
-    'webhooks' => %w[receive]
+    'webhooks' => %w[receive],
+    # Per-device bearer token checked by DeviceWebhooksController#authenticate_device!.
+    'device_webhooks' => %w[parking_permit],
+    # The emailed 12-hour link: the token reaches one permit and signs nobody in.
+    'parking_permit_forms' => %w[show update pdf]
   }.freeze
 
   FILTER_NAMES = %w[require_authenticated_user! require_admin! require_privilege!

@@ -1,0 +1,16 @@
+Your parking permit
+
+Hello <%= @user.display_name %>,
+
+<% if @template_key == 'parking_permit_form_link' -%>
+You asked for a parking permit at <%= @device_name %>. Use the link below to fill it in and print it.
+<% else -%>
+You have a parking permit valid until <%= @permit_expires_at %>. Please record what you parked and where.
+<% end -%>
+
+<%= @permit_form_url %>
+
+This link works until <%= @permit_form_expires_at %> and does not sign you in to Member Zone.
+
+Best regards,
+The <%= @organization %> Team
