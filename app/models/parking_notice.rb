@@ -1,12 +1,17 @@
 class ParkingNotice < ApplicationRecord
+  include ParkingNoticeDeviceDetails
+
   NOTICE_TYPES = %w[permit ticket].freeze
   STATUSES = %w[active expired cleared].freeze
+  # The longest permit a member can give themselves, whether on their own or at a device.
+  MAX_SELF_SERVICE_DURATION = 2.weeks
 
-  belongs_to :user, optional: true
   belongs_to :issued_by, class_name: 'User'
   belongs_to :cleared_by, class_name: 'User', optional: true
   belongs_to :clearance_requested_by, class_name: 'User', optional: true
 
+  has_many :parking_notice_members, dependent: :destroy
+  has_many :members, through: :parking_notice_members, source: :user
   has_many :events, class_name: 'ParkingNoticeEvent', dependent: :destroy
   has_many_attached :photos
 
@@ -16,7 +21,7 @@ class ParkingNotice < ApplicationRecord
   validates :notice_type, presence: true, inclusion: { in: NOTICE_TYPES }
   validates :status, presence: true, inclusion: { in: STATUSES }
   validates :expires_at, presence: true
-  validates :user, presence: true, if: :permit?
+  validate :members_present_for_permit
 
   after_create :log_opened_event
   after_update :log_renewal_event, if: :renewal_logged?
@@ -31,7 +36,9 @@ class ParkingNotice < ApplicationRecord
   scope :remindable, -> { not_cleared.where(status: %w[active expired]) }
   scope :ordered, -> { order(expires_at: :asc) }
   scope :newest_first, -> { order(created_at: :desc) }
-  scope :for_user, ->(user) { where(user: user) }
+  scope :for_user, lambda { |user|
+    joins(:parking_notice_members).where(parking_notice_members: { user_id: user }).distinct
+  }
 
   def permit?
     notice_type == 'permit'
@@ -84,20 +91,71 @@ class ParkingNotice < ApplicationRecord
     parts.join(' — ')
   end
 
+  def member?(user)
+    return false if user.blank?
+
+    if members.loaded?
+      members.any? { |member| member.id == user.id }
+    else
+      parking_notice_members.exists?(user_id: user.id)
+    end
+  end
+
+  # Whoever issued a notice may take members off it; anyone else on it may only add.
+  def members_removable_by?(user)
+    new_record? || issued_by_id == user&.id
+  end
+
+  def members_label
+    members.map(&:parking_member_label).join(', ')
+  end
+
+  # Replaces the member list. Returns User records that were newly added.
+  def replace_members!(member_ids)
+    ids = Array(member_ids).filter_map { |raw| raw.presence&.to_i }.uniq
+    if permit? && ids.empty?
+      errors.add(:members, 'must include at least one member')
+      raise ActiveRecord::RecordInvalid, self
+    end
+
+    previous_ids = members.pluck(:id)
+
+    transaction do
+      parking_notice_members.where.not(user_id: ids).destroy_all
+      ids.each do |user_id|
+        parking_notice_members.find_or_create_by!(user_id: user_id)
+      end
+    end
+
+    members.reload
+    members.select { |member| ids.include?(member.id) && previous_ids.exclude?(member.id) }
+  end
+
+  def build_members_from_ids!(member_ids)
+    ids = Array(member_ids).filter_map { |raw| raw.presence&.to_i }.uniq
+    if persisted?
+      replace_members!(ids)
+    else
+      self.members = User.where(id: ids).to_a
+    end
+  end
+
+  def notify_issued!(recipients = members)
+    Array(recipients).filter_map do |member|
+      enqueue_notification!(issued_template_key, recipient: member)
+    end
+  end
+
   # A member may clear their own active or expired notice unless it has been
   # flagged as requiring admin clearance. Admins can always clear any
   # uncleared notice.
-  # The one privilege check in a member-facing model, so the order matters: a member keeps
-  # the right to clear their own notice, and each privilege only adds to that. The
-  # admin-clearance flag exists to hold a notice open until someone with the authority to
-  # clear it looks at it, so only that authority passes it.
   def clearable_by?(actor)
     return false if cleared? || actor.blank?
     return true if actor.admin? || actor.can?(:'parking.clear_admin_required')
     return false if requires_admin_clearance?
     return true if actor.can?(:'parking.manage_notices')
 
-    user_id == actor.id
+    member?(actor)
   end
 
   def clearance_requested?
@@ -134,40 +192,28 @@ class ParkingNotice < ApplicationRecord
   end
 
   def record_journal_entry!(action_name, actor: nil)
-    return if user.blank?
-
-    Journal.create!(
-      user: user,
-      actor_user: actor,
-      action: action_name,
-      changes_json: {
-        'parking_notice' => {
-          'id' => id,
-          'notice_type' => notice_type,
-          'location' => location_display,
-          'expires_at' => expires_at.strftime('%B %d, %Y'),
-          'description' => description.to_s.truncate(100)
-        }
-      },
-      changed_at: Time.current,
-      highlight: true
-    )
+    members.find_each do |member|
+      Journal.create!(
+        user: member,
+        actor_user: actor,
+        action: action_name,
+        changes_json: journal_payload,
+        changed_at: Time.current,
+        highlight: true
+      )
+    end
   end
 
-  def enqueue_notification!(template_key)
-    return unless user.present? && user.email.present?
+  def enqueue_notification!(template_key, recipient: nil)
+    targets = recipient.present? ? [recipient] : deliverable_members
+    results = targets.filter_map { |member| enqueue_notification_to!(template_key, member) }
+    return results.first if recipient.present?
 
-    QueuedMail.enqueue(
-      template_key,
-      user,
-      reason: "Parking #{notice_type}: #{template_key.humanize}",
-      location: location_display,
-      location_detail: location_detail.to_s,
-      description: description.to_s,
-      expires_at: expires_at.strftime('%B %d, %Y'),
-      notice_type: notice_type_display,
-      parking_notice_id: id
-    )
+    results
+  end
+
+  def deliverable_members
+    members.select { |member| member_deliverable?(member) }
   end
 
   def template_key_for_reminder_phase(phase)
@@ -201,6 +247,54 @@ class ParkingNotice < ApplicationRecord
 
   private
 
+  def members_present_for_permit
+    return unless permit?
+
+    count = parking_notice_members.reject(&:marked_for_destruction?).size
+    return if count.positive?
+
+    errors.add(:members, 'must include at least one member')
+  end
+
+  def journal_payload
+    {
+      'parking_notice' => {
+        'id' => id,
+        'notice_type' => notice_type,
+        'location' => location_display,
+        'expires_at' => expires_at.strftime('%B %d, %Y'),
+        'description' => description.to_s.truncate(100)
+      }
+    }
+  end
+
+  def enqueue_notification_to!(template_key, user)
+    return if user.blank? || user.email.blank?
+
+    QueuedMail.enqueue(
+      template_key,
+      user,
+      reason: "Parking #{notice_type}: #{template_key.humanize}",
+      location: location_display,
+      location_detail: location_detail.to_s,
+      description: description.to_s,
+      expires_at: expires_at.strftime('%B %d, %Y'),
+      notice_type: notice_type_display,
+      parking_notice_id: id
+    )
+  end
+
+  def member_deliverable?(member)
+    return false if member.blank? || member.email.blank?
+    return false if MailRecipientGuard.blocked?(member)
+    return false if MembershipState::TERMINAL_STATES.include?(member.membership_state)
+
+    category = NotificationCategory.reminder_backed.find { |entry| entry.reminder_key == 'parking_notices' }&.key
+    return true unless category && NotificationCategory.opt_out_allowed?(category)
+
+    !NotificationOptOut.opted_out?(member, category: category, channel: 'email')
+  end
+
   def log_opened_event
     log_event!('opened', actor: event_actor || issued_by)
   end
@@ -209,8 +303,6 @@ class ParkingNotice < ApplicationRecord
     log_event!('renewed', actor: event_actor)
   end
 
-  # Treat an expiration change (without a status change) as a renewal so it lands
-  # in the history. clear!/expire! change status, so they don't trip this.
   def renewal_logged?
     saved_change_to_expires_at? && !saved_change_to_status?
   end

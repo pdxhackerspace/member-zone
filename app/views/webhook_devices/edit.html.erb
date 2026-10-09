@@ -1,0 +1,14 @@
+<div class="mb-4">
+  <%= link_to "&larr; Back to #{@webhook_device.name}".html_safe, webhook_device_path(@webhook_device), class: "text-decoration-none" %>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h1 class="h4 mb-4">Edit Webhook Device</h1>
+        <%= render "form" %>
+      </div>
+    </div>
+  </div>
+</div>

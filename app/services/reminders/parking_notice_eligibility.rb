@@ -29,22 +29,10 @@ module Reminders
       NOT EXISTS (
         SELECT 1
         FROM queued_mails
-        WHERE queued_mails.recipient_id = parking_notices.user_id
-          AND queued_mails.mailer_action IN (#{REMINDER_MAILER_ACTIONS_SQL})
+        WHERE queued_mails.mailer_action IN (#{REMINDER_MAILER_ACTIONS_SQL})
           AND queued_mails.status IN ('pending', 'approved')
           AND queued_mails.sent_at IS NULL
           AND queued_mails.mailer_args ->> 'parking_notice_id' = parking_notices.id::text
-      )
-    SQL
-
-    DELIVERABLE_USER_SQL = <<~SQL.squish
-      parking_notices.user_id IS NOT NULL
-      AND EXISTS (
-        SELECT 1 FROM users
-        WHERE users.id = parking_notices.user_id
-          AND users.email IS NOT NULL
-          AND users.email ~ '\\S'
-          AND users.membership_state NOT IN (#{TERMINAL_MEMBERSHIP_STATES_SQL})
       )
     SQL
 
@@ -59,7 +47,7 @@ module Reminders
     def self.due(now: Time.current)
       ids = []
       candidates(now: now).find_each { |notice| ids << notice.id if due?(notice, now: now) }
-      ParkingNotice.where(id: ids).includes(:user).order(:expires_at)
+      ParkingNotice.where(id: ids).includes(:members).order(:expires_at)
     end
 
     def self.count_due(now: Time.current)
@@ -78,8 +66,7 @@ module Reminders
 
     def self.remindable?(notice)
       return false if notice.cleared?
-      return false if notice.user.blank? || notice.user.email.blank?
-      return false if MailRecipientGuard.blocked?(notice.user)
+      return false unless any_deliverable_member?(notice)
       return false if pending_reminder_mail?(notice)
 
       true
@@ -104,7 +91,6 @@ module Reminders
 
     def self.pending_reminder_mail?(notice)
       QueuedMail.where(
-        recipient: notice.user,
         status: %w[pending approved],
         sent_at: nil,
         mailer_action: REMINDER_MAILER_ACTIONS
@@ -119,11 +105,41 @@ module Reminders
     def self.remindable_scope
       ParkingNotice.not_cleared
                    .where(status: %w[active expired])
-                   .where(DELIVERABLE_USER_SQL)
+                   .where(deliverable_member_exists_sql)
                    .where(WITHOUT_PENDING_REMINDER_MAIL_SQL)
-                   .then do |scope|
-                     Notifications::EligibilityOptOuts.parking_notice_scope_excluding_opt_outs(scope, REMINDER_KEY)
-                   end
+    end
+
+    def self.any_deliverable_member?(notice)
+      notice.deliverable_members.any?
+    end
+
+    def self.deliverable_member_exists_sql
+      category = Notifications::EligibilityOptOuts.category_for_reminder(REMINDER_KEY)
+      opt_out_filter = if category && NotificationCategory.opt_out_allowed?(category)
+                         ActiveRecord::Base.sanitize_sql_array(
+                           ['AND NOT EXISTS (
+                              SELECT 1 FROM notification_opt_outs noo
+                              WHERE noo.user_id = users.id
+                                AND noo.category = ?
+                                AND noo.channel = ?
+                            )', category, 'email']
+                         )
+                       else
+                         ''
+                       end
+
+      <<~SQL.squish
+        EXISTS (
+          SELECT 1
+          FROM parking_notice_members pnm
+          INNER JOIN users ON users.id = pnm.user_id
+          WHERE pnm.parking_notice_id = parking_notices.id
+            AND users.email IS NOT NULL
+            AND users.email ~ '\\S'
+            AND users.membership_state NOT IN (#{TERMINAL_MEMBERSHIP_STATES_SQL})
+            #{opt_out_filter}
+        )
+      SQL
     end
   end
 end

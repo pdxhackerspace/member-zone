@@ -17,6 +17,8 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/New Parking Permit/i, response.body)
     assert_expiration_quick_buttons
+    # The member is always on their own permit, so the picker must not claim it is empty.
+    assert_select '[data-member-picker-fixed-count-value="1"]'
   end
 
   test 'member can create own parking permit' do
@@ -37,7 +39,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     notice = ParkingNotice.order(:created_at).last
     assert_equal 'permit', notice.notice_type
     assert_equal 'active', notice.status
-    assert_equal member.id, notice.user_id
+    assert notice.member?(member)
     assert_equal member.id, notice.issued_by_id
     assert_redirected_to user_path(member, tab: :parking)
   end
@@ -75,22 +77,118 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/must be within 2 weeks/i, response.body)
   end
 
-  test 'member cannot extend permit beyond 2 weeks' do
+  test 'member cannot create permit with two week quick pick time past the max window' do
     sign_in_as_member
-    permit = member_permit
+    travel_to Time.zone.local(2026, 10, 5, 8, 0, 0) do
+      # Calendar day + 5pm would land after the true two-week limit from now.
+      too_late = 14.days.from_now.change(hour: 17, min: 0)
 
-    assert_no_changes -> { permit.reload.expires_at } do
+      assert_no_difference 'ParkingNotice.count' do
+        post member_parking_permits_path, params: {
+          parking_notice: {
+            description: 'Late afternoon pick',
+            location: 'Woodshop',
+            expires_at: too_late.strftime('%Y-%m-%dT%H:%M')
+          }
+        }
+      end
+
+      assert_response :unprocessable_content
+      assert_match(/must be within 2 weeks/i, response.body)
+    end
+  end
+
+  test 'member cannot extend permit beyond 2 weeks from creation' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 10, 1, 10, 0, 0) do
+      permit = member_permit
+      travel 8.days
+
+      assert_no_changes -> { permit.reload.expires_at } do
+        patch member_parking_permit_path(permit), params: {
+          parking_notice: {
+            description: permit.description,
+            location: permit.location,
+            expires_at: 15.days.after(permit.created_at).strftime('%Y-%m-%dT%H:%M')
+          }
+        }
+      end
+
+      assert_response :unprocessable_content
+      assert_match(/must be within 2 weeks/i, response.body)
+    end
+  end
+
+  test 'member can update permit when expiration exceeds self-service cap if unchanged' do
+    sign_in_as_member
+    permit = travel_to(Time.zone.local(2026, 1, 1, 10, 0, 0)) { member_permit_for(current_member) }
+
+    permit.update_columns(created_at: 20.days.ago, expires_at: 10.days.from_now)
+    expires_param = permit.expires_at.strftime('%Y-%m-%dT%H:%M')
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: {
+        description: 'Updated description',
+        location: permit.location,
+        expires_at: expires_param
+      }
+    }
+
+    assert_redirected_to user_path(current_member, tab: :parking)
+    assert_equal 'Updated description', permit.reload.description
+  end
+
+  test 'failed create form caps expiration at self-service limit not invalid value' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 6, 1, 12, 0, 0) do
+      assert_no_difference 'ParkingNotice.count' do
+        post member_parking_permits_path, params: {
+          parking_notice: {
+            description: 'Too long',
+            location: 'Woodshop',
+            expires_at: 3.weeks.from_now.strftime('%Y-%m-%dT%H:%M')
+          }
+        }
+      end
+
+      cap = 2.weeks.from_now.strftime('%Y-%m-%dT%H:%M')
+      assert_response :unprocessable_content
+      assert_select '[data-quick-expire-max-at-value=?]', cap
+      assert_select 'input[name="parking_notice[expires_at]"][max=?]', cap
+    end
+  end
+
+  test 'grandfathered permit edit uses self-service cap for quick-expire only' do
+    sign_in_as_member
+    permit = travel_to(Time.zone.local(2026, 1, 1, 10, 0, 0)) { member_permit_for(current_member) }
+    permit.update_columns(created_at: 20.days.ago, expires_at: 10.days.from_now)
+
+    get edit_member_parking_permit_path(permit)
+
+    cap = 2.weeks.after(permit.created_at).strftime('%Y-%m-%dT%H:%M')
+    assert_response :success
+    assert_select '[data-quick-expire-max-at-value=?]', cap
+    assert_select 'input[name="parking_notice[expires_at]"][max]', false
+  end
+
+  test 'failed update with rejected extension keeps input max constraint' do
+    sign_in_as_member
+    travel_to Time.zone.local(2026, 10, 1, 10, 0, 0) do
+      permit = member_permit
+      cap = 2.weeks.after(permit.created_at)
+      beyond = cap + 1.day
+
       patch member_parking_permit_path(permit), params: {
         parking_notice: {
           description: permit.description,
           location: permit.location,
-          expires_at: 1.month.from_now.strftime('%Y-%m-%dT%H:%M')
+          expires_at: beyond.strftime('%Y-%m-%dT%H:%M')
         }
       }
-    end
 
-    assert_response :unprocessable_content
-    assert_match(/must be within 2 weeks/i, response.body)
+      assert_response :unprocessable_content
+      assert_select 'input[name="parking_notice[expires_at]"][max=?]', cap.strftime('%Y-%m-%dT%H:%M')
+    end
   end
 
   test 'anonymous user cannot access member permit form' do
@@ -101,10 +199,7 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
   test 'member can close own active permit' do
     sign_in_as_member
     member = User.find_by(authentik_id: "local:#{local_accounts(:regular_member).id}")
-    permit = member.parking_notices.create!(
-      notice_type: 'permit', status: 'active', issued_by: member,
-      expires_at: 3.days.from_now, description: 'Done early', location: 'Woodshop'
-    )
+    permit = member_permit_for(member)
 
     patch close_member_parking_permit_path(permit)
 
@@ -441,6 +536,91 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
+  test 'member_search hides private profiles' do
+    sign_in_as_member
+    private_member = users(:two)
+    private_member.update!(profile_visibility: 'private')
+
+    get member_search_member_parking_permits_path, params: { q: private_member.username[0, 2] },
+                                                   headers: { 'Accept' => 'application/json' }
+
+    assert_response :success
+    ids = response.parsed_body.pluck('id')
+    assert_not_includes ids, private_member.id
+  end
+
+  test 'member cannot add a private-profile member to their permit' do
+    sign_in_as_member
+    private_member = users(:two)
+    private_member.update!(profile_visibility: 'private')
+
+    post member_parking_permits_path, params: {
+      parking_notice: {
+        description: 'Solo project',
+        location: 'Woodshop',
+        expires_at: 3.days.from_now.strftime('%Y-%m-%dT%H:%M'),
+        member_ids: [private_member.id]
+      }
+    }
+
+    notice = ParkingNotice.order(:created_at).last
+    assert notice.member?(current_member)
+    assert_not notice.member?(private_member)
+  end
+
+  test 'a member who did not issue a shared permit cannot remove anyone from it' do
+    sign_in_as_member
+    issuer = users(:two)
+    permit = member_permit_for(issuer)
+    permit.replace_members!([issuer.id, current_member.id])
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: 'Mine now', location: permit.location, member_ids: [''] }
+    }
+
+    assert_redirected_to user_path(current_member, tab: :parking)
+    assert_equal [issuer.id, current_member.id].sort, permit.reload.members.ids.sort
+  end
+
+  test 'the edit form shows a non-issuer the existing members as fixed' do
+    sign_in_as_member
+    issuer = users(:two)
+    permit = member_permit_for(issuer)
+    permit.replace_members!([issuer.id, current_member.id])
+
+    get edit_member_parking_permit_path(permit)
+
+    assert_select '[data-member-picker-fixed-count-value="2"]'
+    assert_select "input[type=hidden][name='parking_notice[member_ids][]'][value='#{issuer.id}']", count: 0
+  end
+
+  test 'the issuer can remove another member from their permit' do
+    sign_in_as_member
+    other = users(:two)
+    permit = member_permit
+    permit.replace_members!([current_member.id, other.id])
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: permit.description, location: permit.location, member_ids: [''] }
+    }
+
+    assert_equal [current_member.id], permit.reload.members.ids
+  end
+
+  test 'the issuer keeps a member already on the permit whose profile they cannot see' do
+    sign_in_as_member
+    private_member = users(:two)
+    permit = member_permit
+    permit.replace_members!([current_member.id, private_member.id])
+    private_member.update!(profile_visibility: 'private')
+
+    patch member_parking_permit_path(permit), params: {
+      parking_notice: { description: permit.description, location: permit.location, member_ids: [private_member.id] }
+    }
+
+    assert permit.reload.member?(private_member)
+  end
+
   private
 
   def current_member
@@ -448,17 +628,26 @@ class MemberParkingPermitsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def member_permit(status: 'active')
-    current_member.parking_notices.create!(
-      notice_type: 'permit', status: status, issued_by: current_member,
+    member_permit_for(current_member, status: status)
+  end
+
+  def member_permit_for(member, status: 'active')
+    notice = ParkingNotice.new(
+      notice_type: 'permit', status: status, issued_by: member,
       expires_at: 3.days.from_now, description: 'My item', location: 'Woodshop'
     )
+    notice.build_members_from_ids!([member.id])
+    notice.save!
+    notice
   end
 
   def member_ticket
-    ParkingNotice.create!(
-      notice_type: 'ticket', status: 'active', user: current_member, issued_by: current_member,
+    notice = ParkingNotice.create!(
+      notice_type: 'ticket', status: 'active', issued_by: users(:one),
       expires_at: 3.days.from_now, description: 'Enforcement', location: 'Main Area'
     )
+    notice.replace_members!([current_member.id])
+    notice
   end
 
   def sign_in_as_member

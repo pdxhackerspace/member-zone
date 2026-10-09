@@ -68,9 +68,9 @@ gem 'rqrcode', '~> 3.2'
 gem 'bcrypt', '~> 3.1'
 
 # Error tracking
-gem 'sentry-rails', '~> 7.0'
+gem 'sentry-rails', '~> 7.1'
 gem 'sentry-ruby', '~> 7.0'
-gem 'sentry-sidekiq', '~> 7.0'
+gem 'sentry-sidekiq', '~> 7.1'
 gem 'stackprof'
 
 # SSH client for Ruby scripts
@@ -85,7 +85,7 @@ gem 'bootsnap', require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # ruby-vips backs the default :vips variant processor; Active Storage requires it
 # eagerly at boot, so it must be declared even though nothing calls it directly.
-gem 'image_processing', '~> 2.1'
+gem 'image_processing', '~> 2.2'
 gem 'ruby-vips', '~> 2.2'
 
 # csv is no longer a default gem starting in Ruby 3.4

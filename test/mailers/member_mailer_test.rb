@@ -234,7 +234,7 @@ class MemberMailerTest < ActionMailer::TestCase
     EmailTemplate.where(key: 'parking_permit_issued').delete_all
     notice = parking_notices(:active_permit)
 
-    mail = MemberMailer.parking_permit_issued(notice.user, **parking_notice_opts(notice))
+    mail = MemberMailer.parking_permit_issued(notice.members.first, **parking_notice_opts(notice))
 
     html = mail.html_part&.body&.decoded || mail.body.decoded
     assert_includes html, "http://www.example.com/member_parking_permits/#{notice.id}"
@@ -245,7 +245,7 @@ class MemberMailerTest < ActionMailer::TestCase
     EmailTemplate.where(key: 'parking_ticket_expired').delete_all
     notice = parking_notices(:expired_ticket)
 
-    mail = MemberMailer.parking_ticket_expired(notice.user, **parking_notice_opts(notice))
+    mail = MemberMailer.parking_ticket_expired(notice.members.first, **parking_notice_opts(notice))
 
     html = mail.html_part&.body&.decoded || mail.body.decoded
     assert_includes html, "http://www.example.com/member_parking_permits/#{notice.id}"
@@ -257,7 +257,7 @@ class MemberMailerTest < ActionMailer::TestCase
   test 'parking notice template variables carry the member-facing notice link' do
     notice = parking_notices(:active_permit)
 
-    variables = MemberMailer.build_template_variables(notice.user, parking_notice_opts(notice))
+    variables = MemberMailer.build_template_variables(notice.members.first, parking_notice_opts(notice))
 
     assert_equal "http://www.example.com/member_parking_permits/#{notice.id}", variables[:parking_notice_url]
   end

@@ -59,12 +59,22 @@ class NotificationCategory
       reminder_key: 'lapsed_access',
       mailer_actions: %w[lapsed_access_reminder]
     },
+    'parking_permit_details' => {
+      name: 'Parking permit details reminders',
+      description: 'Reminders to fill in a blank parking permit online.',
+      group: 'Reminders',
+      reminder_key: 'parking_permit_details',
+      mailer_actions: %w[parking_permit_details_reminder]
+    },
+    # The device-issued emails sit here because the member asked for them at the kiosk moments
+    # earlier, and the form link is the only way to get the permit they asked for.
     'parking_issued' => {
       name: 'Parking notices issued',
       description: 'Confirmation when a parking permit or ticket is created for you.',
       group: 'Parking',
       reminder_key: nil,
-      mailer_actions: %w[parking_permit_issued parking_ticket_issued]
+      mailer_actions: %w[parking_permit_issued parking_ticket_issued parking_permit_form_link
+                         parking_permit_blank_issued]
     },
     'membership_status' => {
       name: 'Membership status updates',
@@ -100,6 +110,14 @@ class NotificationCategory
       group: 'Messages',
       reminder_key: nil,
       mailer_actions: %w[message_received]
+    },
+    'credentials' => {
+      name: 'Credential notices',
+      description: 'Warnings before your API keys and app passwords expire, and notices when they are revoked.',
+      group: 'Account',
+      reminder_key: nil,
+      opt_out: true,
+      mailer_actions: %w[credential_expiring_soon credential_expired credentials_revoked]
     },
     'account_security' => {
       name: 'Account security',

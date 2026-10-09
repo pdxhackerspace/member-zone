@@ -12,6 +12,19 @@
     </div>
   <% end %>
 
+  <% removable = parking_notice.members_removable_by?(current_user) %>
+  <% others = parking_notice.members.reject { |member| member.id == current_user.id } %>
+  <div class="mb-3">
+    <%= render 'parking_notices/member_picker',
+        field_name: 'parking_notice[member_ids][]',
+        label: 'Who else is on this permit?',
+        help_text: "They'll see this permit, can clear it, and get its reminders.",
+        required: false,
+        member_search_url: member_search_member_parking_permits_path,
+        fixed_members: removable ? [current_user] : [current_user, *others],
+        selected_members: removable ? others : [] %>
+  </div>
+
   <div class="mb-3">
     <%= f.label :description, class: 'form-label' %>
     <%= f.text_area :description, class: 'form-control', rows: 3, placeholder: 'Describe your project or item...' %>
@@ -28,17 +41,27 @@
     </div>
   </div>
 
-  <% max_expires_at = MemberParkingPermitsController::MAX_MEMBER_PERMIT_DURATION.from_now %>
-  <div class="mt-3 mb-4" data-controller="quick-expire">
+  <% permit_anchor = parking_notice.persisted? ? parking_notice.created_at : Time.current %>
+  <% self_service_cap = permit_anchor + MemberParkingPermitsController::MAX_MEMBER_PERMIT_DURATION %>
+  <% self_service_cap_value = self_service_cap.strftime('%Y-%m-%dT%H:%M') %>
+  <% stored_expires_at = parking_notice.persisted? ? parking_notice.expires_at_in_database : nil %>
+  <% grandfathered_expiration = stored_expires_at.present? && stored_expires_at > self_service_cap %>
+  <div class="mt-3 mb-4"
+       data-controller="quick-expire"
+       data-quick-expire-exact-value="true"
+       data-quick-expire-max-at-value="<%= self_service_cap_value %>">
     <%= f.label :expires_at, 'Expiration', class: 'form-label' %>
     <div class="text-12 text-secondary mb-2">Self-service permits cannot exceed 2 weeks.</div>
     <%= render 'expiration_quick_buttons' %>
-    <%= f.datetime_local_field :expires_at,
-                               class: 'form-control',
-                               required: true,
-                               max: max_expires_at.strftime('%Y-%m-%dT%H:%M'),
-                               data: { quick_expire_target: 'field' },
-                               value: parking_notice.expires_at&.strftime('%Y-%m-%dT%H:%M') %>
+    <% expires_at_field_options = {
+         class: 'form-control',
+         required: true,
+         include_seconds: false,
+         data: { quick_expire_target: 'field' },
+         value: parking_notice.expires_at&.strftime('%Y-%m-%dT%H:%M')
+       } %>
+    <% expires_at_field_options[:max] = self_service_cap_value unless grandfathered_expiration %>
+    <%= f.datetime_local_field :expires_at, **expires_at_field_options %>
   </div>
 
   <div class="d-flex gap-2">

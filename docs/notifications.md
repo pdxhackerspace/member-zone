@@ -27,6 +27,7 @@ The **anchor** is the timestamp a reminder counts from, and each `Reminders::*El
 | `payment_overdue` | when the member fell behind | +5, every 7, unlimited |
 | `orientation` | `users.membership_approved_at` | +14, every 14, unlimited |
 | `parking_notices` | `parking_notices.expires_at` | −3, every 7, max 4 |
+| `parking_permit_details` | `parking_notices.details_requested_at` | +1, every 2, max 3 |
 | `lapsed_access` | the earliest visit not yet mentioned | +0, daily, unlimited |
 | `staff_application` | `submitted_at` or `created_at` | +7, every 3, unlimited |
 

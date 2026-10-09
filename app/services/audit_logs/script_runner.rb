@@ -45,7 +45,7 @@ module AuditLogs
     private
 
     def execute(env, command)
-      Open3.popen3(env, *command, pgroup: true) do |stdin, stdout, stderr, thread|
+      Open3.popen3(env, direct(command), *command.drop(1), pgroup: true) do |stdin, stdout, stderr, thread|
         stdin.close
         out = Thread.new { stdout.read }
         err = Thread.new { stderr.read }
@@ -58,6 +58,13 @@ module AuditLogs
                      exit_code: nil, timed_out: true)
         end
       end
+    end
+
+    # [path, argv0] is the form that never goes through a shell. A bare path string would: with
+    # no arguments popen3 hands it to Process.spawn as one command string, so a path with a
+    # space or a metacharacter in it would be split or interpreted instead of run.
+    def direct(command)
+      [command.first, command.first]
     end
 
     # The program was started as its own process group leader, so the whole group goes: a

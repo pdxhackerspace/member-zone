@@ -13,6 +13,7 @@ module Reminders
         'payment_overdue' => PaymentOverdueEligibility,
         'orientation' => OrientationEligibility,
         'parking_notices' => ParkingNoticeEligibility,
+        'parking_permit_details' => ParkingPermitDetailsEligibility,
         'lapsed_access' => LapsedAccessEligibility,
         'staff_application' => StaleApplicationEligibility
       }[reminder_key.to_s]
@@ -29,7 +30,7 @@ module Reminders
       args = mailer_args.is_a?(Hash) ? mailer_args : {}
 
       case reminder_key.to_s
-      when 'parking_notices' then ParkingNotice.find_by(id: args['parking_notice_id'])
+      when 'parking_notices', 'parking_permit_details' then ParkingNotice.find_by(id: args['parking_notice_id'])
       when 'application_link' then ApplicationVerification.find_by(id: args['application_verification_id'])
       else recipient
       end

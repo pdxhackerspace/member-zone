@@ -27,6 +27,8 @@ The **Send now** button runs the reminder immediately against everyone the caden
 
 Every parking permit and ticket email ends with a link to the notice it is about, so the member can open it, add a note, or clear it without hunting through their profile. The link is the `{{parking_notice_url}}` variable, and it points at the member's own view of the notice rather than the admin page.
 
+A permit or ticket can list **multiple members**. Everyone on the notice sees it on their parking tab, can clear it (unless it requires admin clearance), and receives the issued and reminder emails. When creating a permit, members can add other active members whose profiles are visible to them (search by username). Staff can add anyone when creating or editing a notice. Newly added members receive the issued email when they are put on an existing notice.
+
 ### Slack signup reminder
 
 Reminds **active members without a linked Slack account** to join the workspace. The daily job runs at 7:00 AM.
@@ -129,13 +131,34 @@ Changing the interval or the maximum changes which days those four emails land o
 
 Each notice runs its own sequence, so clearing one has no effect on another. Giving a notice a new expiration date starts its sequence over from the warning.
 
+### Blank parking permit reminder
+
+Reminds members who took a **blank** parking permit from an access control device (see [Parking permits from access control devices](#parking-permits-from-access-control-devices)) to record what they parked and where. **Ships enabled**, because the device only hands out a blank permit on the understanding that the member fills it in later. Members can opt out.
+
+**Timing** counts from the moment the device issued the permit: 1 day, then every 2, up to 3 reminders. It stops as soon as the permit has a description and location — whether the member used the emailed link, edited it from their profile, or an admin filled it in — and stops if the permit is cleared or expires.
+
+Each reminder carries a **fresh 12-hour link** to the permit form, so these are sent directly rather than held in the outbound mail review queue, where review could outlast the link. **Email copy** is editable under Settings → Email templates (`Parking Permit Details Reminder`).
+
 ### Stale application reminder
 
-Tells directors that a membership application has been sitting unreviewed. **This is the one reminder that ships enabled** — a review queue nobody is told about is exactly the problem it exists to prevent.
+Tells directors that a membership application has been sitting unreviewed. **This reminder ships enabled** — a review queue nobody is told about is exactly the problem it exists to prevent.
 
 It goes to reviewers rather than to the applicant, so there is nobody to opt out and the card does not offer a **Members can opt out** switch.
 
 **Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
+
+## Parking permits from access control devices
+
+Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. Each device needs a token, issued under **Settings → Webhook devices** (requires the *Manage access controllers* privilege). The token is shown **once**, when the device is created or its token is regenerated; copy it into the device's configuration then. Regenerating or disabling a device stops its old token working immediately, and the device page shows when and from where it last called.
+
+The device calls `POST /webhooks/devices/parking_permits` with its token in an `Authorization: Bearer …` header (or an `X-Device-Token` header, or a `token` parameter), identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
+
+- **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
+- **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.
+
+The device gets back JSON with the member's name and, for a blank permit, its id and expiry — enough to print a blank permit with the name on it. The form link itself only ever goes to the member's inbox. Banned and deceased members are refused, as are members with no email address when the mode is `link`.
+
+Permits issued this way show up on the member's profile like any other, and record which device issued them.
 
 ## Member notification preferences
 
@@ -162,6 +185,28 @@ Administrators (and anyone with *Configure audit log sources and alert rules*) u
 The run history on the source's page shows each run's status, how many entries were new, and anything the program wrote to its error output. A source that has entries cannot be deleted; disable it instead.
 
 Alert emails can be turned off under **Notifications** (the *Audit log alerts* row appears only for people who receive them). See `docs/audit-logs.md` for how programs are written.
+
+## Credentials
+
+### Requesting a credential (members)
+
+**Your credentials** on your dashboard lists the API keys and app passwords issued to you, and the systems you can request one from. Each system shows why you cannot request one if that is the case (for example, training you still need, or that you already have the most allowed).
+
+1. Choose a system and, if you like, say what it is for ("laptop CLI").
+2. **Request credential.** The next page shows the new secret **once**. Copy it somewhere safe before leaving; we keep only its first and last four characters, so we cannot show it again. If you did not save it, revoke it and request a new one.
+3. Afterwards the list shows each credential as `abcd…wxyz` (things that are not secret, like a client ID, are shown whole), its status and when it expires.
+
+**Replace** issues a new credential and revokes the old one in one step. **Revoke** switches one off at once.
+
+Your credentials are revoked automatically when your membership stops being active. If your key access is paused they are paused too, or revoked when the system cannot pause them. Reactivating your membership does not bring them back; request new ones. We email you a week before a credential expires, when it expires, and when we revoke any. You can turn these emails off under **Notifications** (*Credential notices*).
+
+### Administering credentials
+
+- **Settings → Credential providers** (needs *Configure credential providers*). **New provider**: choose the program from the list, add arguments and environment variables (API tokens, stored encrypted and never shown again — leave the box blank when editing to keep them), optionally require training topics (a member needs all of them), set the most per member, and choose whether members can request their own. Saving asks the program what it issues. The provider's page shows the schema, health, recent runs and the buttons **Check health**, **Refresh schema**, **Disable**, **Revoke all** and **Delete** (only for a provider that has never issued anything).
+- **Admin → Credentials** (needs *View every issued credential*) lists every credential with filters for provider, status, member and "expiring in 14 days". **Revoke** needs *Revoke any member's credentials*. **Issue for member** and **Rotate** need *Issue and rotate credentials for members*: enter the member's full email address; you will see the secret once and must give it to them yourself. You cannot issue or rotate while viewing as a member.
+- Providers and revocations that need attention appear on the settings page, the admin dashboard and the urgent digest. A revocation that fails is retried daily, backing off up to a day.
+
+See `docs/credentials.md` for how programs are written, and the `Credentials administrator` role for the four `credentials.*` privileges.
 
 ## Membership states
 

@@ -57,6 +57,9 @@ module SettingsHelper
         attention_count: settings_attention_counts[:access_controllers] },
       { category: 'Access & hardware', title: 'Access controller types', privilege: :'access.manage_controller_types',
         desc: 'SSH script types and optional access tokens.', path: access_controller_types_path },
+      { category: 'Access & hardware', title: 'Webhook devices', privilege: :'access.manage_controllers',
+        desc: 'Tokens for devices that call Member Zone, such as parking permit kiosks.',
+        path: webhook_devices_path },
       { category: 'Access & hardware', title: 'Authentik webhooks', privilege: :'settings.authentik_webhooks',
         desc: 'User and group change notifications from Authentik.', path: authentik_webhooks_path },
       { category: 'Access & hardware', title: 'Incoming webhooks', privilege: :'webhooks.incoming.manage',
@@ -132,6 +135,9 @@ module SettingsHelper
       { category: 'System', title: 'Audit log sources', privilege: :'audit_logs.manage',
         desc: 'Programs that feed the audit log, their schedules, and alert rules.',
         path: audit_log_sources_path },
+      { category: 'System', title: 'Credential providers', privilege: :'credentials.manage_providers',
+        desc: 'Programs that issue API keys and app passwords to members, and their health.',
+        path: credential_providers_path, attention_count: settings_attention_counts[:credential_providers] },
       # Roles hand out privileges, so managing them stays with administrators until the
       # no-escalation containment in User#may_confer? is proven under privilege gates.
       { category: 'System', title: 'Roles',

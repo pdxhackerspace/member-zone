@@ -95,6 +95,33 @@ bin/rails 'audit_logs:preview[Door log]'   # dry run: prints what would be store
 bin/rails 'audit_logs:run[Door log]'       # runs it and stores the result
 ```
 
+## Bundled programs
+
+`scripts/audit-log/` in this repository holds programs ready to use as sources. Point a source's program path at
+the file (in the production image it is under `/rails/scripts/audit-log/`) or copy it beside your access
+controller scripts.
+
+### `unifi_protect.rb`: UniFi Protect events
+
+Ruby, standard library only. Configure the source's environment variables:
+
+| Variable | |
+| --- | --- |
+| `UNIFI_API_KEY` | Required. Create one in UniFi OS → Control Plane → Integrations. |
+| `UNIFI_HOST` | Required. Console address, with a port if it is not 443. |
+| `UNIFI_LISTEN_SECONDS` | Optional. Listening window, default 240, capped at 540 (a run is stopped at 10 minutes). |
+| `UNIFI_INSECURE` | Optional. `1` skips certificate verification, for consoles with a self-signed certificate. |
+| `UNIFI_CA_FILE` | Optional. A PEM file to trust instead. |
+
+It prints one entry per event (start and end are separate entries), with camera, sensor and door lock names
+looked up from the console. Exit 1 means the run failed (bad key, console unreachable); exit 2 means it is not
+configured.
+
+**It cannot backfill.** An API key only reaches UniFi's Integration API, which has no event history: events are
+delivered live over a WebSocket. The program listens for its window each run, so anything that happens between
+runs is missed. Schedule the source hourly with a long window to sample activity; it is not a complete record.
+Try it with **Test run** before scheduling.
+
 ## Entries cannot be deleted
 
 There is no delete route, and the model refuses `destroy`, `delete`, `delete_all`, `destroy_all`, `delete_by`
@@ -114,6 +141,11 @@ After a run, every *newly stored* entry is tested against the enabled rules (an 
 program never alerts twice). Matching entries are stamped with the rules that matched, and each recipient
 gets **one** email per run listing the matches (up to 50; the total is in the subject), built from the
 `audit_log_alert` email template.
+
+An entry counts as checked only once its emails have been handed to the mail queue. If that fails, the run
+still succeeds (the failure is noted on the run and reported) and the entries are checked again on the next
+run, so an alert is delayed rather than lost. A recipient reached before the failure may get a second copy.
+Entries stored before a rule existed are never re-checked against it.
 
 Patterns are checked with a one-second budget per match, so a pattern that backtracks badly is skipped rather
 than stalling the job.

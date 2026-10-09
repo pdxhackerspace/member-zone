@@ -12,8 +12,15 @@ import { Controller } from "@hotwired/stimulus"
 //        data-live-filter-min-length-value="2"
 //        data-member-picker-field-name-value="model[member_ids][]">
 export default class extends Controller {
-  static targets = ["search", "selected", "inputs", "result", "empty", "template"]
-  static values = { fieldName: String }
+  static targets = ["search", "selected", "inputs", "result", "empty", "template", "resultsContainer", "noResults"]
+  static values = {
+    fieldName: String,
+    searchUrl: String,
+    searchMinLength: { type: Number, default: 1 },
+    // Members shown outside the picker who always belong to the selection (the
+    // signed-in member on their own permit), so the list is never "empty".
+    fixedCount: { type: Number, default: 0 }
+  }
 
   connect() {
     this.selectedTarget.replaceChildren()
@@ -80,7 +87,7 @@ export default class extends Controller {
       row.querySelector("[data-member-added]")?.classList.toggle("d-none", !added)
     })
 
-    this.emptyTarget.classList.toggle("d-none", selected.size > 0)
+    this.emptyTarget.classList.toggle("d-none", selected.size + this.fixedCountValue > 0)
   }
 
   _resetSearch() {
@@ -88,6 +95,87 @@ export default class extends Controller {
     // Hands control of result visibility back to live-filter rather than
     // hiding the list here.
     this.searchTarget.dispatchEvent(new Event("input", { bubbles: true }))
+    if (this.hasResultsContainerTarget) {
+      this.resultsContainerTarget.classList.add("d-none")
+      // Server search builds rows in JS; admin live-filter keeps its roster in the DOM.
+      if (this.searchUrlValue) {
+        this.resultsContainerTarget.replaceChildren()
+      }
+    }
+    if (this.hasNoResultsTarget) {
+      this.noResultsTarget.classList.add("d-none")
+    }
     this.searchTarget.focus()
+  }
+
+  queryServer() {
+    if (!this.searchUrlValue) return
+
+    clearTimeout(this.serverSearchTimeout)
+    this.serverSearchTimeout = setTimeout(() => this._runServerSearch(), 250)
+  }
+
+  async _runServerSearch() {
+    const term = this.searchTarget.value.trim()
+    if (term.length < this.searchMinLengthValue) {
+      if (this.hasResultsContainerTarget) {
+        this.resultsContainerTarget.classList.add("d-none")
+        this.resultsContainerTarget.replaceChildren()
+      }
+      if (this.hasNoResultsTarget) this.noResultsTarget.classList.add("d-none")
+      return
+    }
+
+    const response = await fetch(`${this.searchUrlValue}?q=${encodeURIComponent(term)}`, {
+      headers: { Accept: "application/json" }
+    })
+    if (!response.ok) return
+
+    const users = await response.json()
+    this._renderServerResults(users)
+  }
+
+  _renderServerResults(users) {
+    if (!this.hasResultsContainerTarget) return
+
+    this.resultsContainerTarget.replaceChildren()
+    const selected = this._selectedIds()
+
+    users.forEach((user) => {
+      const row = document.createElement("div")
+      row.className = "search-result-item p-2 border-bottom d-flex justify-content-between align-items-center"
+      row.style.cursor = "pointer"
+      row.dataset.memberPickerTarget = "result"
+      row.dataset.userId = String(user.id)
+      row.dataset.action = "click->member-picker#add"
+      row.dataset.memberPickerIdParam = String(user.id)
+      row.dataset.memberPickerNameParam = user.username
+      row.innerHTML = `
+        <div class="fw-medium text-13">${this._escapeHtml(user.username)}</div>
+        <span class="badge text-bg-success-subtle d-none" data-member-added>
+          <i class="bi bi-check"></i> Added
+        </span>
+      `
+      row.addEventListener("click", () => {
+        this.add({ params: { id: user.id, name: user.username } })
+      })
+      if (selected.has(String(user.id))) {
+        row.classList.add("opacity-50")
+        row.querySelector("[data-member-added]")?.classList.remove("d-none")
+      }
+      this.resultsContainerTarget.appendChild(row)
+    })
+
+    const visible = users.length > 0
+    this.resultsContainerTarget.classList.toggle("d-none", !visible)
+    if (this.hasNoResultsTarget) {
+      this.noResultsTarget.classList.toggle("d-none", visible)
+    }
+  }
+
+  _escapeHtml(text) {
+    const div = document.createElement("div")
+    div.textContent = text
+    return div.innerHTML
   }
 }

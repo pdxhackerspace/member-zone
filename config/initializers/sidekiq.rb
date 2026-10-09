@@ -127,6 +127,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Blank Parking Permit Details Reminder - Daily at 8:10am (cadence enforced per permit)
+  Sidekiq::Cron::Job.create(
+    name: 'Blank Parking Permit Details Reminder - Daily at 8:10am',
+    cron: '10 8 * * *',
+    class: 'ParkingPermitDetailsReminderJob',
+    active_job: true
+  )
+
   # Login Link Expiration - Daily at 8am
   Sidekiq::Cron::Job.create(
     name: 'Login Link Expiration - Daily at 8am',
@@ -183,6 +191,27 @@ Sidekiq.configure_server do |config|
     name: 'Audit Log Dispatch - Hourly',
     cron: '2 * * * *',
     class: 'AuditLogs::DispatchJob',
+    active_job: true
+  )
+
+  # Credentials - provider health every ten minutes; expiry and reconciliation after
+  # Membership::TickJob has settled member standing at 4 AM.
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Provider Health - Every 10 minutes',
+    cron: '*/10 * * * *',
+    class: 'Credentials::HealthCheckJob',
+    active_job: true
+  )
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Expiry - Daily at 4:20am',
+    cron: '20 4 * * *',
+    class: 'Credentials::ExpireJob',
+    active_job: true
+  )
+  Sidekiq::Cron::Job.create(
+    name: 'Credential Reconcile - Daily at 4:30am',
+    cron: '30 4 * * *',
+    class: 'Credentials::ReconcileJob',
     active_job: true
   )
 

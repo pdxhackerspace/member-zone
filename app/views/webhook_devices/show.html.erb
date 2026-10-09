@@ -1,0 +1,62 @@
+<div class="mb-4">
+  <%= link_to "&larr; Back to Webhook Devices".html_safe, webhook_devices_path, class: "text-decoration-none" %>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0"><%= @webhook_device.name %></h1>
+  <div class="d-flex gap-2">
+    <%= link_to "Edit", edit_webhook_device_path(@webhook_device), class: "btn btn-outline-secondary" %>
+    <%= button_to "Regenerate token", regenerate_token_webhook_device_path(@webhook_device), method: :post,
+          class: "btn btn-outline-secondary",
+          form: { data: { turbo_confirm: "Issue a new token? The current token stops working immediately." } } %>
+    <%= button_to "Delete", webhook_device_path(@webhook_device), method: :delete,
+          class: "btn btn-outline-danger",
+          form: { data: { turbo_confirm: "Delete this device? Its token stops working immediately." } } %>
+  </div>
+</div>
+
+<% if flash[:webhook_device_token].present? %>
+  <div class="alert alert-warning">
+    <div class="fw-semibold mb-1">Copy this token now — it will not be shown again.</div>
+    <code class="user-select-all d-block text-break"><%= flash[:webhook_device_token] %></code>
+  </div>
+<% end %>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3">Enabled</dt>
+      <dd class="col-sm-9"><%= @webhook_device.enabled? ? "Yes" : "No — requests with its token are refused" %></dd>
+      <dt class="col-sm-3">Token</dt>
+      <dd class="col-sm-9"><code>…<%= @webhook_device.token_hint %></code></dd>
+      <dt class="col-sm-3">Last used</dt>
+      <dd class="col-sm-9">
+        <% if @webhook_device.last_used_at %>
+          <%= l(@webhook_device.last_used_at, format: :long) %> from <%= @webhook_device.last_used_ip.presence || "unknown address" %>
+        <% else %>
+          Never
+        <% end %>
+      </dd>
+      <dt class="col-sm-3">Permits issued</dt>
+      <dd class="col-sm-9"><%= @parking_notice_count %></dd>
+      <% if @webhook_device.description.present? %>
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9"><%= simple_format(@webhook_device.description, class: "mb-0") %></dd>
+      <% end %>
+    </dl>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <h2 class="h5">Calling the parking permit webhook</h2>
+    <p class="text-secondary">
+      Identify the member by <code>rfid</code> (the key fob they badged with), <code>username</code>, or full
+      <code>email</code>. Set <code>mode</code> to <code>link</code> to email them a 12-hour link to a form that
+      creates and prints the permit, or <code>blank</code> to issue a 2-week permit right away for them to hand-write.
+    </p>
+<pre class="bg-body-tertiary p-3 rounded small mb-0"><code>curl -X POST <%= device_parking_permit_webhook_url %> \
+  -H "Authorization: Bearer $DEVICE_TOKEN" \
+  -d rfid=0012345678 -d mode=blank</code></pre>
+  </div>
+</div>

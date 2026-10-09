@@ -105,5 +105,41 @@ module AuditLogs
       assert_includes mail.subject, '55 audit log alert'
       assert_equal 50, mail.text_part.body.to_s.scan('Failed login ').size
     end
+
+    # --- Retry ---
+
+    def failing_mailer
+      original = MemberMailer.method(:audit_log_alert)
+      MemberMailer.define_singleton_method(:audit_log_alert) { |*| raise 'queue is down' }
+      yield
+    ensure
+      MemberMailer.define_singleton_method(:audit_log_alert, original)
+    end
+
+    test 'every entry offered is marked checked once handed off, matched or not' do
+      perform_enqueued_jobs { Alerter.call(@source, [@failed, @quiet]) }
+
+      assert_not_nil @failed.reload.alert_checked_at
+      assert_not_nil @quiet.reload.alert_checked_at
+    end
+
+    test 'if sending fails nothing is stamped, so the entries are offered again' do
+      failing_mailer do
+        assert_raises(RuntimeError) { Alerter.call(@source, [@failed, @quiet]) }
+      end
+
+      assert_nil @failed.reload.alert_checked_at
+      assert_nil @failed.alerted_at
+      assert_empty @failed.matched_rule_ids
+      assert_nil @quiet.reload.alert_checked_at
+
+      perform_enqueued_jobs { Alerter.call(@source, [@failed, @quiet]) }
+      assert_equal 1, ActionMailer::Base.deliveries.size
+      assert_predicate @failed.reload, :alerted?
+    end
+
+    test 'nothing offered means nothing sent' do
+      assert_no_enqueued_jobs { assert_empty Alerter.call(@source, []) }
+    end
   end
 end

@@ -1,0 +1,11 @@
+active_permit_one:
+  parking_notice: active_permit
+  user: one
+
+expired_ticket_two:
+  parking_notice: expired_ticket
+  user: two
+
+cleared_permit_one:
+  parking_notice: cleared_permit
+  user: one

@@ -58,7 +58,14 @@ Rails.application.routes.draw do
   get  "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#show", as: :applicant_notification_opt_out
   post "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#create"
 
+  # Device webhooks authenticate with a per-device token (Settings → Webhook Devices).
+  post "/webhooks/devices/parking_permits", to: "device_webhooks#parking_permit", as: :device_parking_permit_webhook
   post "/webhooks/:slug", to: "webhooks#receive", as: :webhook_receive
+
+  # No-login parking permit form reached from a device-issued email link.
+  get   "/parking_permit/:token", to: "parking_permit_forms#show", as: :parking_permit_form
+  patch "/parking_permit/:token", to: "parking_permit_forms#update"
+  get   "/parking_permit/:token/pdf", to: "parking_permit_forms#pdf", as: :parking_permit_form_pdf
 
   # Impersonation
   post "/impersonate/:user_id", to: "impersonations#create", as: :impersonate_user, constraints: { user_id: /[^\/]+/ }
@@ -83,6 +90,9 @@ Rails.application.routes.draw do
   post '/training/record', to: 'trainings#create_bulk'
   get '/training/:id',  to: 'training_catalog#show',  as: :training_catalog_topic, constraints: { id: /\d+/ }
   resources :member_parking_permits, only: %i[new create show edit update] do
+    collection do
+      get :member_search
+    end
     member do
       patch :close
       post :request_clearance
@@ -427,6 +437,23 @@ Rails.application.routes.draw do
     resources :audit_log_alert_rules, only: %i[create update destroy]
   end
 
+  resources :credential_providers do
+    member do
+      post :toggle
+      post :check_health
+      post :refresh_schema
+      post :revoke_all
+    end
+  end
+
+  resources :credentials, only: %i[index new create] do
+    member do
+      post :revoke
+      post :rotate
+    end
+  end
+  resources :issued_credentials, only: :index
+
   resources :access_controllers do
     member do
       post :toggle
@@ -437,6 +464,13 @@ Rails.application.routes.draw do
       post :sync_all
       post :toggle_sync_inactive
       get :recent_logs
+    end
+  end
+
+  resources :webhook_devices, path: "settings/webhook_devices" do
+    member do
+      post :toggle
+      post :regenerate_token
     end
   end
 

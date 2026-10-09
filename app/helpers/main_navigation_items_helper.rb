@@ -9,7 +9,7 @@ module MainNavigationItemsHelper
     ai_providers interests member_sources rfid_readers access_controllers
     access_controller_types authentik_webhooks default_settings membership_settings
     payment_processors reminder_settings roles training_topics audit_log_sources
-    audit_log_alert_rules
+    audit_log_alert_rules credential_providers
   ].freeze
 
   private
@@ -58,6 +58,8 @@ module MainNavigationItemsHelper
         privilege: :'reports.view', controllers: %w[reports] },
       { key: 'member_map', label: 'Map', path: member_map_path,
         privilege: :'member_map.view', controllers: %w[member_maps] },
+      { key: 'credentials', label: 'Credentials', path: issued_credentials_path,
+        privilege: :'credentials.view_all', controllers: %w[issued_credentials] },
       { key: 'queued_mail', label: 'Mail queue', path: queued_mails_path,
         privilege: :'queued_mail.view', controllers: %w[queued_mails] },
       { key: 'mail_log', label: 'Mail log', path: mail_log_path,

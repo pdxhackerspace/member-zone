@@ -150,5 +150,97 @@ module AuditLogs
       perform_enqueued_jobs { RunSource.call(source.reload) }
       assert_equal 1, ActionMailer::Base.deliveries.size, 're-printed entries must not alert again'
     end
+
+    # --- Alert delivery failures ---
+
+    def failing_mailer
+      original = MemberMailer.method(:audit_log_alert)
+      MemberMailer.define_singleton_method(:audit_log_alert) { |*| raise 'redis is down' }
+      yield
+    ensure
+      MemberMailer.define_singleton_method(:audit_log_alert, original)
+    end
+
+    def alerting_source
+      source = create_audit_log_source(script: 'json_lines.sh')
+      source.audit_log_alert_rules.create!(name: 'door', pattern: 'door opened')
+      users(:one).update_columns(is_admin: true)
+      ActionMailer::Base.deliveries.clear
+      source
+    end
+
+    test 'a failure while alerting does not fail the run, and the entries and cursor are kept' do
+      source = alerting_source
+
+      run = failing_mailer { RunSource.call(source) }
+
+      assert_equal 'success', run.status
+      assert_equal 'success', source.reload.run_status
+      assert_equal 2, run.entries_added
+      assert_equal 2, source.audit_log_entries.count
+      assert_equal Time.utc(2026, 9, 29, 10, 5), source.last_entry_at
+      assert_match(/Alerting failed and will be retried.*redis is down/, run.reload.output)
+    end
+
+    test 'the alert is sent on the next run even though the entries were stored by the failed one' do
+      source = alerting_source
+      failing_mailer { RunSource.call(source) }
+      assert_predicate source.audit_log_entries.where(alert_checked_at: nil), :any?
+
+      perform_enqueued_jobs { RunSource.call(source.reload) }
+
+      assert_equal 1, ActionMailer::Base.deliveries.size
+      assert_includes ActionMailer::Base.deliveries.sole.body.encoded, 'door opened'
+      assert_predicate source.audit_log_entries.where(alert_checked_at: nil), :none?
+      assert_predicate source.audit_log_entries.find_by!(message: 'door opened'), :alerted?
+    end
+
+    test 'once delivered, the alert is not sent again on later runs' do
+      source = alerting_source
+      failing_mailer { RunSource.call(source) }
+      perform_enqueued_jobs { RunSource.call(source.reload) }
+      perform_enqueued_jobs { RunSource.call(source.reload) }
+
+      assert_equal 1, ActionMailer::Base.deliveries.size
+    end
+
+    test 'a failed script run still retries alerts left over from an earlier run' do
+      source = alerting_source
+      failing_mailer { RunSource.call(source) }
+      source.update!(script_path: '/nonexistent/nope.sh')
+
+      perform_enqueued_jobs { RunSource.call(source.reload) }
+
+      assert_equal 'failed', source.reload.run_status
+      assert_equal 1, ActionMailer::Base.deliveries.size
+    end
+
+    test 'a rule added after entries were checked does not alert on them' do
+      source = create_audit_log_source(script: 'json_lines.sh')
+      RunSource.call(source)
+      source.audit_log_alert_rules.create!(name: 'door', pattern: 'door opened')
+      users(:one).update_columns(is_admin: true)
+      ActionMailer::Base.deliveries.clear
+
+      perform_enqueued_jobs { RunSource.call(source.reload) }
+
+      assert_empty ActionMailer::Base.deliveries
+    end
+
+    test 'the failure is reported' do
+      source = alerting_source
+
+      reported = []
+      subscriber = Object.new
+      subscriber.define_singleton_method(:report) { |error, **| reported << error }
+      Rails.error.subscribe(subscriber)
+      begin
+        failing_mailer { RunSource.call(source) }
+      ensure
+        Rails.error.unsubscribe(subscriber)
+      end
+
+      assert_equal ['redis is down'], reported.map(&:message)
+    end
   end
 end
