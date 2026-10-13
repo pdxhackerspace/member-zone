@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -785,6 +785,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120100) do
     t.integer "slack_signup_reminder_max_account_age_months", default: 6, null: false
     t.datetime "updated_at", null: false
     t.boolean "use_builtin_membership_application", default: true, null: false
+    t.integer "application_backlog_overdue_days", default: 7, null: false
     t.index ["building_access_training_topic_id"], name: "index_membership_settings_on_building_access_training_topic_id"
   end
 

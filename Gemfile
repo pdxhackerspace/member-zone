@@ -9,7 +9,7 @@ gem 'rails', '~> 8.1.4'
 gem 'sprockets-rails'
 
 # Use postgresql as the database for Active Record
-gem 'pg', '~> 1.1'
+gem 'pg', '~> 1.7'
 
 # Use the Puma web server [https://github.com/puma/puma]
 gem 'puma', '>= 6.0'
@@ -30,7 +30,7 @@ gem 'cssbundling-rails'
 
 # Authentication & integrations
 gem 'faraday', '~> 2.14'
-gem 'google-apis-sheets_v4', '~> 0.48.0'
+gem 'google-apis-sheets_v4', '~> 0.49.0'
 gem 'googleauth', '~> 1.17'
 gem 'multi_json'
 gem 'omniauth', '~> 2.1'
@@ -60,7 +60,7 @@ gem 'prawn', '~> 2.5'
 gem 'prawn-table', '~> 0.2'
 
 # Pagination
-gem 'pagy', '~> 43.6'
+gem 'pagy', '~> 43.7'
 
 # QR code generation
 gem 'rqrcode', '~> 3.2'

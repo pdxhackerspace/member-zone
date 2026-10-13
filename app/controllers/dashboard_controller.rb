@@ -46,6 +46,7 @@ class DashboardController < AuthenticatedController
     @queued_mail_count = QueuedMail.pending.count
 
     prepare_attention_items
+    @application_backlog = MembershipApplications::Backlog.call if can?(:'applications.view')
 
     # Highlighted journal entries from the last 2 weeks
     @recent_highlights = Journal.highlighted

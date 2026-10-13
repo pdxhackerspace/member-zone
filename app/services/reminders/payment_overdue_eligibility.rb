@@ -75,7 +75,7 @@ module Reminders
           .where(membership_state: REMINDER_CANDIDATE_STATES)
           .where(DELIVERABLE_EMAIL_SQL)
           .find_each do |user|
-        next unless base_user?(user)
+        next unless base_user?(user, now: now)
 
         counts[:total] += 1
         counts[:within_grace] += 1 if within_grace_period?(user, now: now, offset_days: offset_days)
@@ -84,7 +84,7 @@ module Reminders
     end
 
     def self.due?(user, now: Time.current)
-      return false unless base_user?(user)
+      return false unless base_user?(user, now: now)
       return false if pending_reminder_mail?(user)
 
       cadence_due?(user, now: now)
@@ -149,10 +149,10 @@ module Reminders
 
     # Reads the resolved state rather than the column: a member whose overdue grace ran
     # out is on their way to inactive and should not get one last nag.
-    def self.base_user?(user)
+    def self.base_user?(user, now:)
       return false if user.service_account?
       return false if user.email.blank?
-      return false unless user.effective_membership_state == 'overdue_member'
+      return false unless user.effective_membership_state(now: now) == 'overdue_member'
 
       # Someone who told us they were leaving is not someone to chase for a payment,
       # whether or not the notice has been processed yet.

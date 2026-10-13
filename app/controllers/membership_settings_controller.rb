@@ -29,6 +29,7 @@ class MembershipSettingsController < AuthenticatedController
                                          application_verification_expiry_hours
                                          manual_payment_due_soon_days
                                          application_review_time_cap_days
+                                         application_backlog_overdue_days
                                          slack_signup_reminder_max_account_age_months
                                          new_member_grace_period_days
                                          new_member_expiry_days

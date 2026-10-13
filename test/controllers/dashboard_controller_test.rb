@@ -26,8 +26,9 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select '.h-section-label', text: 'Members'
-    assert_select '.h-section-label', text: 'Building'
     assert_select '.h-section-label', text: 'Operations'
+    assert_select '.h-section-label', text: 'Applications'
+    assert_select '.h-section-label', text: 'Building', count: 0
 
     [
       [new_rfid_path, /Key/],
@@ -44,6 +45,47 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_select 'a.action-card .action-card-desc', minimum: 8
     assert_select "a.action-card[href='#{new_rfid_path}'] .action-card-title i.bi-key"
+  end
+
+  test 'admin dashboard draws the application backlog with links to each group' do
+    MembershipSetting.instance.update!(application_backlog_overdue_days: 7)
+    MembershipApplication.create!(email: 'fresh@example.com', status: 'submitted', submitted_at: 2.days.ago)
+    MembershipApplication.create!(email: 'fresh2@example.com', status: 'submitted', submitted_at: 6.days.ago)
+    MembershipApplication.create!(email: 'late@example.com', status: 'submitted', submitted_at: 12.days.ago)
+    MembershipApplication.create!(email: 'held@example.com', status: 'under_review', submitted_at: 3.days.ago)
+
+    get root_path
+
+    assert_response :success
+    recent_path = membership_applications_path(status: 'submitted', age: 'recent')
+    overdue_path = membership_applications_path(status: 'submitted', age: 'overdue')
+    held_path = membership_applications_path(status: 'under_review')
+    assert_select 'a.backlog-segment.backlog-recent[href=?]', recent_path, text: '2'
+    assert_select 'a.backlog-segment.backlog-overdue[href=?]', overdue_path, text: '1'
+    assert_select 'a.backlog-segment.backlog-held[href=?]', held_path, text: '1'
+    assert_select '.backlog-legend a[href=?]', overdue_path, text: /1 waiting more than 7 days/
+  end
+
+  test 'admin dashboard backlog says all caught up when nothing is pending' do
+    MembershipApplication.pending.delete_all
+
+    get root_path
+
+    assert_select '.backlog-bar.empty'
+    assert_select '.backlog-legend', text: /All caught up/
+    assert_select '.backlog-segment', count: 0
+  end
+
+  test 'admin dashboard hides the application backlog without applications.view' do
+    member = sign_in_as_plain_member
+    grant_privileges(member, 'dashboard.admin')
+    sign_in_as_plain_member
+
+    get root_path
+
+    assert_response :success
+    assert_select '.h-section-label', text: 'Applications', count: 0
+    assert_select '.backlog-bar', count: 0
   end
 
   test 'admin home member dashboard tab renders member dashboard content' do

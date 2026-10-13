@@ -4,6 +4,9 @@ module Reminders
   class NotifyOrientationTest < ActiveSupport::TestCase
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
+      # Membership state resolves its deadlines against the real clock, so pin it to @now or
+      # the new-member window these users sit in runs out as the calendar moves on.
+      travel_to @now
       @topic = training_topics(:building_access)
       MembershipSetting.instance.update!(
         new_member_expiry_days: 90,
@@ -70,6 +73,16 @@ module Reminders
       NotifyOrientation.call(now: @now)
 
       assert_match 'approved 21 days ago', ActionMailer::Base.deliveries.last.to_s
+    end
+
+    test 'judges the new-member window by the run time rather than the wall clock' do
+      awaiting_user(email: 'orientation-clock@example.com')
+
+      travel_to(@now + 1.year) do
+        assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
+          NotifyOrientation.call(now: @now)
+        end
+      end
     end
 
     test 'records the send when mail held for review is later delivered' do
