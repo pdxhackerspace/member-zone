@@ -22,14 +22,16 @@ module MembershipStateResolution
   # Stops a cycle in EXPIRY_TARGETS from turning resolution into an infinite loop.
   MAX_EXPIRY_HOPS = 4
 
-  # The state this member should be in right now, with elapsed deadlines applied.
-  def effective_membership_state
+  # The state this member should be in at +now+, with elapsed deadlines applied. Callers
+  # that run against a clock of their own — the reminder jobs take a +now:+ — pass it here,
+  # or a deadline that has passed on the wall clock but not on theirs decides the answer.
+  def effective_membership_state(now: Time.current)
     state = membership_state
     entered = membership_state_anchor
 
     MAX_EXPIRY_HOPS.times do
       deadline = membership_state_deadline(state, entered)
-      break if deadline.nil? || deadline > Time.current
+      break if deadline.nil? || deadline > now
 
       target = EXPIRY_TARGETS[state]
       break if target.nil? || target == state
