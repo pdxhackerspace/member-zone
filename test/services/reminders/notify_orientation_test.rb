@@ -4,6 +4,9 @@ module Reminders
   class NotifyOrientationTest < ActiveSupport::TestCase
     setup do
       @now = Time.zone.local(2026, 8, 5, 7, 0, 0)
+      # Membership state resolves its deadlines against the real clock, so pin it to @now or
+      # the new-member window these users sit in runs out as the calendar moves on.
+      travel_to @now
       @topic = training_topics(:building_access)
       MembershipSetting.instance.update!(
         new_member_expiry_days: 90,
