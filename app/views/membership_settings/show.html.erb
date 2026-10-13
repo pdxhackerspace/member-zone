@@ -79,6 +79,11 @@
           value: application_verification_expiry_display(@membership_setting),
           help: "How long application email verification links remain valid." %>
       <%= render "show_field",
+          label: "Application overdue after",
+          value: safe_join([content_tag(:strong, @membership_setting.application_backlog_overdue_days), " ",
+                            "day".pluralize(@membership_setting.application_backlog_overdue_days)]),
+          help: "Open applications waiting longer than this show as overdue in the dashboard's application backlog." %>
+      <%= render "show_field",
           label: "Application review time cap",
           value: safe_join([content_tag(:strong, @membership_setting.application_review_time_cap_days), " ",
                             "day".pluralize(@membership_setting.application_review_time_cap_days)]),

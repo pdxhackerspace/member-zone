@@ -147,6 +147,16 @@ It goes to reviewers rather than to the applicant, so there is nobody to opt out
 
 **Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
 
+## Application backlog on the admin dashboard
+
+The admin dashboard's **Applications** column draws every application still waiting on a decision as one bar, with the total above it:
+
+- **Green** — open applications submitted within the overdue window.
+- **Red** — open applications waiting longer than that.
+- **Yellow** — applications held for review (Under review or Needs review), however old.
+
+Click a segment or its legend line to open the application list filtered to that group. The window is **Application overdue after (days)** in Settings → Membership settings, seven days out of the box. When nothing is pending the column reads *All caught up*. The column only appears for people who can view the application queue.
+
 ## Parking permits from access control devices
 
 Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. Each device needs a token, issued under **Settings → Webhook devices** (requires the *Manage access controllers* privilege). The token is shown **once**, when the device is created or its token is regenerated; copy it into the device's configuration then. Regenerating or disabling a device stops its old token working immediately, and the device page shows when and from where it last called.

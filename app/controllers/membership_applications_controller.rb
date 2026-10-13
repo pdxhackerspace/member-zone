@@ -40,16 +40,7 @@ class MembershipApplicationsController < ApplicationController
 
     base_scope = MembershipApplication.where.not(status: 'draft')
     @applications = base_scope.includes(:user, :reviewed_by, :application_answers, :acceptance_votes)
-    @applications = case @current_status
-                    when 'all'
-                      @applications
-                    when 'unlinked'
-                      @applications.where(user_id: nil).where(status: 'approved')
-                    when 'under_review'
-                      @applications.where(status: MembershipApplication::IN_REVIEW_STATUSES)
-                    else
-                      @applications.where(status: @current_status)
-                    end
+    @applications = filter_applications_by_status(@applications)
     @applications = @applications.admin_search(params[:q])
     @applications = @applications.newest_first
 
@@ -170,6 +161,22 @@ class MembershipApplicationsController < ApplicationController
   end
 
   private
+
+  def filter_applications_by_status(scope)
+    case @current_status
+    when 'all'
+      scope
+    when 'unlinked'
+      scope.where(user_id: nil).where(status: 'approved')
+    when 'under_review'
+      scope.where(status: MembershipApplication::IN_REVIEW_STATUSES)
+    when 'submitted'
+      @current_age = params[:age].presence_in(MembershipApplications::Backlog::AGES)
+      MembershipApplications::Backlog.filter_by_age(scope.where(status: 'submitted'), @current_age)
+    else
+      scope.where(status: @current_status)
+    end
+  end
 
   # Where to send the admin after approving or rejecting, given what became of the outcome email:
   # held for review (go edit it), sent, queued for retry because email was unavailable (nothing to

@@ -198,8 +198,9 @@
     <div class="col-lg-8">
       <div class="card dashboard-panel mb-4">
         <div class="card-body">
+          <% action_col = @application_backlog ? 'col-md-4' : 'col-md-6' %>
           <div class="row g-3">
-            <div class="col-md-4">
+            <div class="<%= action_col %>">
               <div class="h-section-label mb-2">Members</div>
               <div class="d-grid gap-2">
                 <%= link_to new_rfid_path, class: "action-card" do %>
@@ -222,8 +223,8 @@
                 <% end %>
               </div>
             </div>
-            <div class="col-md-4">
-              <div class="h-section-label mb-2">Building</div>
+            <div class="<%= action_col %>">
+              <div class="h-section-label mb-2">Operations</div>
               <div class="d-grid gap-2">
                 <%= link_to new_parking_notice_path(type: 'permit'), class: "action-card" do %>
                   <div class="action-card-title"><i class="bi bi-p-circle me-1"></i>Parking permit</div>
@@ -239,17 +240,17 @@
                     <div class="action-card-desc">Manage door locks and access hardware</div>
                   <% end %>
                 <% end %>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="h-section-label mb-2">Operations</div>
-              <div class="d-grid gap-2">
                 <%= link_to new_incident_report_path, class: "action-card" do %>
                   <div class="action-card-title"><i class="bi bi-exclamation-triangle me-1"></i>Incident report</div>
                   <div class="action-card-desc">Document a safety or facility incident</div>
                 <% end %>
               </div>
             </div>
+            <% if @application_backlog %>
+              <div class="col-md-4">
+                <%= render 'dashboard/application_backlog', backlog: @application_backlog %>
+              </div>
+            <% end %>
           </div>
         </div>
       </div>

@@ -420,6 +420,34 @@
   color: var(--bs-secondary-color);
 }
 
+.backlog-bar {
+  display: flex;
+  flex-direction: column;
+  width: 56px;
+  height: 200px;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.backlog-bar.empty { background: rgba(255,255,255,0.03); }
+.backlog-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--bs-dark);
+  transition: filter 0.1s;
+}
+.backlog-segment:hover { filter: brightness(1.15); color: var(--bs-dark); }
+.backlog-segment.backlog-recent  { background-color: var(--bs-success); }
+.backlog-segment.backlog-overdue { background-color: var(--bs-danger); }
+.backlog-segment.backlog-held    { background-color: var(--bs-warning); }
+.backlog-legend a { color: var(--bs-secondary-color); text-decoration: none; }
+.backlog-legend a:hover { color: var(--bs-body-color); }
+
 .card-membership {
   background: rgba(255,255,255,0.02);
   border: 0.5px solid rgba(151,196,89,0.25);
