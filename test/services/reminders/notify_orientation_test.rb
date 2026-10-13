@@ -72,6 +72,16 @@ module Reminders
       assert_match 'approved 21 days ago', ActionMailer::Base.deliveries.last.to_s
     end
 
+    test 'judges the new-member window by the run time rather than the wall clock' do
+      awaiting_user(email: 'orientation-clock@example.com')
+
+      travel_to(@now + 1.year) do
+        assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
+          NotifyOrientation.call(now: @now)
+        end
+      end
+    end
+
     test 'records the send when mail held for review is later delivered' do
       EmailTemplate.find_by!(key: 'orientation_reminder').update!(send_immediately: false)
       user = awaiting_user(email: 'orientation-deferred@example.com')

@@ -114,7 +114,7 @@ module Reminders
     end
 
     def self.due?(user, now: Time.current)
-      return false unless base_user?(user)
+      return false unless base_user?(user, now: now)
       return false if pending_reminder_mail?(user)
 
       cadence_due?(user, now: now)
@@ -128,10 +128,10 @@ module Reminders
     # Reads the resolved state rather than the column: a member whose new-member window has
     # already run out is on their way to inactive, and booking an orientation is no longer
     # the conversation to have with them.
-    def self.base_user?(user)
+    def self.base_user?(user, now:)
       return false if user.service_account? || user.legacy?
       return false if user.email.blank?
-      return false unless user.effective_membership_state == 'new_member'
+      return false unless user.effective_membership_state(now: now) == 'new_member'
 
       !user.building_access_trained?
     end
