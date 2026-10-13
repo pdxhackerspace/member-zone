@@ -1,0 +1,46 @@
+<%# Open applications as one stacked bar: recent on top, then overdue, then held for review.
+    Segments with nothing in them are left out rather than drawn as slivers. %>
+<% segments = [
+     { key: :recent, count: backlog.recent, css: 'backlog-recent', dot: 'status-success',
+       label: "waiting #{backlog.overdue_days} #{'day'.pluralize(backlog.overdue_days)} or fewer",
+       path: membership_applications_path(status: 'submitted', age: 'recent') },
+     { key: :overdue, count: backlog.overdue, css: 'backlog-overdue', dot: 'status-danger',
+       label: "waiting more than #{backlog.overdue_days} #{'day'.pluralize(backlog.overdue_days)}",
+       path: membership_applications_path(status: 'submitted', age: 'overdue') },
+     { key: :held, count: backlog.held, css: 'backlog-held', dot: 'status-warning',
+       label: 'held for review',
+       path: membership_applications_path(status: 'under_review') }
+   ] %>
+<div class="h-section-label mb-2">Applications</div>
+<div class="d-flex align-items-end gap-3">
+  <div class="text-center">
+    <% if backlog.empty? %>
+      <div class="backlog-bar empty"></div>
+    <% else %>
+      <div class="kpi-value lh-1"><%= backlog.total %></div>
+      <div class="text-12 text-secondary mb-2">pending</div>
+      <div class="backlog-bar" role="img"
+           aria-label="<%= segments.map { |s| "#{s[:count]} #{s[:label]}" }.join(', ') %>">
+        <% segments.select { |s| s[:count].positive? }.each do |s| %>
+          <%= link_to s[:count], s[:path], class: "backlog-segment #{s[:css]}",
+                                           style: "flex-grow: #{s[:count]};",
+                                           title: "#{s[:count]} #{s[:label]}" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+  <div class="backlog-legend text-12 pb-1">
+    <% if backlog.empty? %>
+      <div class="text-secondary mb-2"><span class="status-dot status-success me-1"></span>All caught up</div>
+    <% else %>
+      <% segments.each do |s| %>
+        <div class="mb-1">
+          <%= link_to s[:path] do %>
+            <span class="status-dot <%= s[:dot] %> me-1"></span><%= s[:count] %> <%= s[:label] %>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+    <%= link_to 'Review applications', membership_applications_path, class: 'link-primary d-inline-block mt-2' %>
+  </div>
+</div>

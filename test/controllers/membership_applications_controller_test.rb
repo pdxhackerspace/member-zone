@@ -104,6 +104,26 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'button', text: 'Link member', count: 0
   end
 
+  test 'index open tab narrows by backlog age' do
+    MembershipSetting.instance.update!(application_backlog_overdue_days: 7)
+    recent = MembershipApplication.create!(email: 'age-recent@example.com', status: 'submitted',
+                                           submitted_at: 1.day.ago)
+    overdue = MembershipApplication.create!(email: 'age-overdue@example.com', status: 'submitted',
+                                            submitted_at: 10.days.ago)
+
+    get membership_applications_path(status: 'submitted', age: 'overdue')
+
+    assert_response :success
+    assert_select 'a[href=?]', membership_application_path(overdue)
+    assert_select 'a[href=?]', membership_application_path(recent), count: 0
+    assert_select '.filter-chip', text: /Waiting more than\s+7 days/
+
+    get membership_applications_path(status: 'submitted', age: 'recent')
+
+    assert_select 'a[href=?]', membership_application_path(recent)
+    assert_select 'a[href=?]', membership_application_path(overdue), count: 0
+  end
+
   test 'index shows average processing time for finalized applications' do
     travel_to Time.zone.local(2026, 6, 19, 12, 0, 0) do
       since = 1.month.ago

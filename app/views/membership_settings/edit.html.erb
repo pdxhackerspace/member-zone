@@ -150,6 +150,14 @@
           <div class="form-text">How long the email verification link for membership applications remains valid.</div>
         </div>
 
+        <div class="mb-3">
+          <%= f.label :application_backlog_overdue_days, "Application overdue after (days)", class: "form-label" %>
+          <%= f.number_field :application_backlog_overdue_days, class: "form-control", min: 1, style: "max-width: 150px;" %>
+          <div class="form-text">
+            Open applications waiting longer than this show as overdue in the admin dashboard's application backlog.
+          </div>
+        </div>
+
         <div class="mb-0">
           <%= f.label :application_review_time_cap_days, "Application review time cap (days)", class: "form-label" %>
           <%= f.number_field :application_review_time_cap_days, class: "form-control", min: 1, style: "max-width: 150px;" %>

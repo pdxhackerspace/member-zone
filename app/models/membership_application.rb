@@ -45,6 +45,16 @@ class MembershipApplication < ApplicationRecord
   # Applications awaiting a final decision (Open, Under Review, or parked Needs Review).
   scope :pending, -> { where(status: %w[submitted] + IN_REVIEW_STATUSES) }
   scope :naggable_pending, -> { where(status: NAGGABLE_PENDING_STATUSES) }
+  # Open applications on either side of a cutoff, by when they were submitted (imports may lack
+  # submitted_at, so fall back to created_at the way stale_pending does).
+  scope :submitted_within, lambda { |cutoff|
+    submitted_apps.where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) >= ?',
+                         cutoff)
+  }
+  scope :submitted_before, lambda { |cutoff|
+    submitted_apps.where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) < ?',
+                         cutoff)
+  }
   scope :stale_pending, lambda { |stale_cutoff = 1.week.ago|
     naggable_pending
       .where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) <= ?', stale_cutoff)

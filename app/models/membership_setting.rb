@@ -12,6 +12,7 @@ class MembershipSetting < ApplicationRecord
   validates :application_verification_expiry_hours, presence: true, numericality: { greater_than: 0 }
   validates :manual_payment_due_soon_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :application_review_time_cap_days, presence: true, numericality: { greater_than: 0 }
+  validates :application_backlog_overdue_days, presence: true, numericality: { greater_than: 0 }
   validates :slack_signup_reminder_max_account_age_months, presence: true, numericality: { greater_than: 0 }
   validates :new_member_grace_period_days, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :new_member_expiry_days, presence: true, numericality: { greater_than: 0 }
@@ -32,6 +33,7 @@ class MembershipSetting < ApplicationRecord
     application_verification_expiry_hours: 24,
     manual_payment_due_soon_days: 7,
     application_review_time_cap_days: 15,
+    application_backlog_overdue_days: 7,
     slack_signup_reminder_max_account_age_months: 6,
     new_member_grace_period_days: 14,
     new_member_expiry_days: 90,
@@ -73,6 +75,10 @@ class MembershipSetting < ApplicationRecord
 
   def self.application_review_time_cap_days
     instance.application_review_time_cap_days
+  end
+
+  def self.application_backlog_overdue_days
+    instance.application_backlog_overdue_days
   end
 
   def self.use_builtin_membership_application?
