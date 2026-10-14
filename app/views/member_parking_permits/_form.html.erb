@@ -42,7 +42,7 @@
   </div>
 
   <% permit_anchor = parking_notice.persisted? ? parking_notice.created_at : Time.current %>
-  <% self_service_cap = permit_anchor + MemberParkingPermitsController::MAX_MEMBER_PERMIT_DURATION %>
+  <% self_service_cap = permit_anchor + ParkingNotice::MAX_SELF_SERVICE_DURATION %>
   <% self_service_cap_value = self_service_cap.strftime('%Y-%m-%dT%H:%M') %>
   <% stored_expires_at = parking_notice.persisted? ? parking_notice.expires_at_in_database : nil %>
   <% grandfathered_expiration = stored_expires_at.present? && stored_expires_at > self_service_cap %>
