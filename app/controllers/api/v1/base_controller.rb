@@ -29,7 +29,7 @@ module Api
                  by: -> { current_api_token.id }, with: -> { render_rate_limited }
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
-      rescue_from ActionController::ParameterMissing, with: :render_bad_request
+      rescue_from ActionController::ParameterMissing, ActionController::BadRequest, with: :render_bad_request
 
       attr_reader :current_api_token
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_14_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_14_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -859,7 +859,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_14_130000) do
     t.text "note"
     t.bigint "parking_notice_id", null: false
     t.datetime "updated_at", null: false
+    t.bigint "api_token_id"
     t.index ["actor_id"], name: "index_parking_notice_events_on_actor_id"
+    t.index ["api_token_id"], name: "index_parking_notice_events_on_api_token_id"
     t.index ["event_type"], name: "index_parking_notice_events_on_event_type"
     t.index ["parking_notice_id", "created_at"], name: "idx_on_parking_notice_id_created_at_1c4803fe34"
     t.index ["parking_notice_id"], name: "index_parking_notice_events_on_parking_notice_id"
@@ -1521,6 +1523,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_14_130000) do
   add_foreign_key "messages", "users", column: "recipient_id"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notification_opt_outs", "users"
+  add_foreign_key "parking_notice_events", "api_tokens", on_delete: :nullify
   add_foreign_key "parking_notice_events", "parking_notices"
   add_foreign_key "parking_notice_events", "users", column: "actor_id"
   add_foreign_key "parking_notice_members", "parking_notices"

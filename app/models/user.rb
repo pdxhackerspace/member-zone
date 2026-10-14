@@ -231,8 +231,10 @@ class User < ApplicationRecord
     handle.present? ? "#{username} @#{handle}" : username.to_s
   end
 
+  # Not while acting through an API token: a token does what its scopes say, so the
+  # administrator shortcuts that models take (ParkingNotice#clearable_by?, say) must not apply.
   def admin?
-    is_admin?
+    is_admin? && !acting_through_api_token?
   end
 
   # Does this member hold a privilege? Admins always do: is_admin is a permanent
@@ -240,10 +242,21 @@ class User < ApplicationRecord
   #
   # Global privileges apply once any held topic confers them. Topic-scoped privileges
   # apply only for the topic that conferred them, so callers must pass that topic.
+  #
+  # During an API request the token's holder is limited to the token's scopes wherever the
+  # question is asked — controller, model, or service — so no check made deeper down can hand
+  # a token more than it was given.
   def can?(privilege_key, topic: nil)
+    return false if acting_through_api_token? && Current.api_token.scopes.exclude?(privilege_key.to_s)
     return true if is_admin?
 
     privilege_conferred?(privilege_key, topic: topic)
+  end
+
+  # True while this user is the holder of the API token authenticating the current request.
+  def acting_through_api_token?
+    token = Current.api_token
+    token.present? && token.user_id == id
   end
 
   # The same question with the is_admin bypass left out: does a role this member actually

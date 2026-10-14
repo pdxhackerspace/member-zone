@@ -99,5 +99,5 @@
 <% end %>
 
 <%= render 'parking_notices/history',
-    events: @parking_notice.events.includes(:actor).chronological,
+    events: @parking_notice.events.includes(:actor, :api_token).chronological,
     note_url: add_note_member_parking_permit_path(@parking_notice) %>
