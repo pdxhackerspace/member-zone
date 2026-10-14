@@ -553,6 +553,16 @@ Rails.application.routes.draw do
   get "/reports/:key", to: "reports#show", as: :report
   get "/member-map", to: "member_maps#show", as: :member_map
   get "/api/users/search", to: "api/users#search", as: :api_users_search
+
+  # Token-authenticated API. docs/api/openapi.yaml is the reference; docs/api.md the guide.
+  namespace :api do
+    namespace :v1 do
+      get 'openapi.json', to: 'specs#show', as: :openapi, defaults: { format: :json }
+      get 'me', to: 'me#show'
+      resources :members, only: %i[index show], constraints: { id: /\d+/ }
+      match '*path', to: 'errors#not_found', via: :all
+    end
+  end
   
   require 'sidekiq/web'
   mount Sidekiq::Web => '/goh7zeeNiezoozaingothu4'

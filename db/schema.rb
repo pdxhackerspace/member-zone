@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_13_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_14_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -150,6 +150,38 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_130000) do
     t.datetime "updated_at", null: false
     t.string "url", null: false
     t.index ["name"], name: "index_ai_providers_on_name", unique: true
+  end
+
+  create_table "api_tokens", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "contact_user_id"
+    t.bigint "created_by_id"
+    t.string "name", null: false
+    t.text "description"
+    t.string "token_digest", null: false
+    t.string "token_hint"
+    t.string "scopes", default: [], null: false, array: true
+    t.datetime "expires_at", null: false
+    t.datetime "last_extended_at"
+    t.datetime "suspended_at"
+    t.bigint "suspended_by_id"
+    t.string "suspended_reason"
+    t.datetime "revoked_at"
+    t.bigint "revoked_by_id"
+    t.string "revoked_reason"
+    t.datetime "last_used_at"
+    t.string "last_used_ip"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_user_id"], name: "index_api_tokens_on_contact_user_id"
+    t.index ["created_by_id"], name: "index_api_tokens_on_created_by_id"
+    t.index ["expires_at"], name: "index_api_tokens_on_expires_at"
+    t.index ["revoked_at"], name: "index_api_tokens_on_revoked_at"
+    t.index ["revoked_by_id"], name: "index_api_tokens_on_revoked_by_id"
+    t.index ["scopes"], name: "index_api_tokens_on_scopes", using: :gin
+    t.index ["suspended_by_id"], name: "index_api_tokens_on_suspended_by_id"
+    t.index ["token_digest"], name: "index_api_tokens_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_api_tokens_on_user_id"
   end
 
   create_table "application_answers", force: :cascade do |t|
@@ -444,6 +476,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_130000) do
     t.string "trained_on_prefix", null: false
     t.string "unbanned_members_group", null: false
     t.datetime "updated_at", null: false
+    t.integer "api_token_max_lifetime_days", default: 365, null: false
   end
 
   create_table "document_training_topics", force: :cascade do |t|
@@ -1429,6 +1462,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_130000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ai_ollama_profiles", "ai_providers", on_delete: :nullify
+  add_foreign_key "api_tokens", "users", column: "contact_user_id", on_delete: :nullify
+  add_foreign_key "api_tokens", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "api_tokens", "users", column: "revoked_by_id", on_delete: :nullify
+  add_foreign_key "api_tokens", "users", column: "suspended_by_id", on_delete: :nullify
+  add_foreign_key "api_tokens", "users", on_delete: :cascade
   add_foreign_key "application_answers", "application_form_questions"
   add_foreign_key "application_answers", "membership_applications"
   add_foreign_key "application_form_questions", "application_form_pages"

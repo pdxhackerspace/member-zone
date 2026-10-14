@@ -21,6 +21,8 @@ class DefaultSetting < ApplicationRecord
   validates :map_default_city, presence: true
   validates :map_default_state, presence: true
   validates :map_radius_miles, numericality: { greater_than: 0, less_than_or_equal_to: 100 }
+  validates :api_token_max_lifetime_days, numericality: { only_integer: true, greater_than: 0,
+                                                          less_than_or_equal_to: 3650 }
 
   def rfid_facility_prefix
     "#{rfid_facility_code},"
