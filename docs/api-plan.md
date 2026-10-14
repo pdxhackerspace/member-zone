@@ -1,6 +1,6 @@
 # Member Zone API — implementation plan
 
-Branch: `feature/api` (off `staging`). Status: in progress — see the PR sequence in section 10.
+Branch: `feature/api` (off `staging`). Status: implemented in the six PRs listed in section 10.
 
 ## Goals
 
@@ -195,8 +195,8 @@ No devices are in production, so this is a straight removal:
 - **`docs/api/openapi.yaml` (OpenAPI 3.1): the source of truth.** Every operation gets a summary, a plain-English description, the required scope (`x-required-scope` plus prose), request/response schemas, and examples, including error examples.
 - Served at `GET /api/v1/openapi.json` (no auth).
 - **`docs/api.md`: human guide.** Getting a token, auth, scopes, errors, pagination, acting for members vs. self, `curl` walkthroughs for each parking flow, the kiosk integration.
-- **`/llms.txt`**: short markdown index linking the guide and spec (per the llms.txt convention), plus `/api/v1/llms-full.txt`, the guide and an endpoint reference flattened into one markdown file.
-- **`/api/docs`**: rendered reference (a static page loading Scalar from a pinned CDN version, pointed at `openapi.json`).
+- **`/llms.txt`**: short markdown index linking the guide and spec (per the llms.txt convention), plus `/api/v1/llms-full.txt`: the guide, every endpoint, and every schema in one markdown file. Both are generated from the spec and guide by `ApiReference::LlmsText`, so they cannot drift.
+- **`/api/docs`**: rendered reference (a static page loading Redoc from a pinned CDN version with an SRI hash, pointed at `openapi.json`).
 - **Contract tests:** every `/api/v1` route has a spec operation and vice versa; request tests validate response bodies against the spec's schemas (adds `json_schemer`, test group only).
 - `README.md` (architecture: API section) and `docs/USER_GUIDE.md` (managing tokens, reminders) updated.
 

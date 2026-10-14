@@ -6,7 +6,7 @@ module Api
     # /api/v1 route is in it and everything in it is routed, and its examples match its schemas.
     class SpecContractTest < ActionDispatch::IntegrationTest
       # Routes that exist for plumbing rather than as operations.
-      UNDOCUMENTED_ROUTES = ['* /*path'].freeze
+      UNDOCUMENTED_ROUTES = ['* /*path', 'GET /llms-full.txt'].freeze
       HTTP_METHODS = %w[get put post delete options head patch trace].freeze
 
       test 'the spec is served as JSON without a token' do

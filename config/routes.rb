@@ -559,9 +559,12 @@ Rails.application.routes.draw do
   get "/api/users/search", to: "api/users#search", as: :api_users_search
 
   # Token-authenticated API. docs/api/openapi.yaml is the reference; docs/api.md the guide.
+  get '/llms.txt', to: 'api_docs#llms_index', as: :llms_txt
+  get '/api/docs', to: 'api_docs#reference', as: :api_docs
   namespace :api do
     namespace :v1 do
       get 'openapi.json', to: 'specs#show', as: :openapi, defaults: { format: :json }
+      get 'llms-full.txt', to: '/api_docs#llms_full', as: :llms_full
       get 'me', to: 'me#show'
       resources :members, only: %i[index show], constraints: { id: /\d+/ }
 
