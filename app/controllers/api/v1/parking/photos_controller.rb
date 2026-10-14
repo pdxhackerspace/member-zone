@@ -3,9 +3,10 @@ module Api
     module Parking
       # Photos on any parking notice, under parking.manage_notices.
       class PhotosController < BaseController
-        include ParkingNoticePhotos
-
+        # Ahead of the concern's record lookups, so a token without the scope learns nothing.
         before_action -> { require_scope!(:'parking.manage_notices') }
+
+        include ParkingNoticePhotos
 
         private
 

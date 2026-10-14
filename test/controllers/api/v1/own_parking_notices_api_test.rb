@@ -23,6 +23,26 @@ module Api
                      json_body['data'].pluck('id').sort
       end
 
+      test 'lists everyone on each of your notices' do
+        notice = parking_notices(:active_permit)
+        notice.replace_members!([@member.id, users(:two).id])
+
+        get api_v1_me_parking_notices_path, headers: api_headers(@raw)
+
+        listed = json_body['data'].find { |row| row['id'] == notice.id }
+        assert_equal [@member.id, users(:two).id].sort, listed['members'].pluck('id').sort
+      end
+
+      test 'a token without the scope cannot tell which of your notices exist' do
+        raw = issue_api_token(@member)
+
+        [api_v1_me_parking_notice_path(parking_notices(:active_permit)), api_v1_me_parking_notice_path(id: 0),
+         api_v1_me_parking_notice_photo_path(parking_notices(:active_permit), 0)].each do |path|
+          get path, headers: api_headers(raw)
+          assert_api_error :forbidden, 'insufficient_scope'
+        end
+      end
+
       test 'filters by status' do
         get api_v1_me_parking_notices_path(status: 'active'), headers: api_headers(@raw)
 

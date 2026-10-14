@@ -41,7 +41,7 @@ class ApiToken < ApplicationRecord
 
   before_validation :normalize_scopes
   before_validation :issue_token, on: :create
-  before_validation :default_contact, on: :create
+  before_validation :default_contact
   before_validation :default_expiry, on: :create
 
   scope :revoked, -> { where.not(revoked_at: nil) }
@@ -52,8 +52,11 @@ class ApiToken < ApplicationRecord
   scope :personal, -> { joins(:user).where(users: { service_account: false }) }
   scope :service, -> { joins(:user).where(users: { service_account: true }) }
   scope :newest_first, -> { order(created_at: :desc) }
-  # Tokens someone is answerable for: their own, and service-account tokens they are the contact for.
-  scope :looked_after_by, ->(user) { where(user: user).or(where(contact_user: user)) }
+  # Tokens someone is answerable for: their own, and service-account tokens they are the contact
+  # for. A personal token's contact is always its holder, so contact access never reaches one.
+  scope :looked_after_by, lambda { |user|
+    where(user: user).or(where(contact_user: user, user_id: User.service_accounts.select(:id)))
+  }
 
   def self.digest(token)
     OpenSSL::Digest::SHA256.hexdigest(token.to_s)
@@ -218,10 +221,10 @@ class ApiToken < ApplicationRecord
     self.token_hint = @token.last(4)
   end
 
-  # A member is the contact for their own token. A service-account token's contact is whoever
-  # its creator chose, and may be nobody, in which case token managers are reminded.
+  # A member is always the contact for their own token. A service-account token's contact is
+  # whoever its creator chose, and may be nobody, in which case token managers are reminded.
   def default_contact
-    self.contact_user = user if contact_user.nil? && user && !user.service_account?
+    self.contact_user = user if user && !user.service_account?
   end
 
   def default_expiry
