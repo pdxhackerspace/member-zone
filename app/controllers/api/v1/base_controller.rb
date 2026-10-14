@@ -14,13 +14,18 @@ module Api
       include MemberVisibility
 
       RATE_LIMIT = 120
+      # Per address, ahead of authentication, so requests with missing or wrong tokens are
+      # throttled too. Generous enough for several devices behind one address.
+      ADDRESS_RATE_LIMIT = 600
       MAX_PER_PAGE = 100
+
+      rate_limit to: ADDRESS_RATE_LIMIT, within: 1.minute, name: 'api-v1-address', store: RateLimiting.store,
+                 by: -> { request.remote_ip }, with: -> { render_rate_limited }
 
       before_action :authenticate_api_token!
 
       rate_limit to: RATE_LIMIT, within: 1.minute, name: 'api-v1', store: RateLimiting.store,
-                 by: -> { "token-#{current_api_token&.id || request.remote_ip}" },
-                 with: -> { render_rate_limited }
+                 by: -> { "token-#{current_api_token.id}" }, with: -> { render_rate_limited }
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
       rescue_from ActionController::ParameterMissing, with: :render_bad_request
@@ -96,8 +101,7 @@ module Api
 
       def render_rate_limited
         response.headers['Retry-After'] = '60'
-        render_error(:rate_limited, "Rate limit of #{RATE_LIMIT} requests a minute exceeded.",
-                     status: :too_many_requests)
+        render_error(:rate_limited, 'Too many requests. Try again in a minute.', status: :too_many_requests)
       end
 
       # page/per_page pagination, with the totals in `meta` and RFC 8288 links in `Link`.
