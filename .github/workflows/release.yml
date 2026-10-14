@@ -6,7 +6,8 @@ name: Release
 # no VERSION file. Pick a bump level and this workflow computes the next version,
 # builds the image with that version baked in, publishes it, then tags the commit.
 #
-# Usage: gh workflow run release.yml -f bump=minor
+# Usage: Actions > Release > Run workflow in the GitHub UI (bump defaults to patch), or
+#        gh workflow run release.yml -f bump=minor
 #        gh workflow run release.yml -f bump=patch -f dry_run=true
 
 on:
@@ -16,6 +17,7 @@ on:
         description: 'Semver bump'
         required: true
         type: choice
+        default: patch
         options: [patch, minor, major]
       sha:
         description: 'Commit on main to release (default: main tip)'
