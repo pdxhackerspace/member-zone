@@ -267,7 +267,7 @@ paths:
       summary: Change a parking notice
       description: |
         Changes any of the notice's fields. Send `member_ids` to replace the member list (members
-        newly added are emailed); leave it out to keep the members as they are. Changing
+        newly added are emailed); leave it out, or send `null`, to keep the members as they are. Changing
         `expires_at` is recorded as a renewal. `PUT` is accepted as a synonym.
       tags: [Parking (staff)]
       x-required-scope: parking.manage_notices
@@ -647,7 +647,8 @@ paths:
       - $ref: '#/components/parameters/Id'
     get:
       operationId: getOwnParkingNoticePdf
-      summary: Download one of your notices as PDF
+      summary: Download one of your permits as PDF
+      description: Permits only; a ticket answers `403 forbidden`.
       tags: [Parking (your own)]
       x-required-scope: parking.own_permits
       responses:
@@ -664,7 +665,8 @@ paths:
       - $ref: '#/components/parameters/Id'
     post:
       operationId: printOwnParkingNotice
-      summary: Print one of your notices
+      summary: Print one of your permits
+      description: Permits only; a ticket answers `403 forbidden`.
       tags: [Parking (your own)]
       x-required-scope: parking.own_permits
       requestBody:

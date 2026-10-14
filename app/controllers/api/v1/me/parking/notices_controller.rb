@@ -12,7 +12,8 @@ module Api
 
           ATTRIBUTES = %i[description location location_detail expires_at].freeze
 
-          before_action :require_permit, only: :update
+          # As on the website, members change and print their permits; tickets are staff's.
+          before_action :require_permit, if: -> { action_name.in?(%w[update pdf print]) }
 
           # Always a permit, at most two weeks long, with the holder on it.
           def create

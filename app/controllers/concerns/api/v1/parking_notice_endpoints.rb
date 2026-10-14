@@ -81,9 +81,10 @@ module Api
         params.permit(*keys).to_h.symbolize_keys
       end
 
-      # nil when the request left member_ids out, so an update leaves the members alone.
+      # nil when the request left member_ids out or sent null, so an update leaves the members
+      # alone; an empty list clears them.
       def requested_member_ids
-        Array(params[:member_ids]) if params.key?(:member_ids)
+        Array(params[:member_ids]) unless params[:member_ids].nil?
       end
 
       def render_result(result, status: :ok)
