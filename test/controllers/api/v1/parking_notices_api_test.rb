@@ -126,6 +126,15 @@ module Api
         assert_equal [users(:one)], notice.members.to_a
       end
 
+      test 'null member_ids leaves the members alone' do
+        notice = parking_notices(:active_permit)
+        patch api_v1_parking_notice_path(notice), params: { location: 'Laser room', member_ids: nil }, as: :json,
+                                                  headers: api_headers(@raw)
+
+        assert_response :success
+        assert_equal [users(:one)], notice.reload.members.to_a
+      end
+
       test 'replaces members and emails the new ones' do
         notice = parking_notices(:active_permit)
 

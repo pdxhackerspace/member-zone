@@ -26,7 +26,7 @@ module Api
                                  'members through /parking/notices.', status: :forbidden)
       end
 
-      # Tickets are issued by staff; members may view and clear them but not change them.
+      # Tickets are issued by staff; members may view and clear them but not change or print them.
       def require_permit
         return if @notice.permit?
 
