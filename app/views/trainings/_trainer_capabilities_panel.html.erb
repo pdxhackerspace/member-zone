@@ -1,9 +1,11 @@
-<% return unless current_user_admin? %>
+<% return if @manageable_trainer_topics.blank? %>
 
 <div class="form-section mt-3" id="trainer-capabilities-panel">
   <div class="form-section-header">
     <span class="h-section-label">Trainer capabilities</span>
-    <span class="text-12 text-secondary">Admin only</span>
+    <% unless current_user_admin? %>
+      <span class="text-12 text-secondary">Topics you can appoint trainers for</span>
+    <% end %>
   </div>
   <div class="text-13 text-secondary mb-3">
     Grant or revoke who can train others in each topic.
@@ -60,7 +62,7 @@
 
     <% trainer_topic_ids = @trainer_manage_user.training_topics.pluck(:id) %>
     <div class="d-flex flex-wrap gap-1">
-      <% @all_training_topics.each do |topic| %>
+      <% @manageable_trainer_topics.each do |topic| %>
         <% is_trainer = trainer_topic_ids.include?(topic.id) %>
         <div class="d-inline-flex align-items-center border rounded px-2 py-1 text-12 <%= is_trainer ? 'border-success' : 'text-secondary' %>">
           <%= link_to topic.name, edit_training_topic_path(topic), class: "me-1 text-decoration-none #{'fw-medium' if is_trainer}" %>

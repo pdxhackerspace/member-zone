@@ -33,8 +33,9 @@ class PrivilegeTest < ActiveSupport::TestCase
     Privilege.seed_defaults!
 
     assert_equal %w[audit_logs.alerts audit_logs.view training.documents.manage training.record
-                    training.respond_requests training.revoke training.subtopics.create training.subtopics.manage
-                    training.topics.edit_details training.topics.manage_links],
+                    training.respond_requests training.revoke training.subtopics.create
+                    training.subtopics.grant_trainer training.subtopics.manage training.topics.edit_details
+                    training.topics.manage_links],
                  Privilege.topic_scoped.order(:key).pluck(:key)
   end
 

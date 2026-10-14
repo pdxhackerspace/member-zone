@@ -309,10 +309,30 @@ class User < ApplicationRecord
 
   # Appointing or removing a trainer confers the topic's can_train roles, and the Training
   # record created alongside confers its trained_in roles, so containment covers both.
+  #
+  # training.grant_trainer reaches every topic. training.subtopics.grant_trainer is a
+  # steward's version: it reaches only the subtopics under the topic that conferred it.
   def may_manage_trainer_capability?(topic)
-    return false unless can?(:'training.grant_trainer')
+    return false unless can?(:'training.grant_trainer') || may_appoint_subtopic_trainer?(topic)
 
     may_confer?(topic, member_sources: TrainingTopicRole::MEMBER_SOURCES)
+  end
+
+  # Like may_manage_subtopic?, this never matches the conferring topic itself: a steward
+  # appoints trainers for the subtopics under their area, not for the area.
+  def may_appoint_subtopic_trainer?(topic)
+    parent_id = topic.is_a?(TrainingTopic) ? topic.parent_id : TrainingTopic.where(id: topic.to_i).pick(:parent_id)
+    return false if parent_id.nil?
+
+    conferred_privileges.any? do |conferring_topic_id, privilege|
+      conferring_topic_id == parent_id && privilege.key == 'training.subtopics.grant_trainer'
+    end
+  end
+
+  # Every topic this member may appoint or remove trainers for, for the pickers in the UI.
+  def manageable_trainer_topics
+    candidates = can?(:'training.grant_trainer') ? TrainingTopic.all : subtopics_of_grant_trainer_topics
+    candidates.order(:name).select { |topic| may_manage_trainer_capability?(topic) }
   end
 
   # Recording or revoking training for a topic, subject to the no-escalation rule.
@@ -721,6 +741,13 @@ class User < ApplicationRecord
 
     topic_id = topic.to_i
     [topic_id, TrainingTopic.where(id: topic_id).pick(:parent_id)].compact
+  end
+
+  def subtopics_of_grant_trainer_topics
+    parent_ids = conferred_privileges.filter_map do |topic_id, privilege|
+      topic_id if privilege.key == 'training.subtopics.grant_trainer'
+    end
+    TrainingTopic.where(parent_id: parent_ids.uniq)
   end
 
   def build_conferred_privileges

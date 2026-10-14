@@ -52,10 +52,10 @@ class Role < ApplicationRecord
     {
       name: 'Area lead',
       description: 'Runs a topic and the subtopics under it: curates resources, adds and removes ' \
-                   'subtopics, and trains on all of them.',
+                   'subtopics, trains on all of them, and appoints trainers for them.',
       privileges: %w[training.topics.manage_links training.documents.manage training.topics.edit_details
-                     training.subtopics.create training.subtopics.manage training.record training.revoke
-                     training.respond_requests]
+                     training.subtopics.create training.subtopics.manage training.subtopics.grant_trainer
+                     training.record training.revoke training.respond_requests]
     },
     {
       name: 'Audit log administrator',

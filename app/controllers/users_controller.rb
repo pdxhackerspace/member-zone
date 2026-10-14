@@ -799,7 +799,7 @@ class UsersController < AuthenticatedController
       view_incidents: can?(:'incidents.manage'),
       view_parking: can?(:'parking.manage_notices'),
       record_training: can_for_any_topic?(:'training.record'),
-      grant_trainer: can?(:'training.grant_trainer')
+      grant_trainer: can?(:'training.grant_trainer') || can_for_any_topic?(:'training.subtopics.grant_trainer')
     }
   end
 
