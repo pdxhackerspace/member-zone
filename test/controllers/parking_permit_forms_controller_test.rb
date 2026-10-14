@@ -4,11 +4,11 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
   setup do
     RateLimiting.reset!
     @member = users(:one)
-    @device = WebhookDevice.create!(name: 'Front door kiosk')
+    @device = kiosk_api_token
   end
 
   test 'shows the form for a live link without signing in' do
-    link = ParkingPermitLink.issue_for_new_permit!(user: @member, webhook_device: @device)
+    link = ParkingPermitLink.issue_for_new_permit!(user: @member, api_token: @device)
 
     get parking_permit_form_path(token: link.token)
 
@@ -29,7 +29,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'submitting the form creates the permit once' do
-    link = ParkingPermitLink.issue_for_new_permit!(user: @member, webhook_device: @device)
+    link = ParkingPermitLink.issue_for_new_permit!(user: @member, api_token: @device)
 
     assert_difference 'ParkingNotice.count', 1 do
       patch parking_permit_form_path(token: link.token), params: { parking_notice: permit_params }
@@ -40,7 +40,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
     assert link.submitted?
     assert_equal [@member], notice.members.to_a
     assert_equal @member, notice.issued_by
-    assert_equal @device, notice.webhook_device
+    assert_equal @device, notice.api_token
     assert_equal 'Woodshop', notice.location
 
     assert_no_difference 'ParkingNotice.count' do
@@ -105,7 +105,7 @@ class ParkingPermitFormsControllerTest < ActionDispatch::IntegrationTest
 
   def blank_permit
     ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [@member], issued_by: @member,
-                          webhook_device: @device, expires_at: 2.weeks.from_now,
+                          api_token: @device, expires_at: 2.weeks.from_now,
                           details_requested_at: Time.current)
   end
 end

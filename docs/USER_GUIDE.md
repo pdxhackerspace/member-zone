@@ -167,9 +167,12 @@ Click a segment or its legend line to open the application list filtered to that
 
 ## Parking permits from access control devices
 
-Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. Each device needs a token, issued under **Settings → Webhook devices** (requires the *Manage access controllers* privilege). The token is shown **once**, when the device is created or its token is regenerated; copy it into the device's configuration then. Regenerating or disabling a device stops its old token working immediately, and the device page shows when and from where it last called.
+Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. A device calls the Member Zone API with a [service account token](#service-account-tokens-and-administration):
 
-The device calls `POST /webhooks/devices/parking_permits` with its token in an `Authorization: Bearer …` header (or an `X-Device-Token` header, or a `token` parameter), identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
+1. Create a service account for the device, and give it a role that confers *Issue permits for members who badge in at a kiosk* (`parking.issue_for_members`). That privilege lets the device act for whoever badges in, and nothing more — it cannot see or change other parking notices.
+2. Under **Settings → API tokens**, create a token for the service account with the `parking.issue_for_members` scope, and choose a contact to be warned before it expires. The token is shown **once**; copy it into the device's configuration then. Suspending or revoking the token stops the device at once, and the token list shows when it was last used.
+
+The device calls `POST /api/v1/parking/permit_requests` with `Authorization: Bearer mz_…`, identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
 
 - **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
 - **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.

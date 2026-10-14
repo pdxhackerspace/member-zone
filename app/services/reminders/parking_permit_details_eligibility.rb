@@ -22,7 +22,7 @@ module Reminders
 
     def self.due(now: Time.current)
       ids = candidates(now: now).select { |notice| due?(notice, now: now) }.map(&:id)
-      ParkingNotice.where(id: ids).includes(:members, :webhook_device).order(:details_requested_at)
+      ParkingNotice.where(id: ids).includes(:members, :api_token).order(:details_requested_at)
     end
 
     def self.count_due(now: Time.current)

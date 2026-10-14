@@ -13,9 +13,17 @@ module ApiTestHelper
 
   # Returns the plaintext token. Extra attributes go straight to ApiToken.
   def issue_api_token(user, scopes: [], created_by: user, **attrs)
-    token = ApiToken.create!(user: user, created_by: created_by, name: "Test token #{SecureRandom.hex(3)}",
-                             scopes: scopes, **attrs)
+    token = ApiToken.create!({ user: user, created_by: created_by, name: "Test token #{SecureRandom.hex(3)}",
+                               scopes: scopes }.merge(attrs))
     token.token
+  end
+
+  # A kiosk's token: a service account that may issue permits for members who badge in.
+  def kiosk_api_token(name: 'Front door kiosk')
+    kiosk = create_service_account(full_name: name)
+    grant_privileges(kiosk, 'parking.issue_for_members')
+    admin = User.find_by(is_admin: true) || create_service_account.tap { |user| user.update_columns(is_admin: true) }
+    ApiToken.create!(user: kiosk, created_by: admin, name: name, scopes: ['parking.issue_for_members'])
   end
 
   def api_headers(raw_token)

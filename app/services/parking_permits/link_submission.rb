@@ -25,7 +25,7 @@ module ParkingPermits
 
     def create_permit
       notice = ParkingNotice.new(@attributes.merge(notice_type: 'permit', status: 'active', members: [@link.user],
-                                                   issued_by: @link.user, webhook_device: @link.webhook_device))
+                                                   issued_by: @link.user, api_token: @link.api_token))
       return notice unless valid_details?(notice) && valid_expiry?(notice)
 
       saved = locked_while_editable do
