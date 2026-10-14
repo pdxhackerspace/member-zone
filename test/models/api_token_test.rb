@@ -23,6 +23,14 @@ class ApiTokenTest < ActiveSupport::TestCase
     assert_equal @member, token.contact_user
   end
 
+  test "a personal token's contact cannot be reassigned" do
+    token = ApiToken.create!(user: @member, created_by: @member, name: 'Laptop')
+    token.update!(contact_user: users(:three))
+
+    assert_equal @member, token.reload.contact_user
+    assert_not_includes ApiToken.looked_after_by(users(:three)), token
+  end
+
   test 'a service account token may have nobody to look after it' do
     token = ApiToken.create!(user: create_service_account, created_by: @admin, name: 'Kiosk')
 

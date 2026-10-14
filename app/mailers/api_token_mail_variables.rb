@@ -17,7 +17,7 @@ module ApiTokenMailVariables
   # in their place uses the settings page.
   def tokens_url(token, recipient)
     base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
-    answerable = recipient.id.in?([token.user_id, token.contact_user_id])
+    answerable = token.user_id == recipient.id || (token.service? && token.contact_user_id == recipient.id)
     answerable ? "#{base}/api_tokens" : "#{base}/settings/api_tokens"
   end
 end
