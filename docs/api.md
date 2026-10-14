@@ -84,7 +84,7 @@ WWW-Authenticate: Bearer realm="Member Zone", error="invalid_token"
 - Times are ISO 8601 in UTC: `2026-10-21T17:00:00Z`.
 - Lists take `page` (from 1) and `per_page` (1–100, default 25), and send RFC 8288 `Link` headers with `first`, `prev`, `next`, and `last`.
 - `PATCH` changes only the fields you send. `PUT` is accepted as a synonym.
-- Each token may make 120 requests a minute; beyond that you get `429` with `Retry-After`.
+- Each token may make 120 requests a minute, and each client address 600; beyond that you get `429` with `Retry-After`.
 
 ### Errors
 
