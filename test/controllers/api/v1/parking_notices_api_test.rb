@@ -37,6 +37,27 @@ module Api
                      json_body['data'].pluck('id').sort
       end
 
+      test 'filtering by member still lists everyone on each notice' do
+        notice = parking_notices(:active_permit)
+        notice.replace_members!([users(:one).id, @member.id])
+
+        get api_v1_parking_notices_path(member_id: @member.id), headers: api_headers(@raw)
+
+        listed = json_body['data'].find { |row| row['id'] == notice.id }
+        assert_equal [users(:one).id, @member.id].sort, listed['members'].pluck('id').sort
+      end
+
+      test 'a token without the scope cannot tell which notices or photos exist' do
+        raw = issue_api_token(@member, scopes: ['parking.own_permits'])
+
+        [api_v1_parking_notice_path(parking_notices(:active_permit)), api_v1_parking_notice_path(id: 0),
+         api_v1_parking_notice_photo_path(parking_notices(:active_permit), 0),
+         api_v1_parking_notice_photo_path(0, 0)].each do |path|
+          get path, headers: api_headers(raw)
+          assert_api_error :forbidden, 'insufficient_scope'
+        end
+      end
+
       test 'refuses an unknown filter value' do
         get api_v1_parking_notices_path(status: 'lost'), headers: api_headers(@raw)
 

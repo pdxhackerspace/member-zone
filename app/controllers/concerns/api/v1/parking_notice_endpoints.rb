@@ -25,7 +25,9 @@ module Api
       }.freeze
 
       def index
-        notices = filtered(notice_scope).includes(:issued_by, :cleared_by, :members, photos_attachments: :blob)
+        # preload, not includes: the member filters join parking_notice_members, and eager loading
+        # members through that join would list only the member filtered on.
+        notices = filtered(notice_scope).preload(:issued_by, :cleared_by, :members, photos_attachments: :blob)
         records, meta = paginate(notices.newest_first)
         render json: { data: records.map { |notice| serialize(notice) }, meta: meta }
       end

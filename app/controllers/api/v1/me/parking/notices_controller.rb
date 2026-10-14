@@ -6,8 +6,9 @@ module Api
         # member can do for themselves on the website. Personal tokens only: a service account has
         # no parking notices of its own, and acts for members through /parking/notices instead.
         class NoticesController < BaseController
-          include ParkingNoticeEndpoints
+          # OwnParkingNotices first: its scope and token checks must run before any record lookup.
           include OwnParkingNotices
+          include ParkingNoticeEndpoints
 
           ATTRIBUTES = %i[description location location_detail expires_at].freeze
 

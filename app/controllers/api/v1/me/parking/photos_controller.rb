@@ -5,8 +5,9 @@ module Api
         # Photos on the token holder's own notices. Anyone on a notice may see its photos; only
         # permits, which members manage themselves, take new ones or lose old ones.
         class PhotosController < BaseController
-          include ParkingNoticePhotos
+          # OwnParkingNotices first: its scope and token checks must run before any record lookup.
           include OwnParkingNotices
+          include ParkingNoticePhotos
 
           private
 

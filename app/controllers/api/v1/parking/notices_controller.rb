@@ -4,11 +4,13 @@ module Api
       # Staff access to every parking permit and ticket, under parking.manage_notices. Members are
       # named explicitly by id, since the token is not acting for any one of them.
       class NoticesController < BaseController
+        # Ahead of the concern's record lookup, so a token without the scope learns nothing about
+        # which notices exist.
+        before_action -> { require_scope!(:'parking.manage_notices') }
+
         include ParkingNoticeEndpoints
 
         ATTRIBUTES = %i[notice_type description location location_detail expires_at requires_admin_clearance].freeze
-
-        before_action -> { require_scope!(:'parking.manage_notices') }
 
         def create
           result = ParkingNotices::Issue.call(actor: current_user, attributes: notice_attributes(*ATTRIBUTES),

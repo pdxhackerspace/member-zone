@@ -133,6 +133,17 @@ class ManagedApiTokensControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'Front desk', token.name
   end
 
+  test "a personal token's edit form has no contact to reassign" do
+    sign_in_as_manager
+    member = users(:two)
+    token = ApiToken.create!(user: member, created_by: member, name: 'Member token')
+
+    get edit_managed_api_token_path(token)
+
+    assert_response :success
+    assert_select 'select[name=?]', 'api_token[contact_user_id]', count: 0
+  end
+
   test 'sets the maximum lifetime' do
     sign_in_as_manager
     patch lifetime_managed_api_tokens_path, params: { api_token_max_lifetime_days: 90 }

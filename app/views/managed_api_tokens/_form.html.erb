@@ -27,12 +27,17 @@
     <%= form.label :description, "Notes (optional)", class: "form-label" %>
     <%= form.text_area :description, class: "form-control", rows: 2 %>
   </div>
-  <div class="mb-3">
-    <%= form.label :contact_user_id, "Contact", class: "form-label" %>
-    <%= form.collection_select :contact_user_id, @contacts, :id, :display_name, { include_blank: "Nobody" },
-                               class: "form-select" %>
-    <div class="form-text">Warned before the token expires. With no active contact, token managers are warned.</div>
-  </div>
+  <% if @api_token.new_record? || @api_token.service? %>
+    <div class="mb-3">
+      <%= form.label :contact_user_id, "Contact", class: "form-label" %>
+      <%= form.collection_select :contact_user_id, @contacts, :id, :display_name, { include_blank: "Nobody" },
+                                 class: "form-select" %>
+      <div class="form-text">
+        Warned before the token expires, and can extend, suspend, or revoke it from their own API tokens page.
+        With no active contact, token managers are warned.
+      </div>
+    </div>
+  <% end %>
   <% if @api_token.new_record? %>
     <div class="mb-3">
       <div class="form-label">Scopes</div>
