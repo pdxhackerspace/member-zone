@@ -135,6 +135,14 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # API Token Expiry Reminder - Daily at 8:15am (cadence enforced per token)
+  Sidekiq::Cron::Job.create(
+    name: 'API Token Expiry Reminder - Daily at 8:15am',
+    cron: '15 8 * * *',
+    class: 'ApiTokenExpiryReminderJob',
+    active_job: true
+  )
+
   # Login Link Expiration - Daily at 8am
   Sidekiq::Cron::Job.create(
     name: 'Login Link Expiration - Daily at 8am',

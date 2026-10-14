@@ -58,8 +58,6 @@ Rails.application.routes.draw do
   get  "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#show", as: :applicant_notification_opt_out
   post "/apply/notifications/:token/opt-out", to: "applicant_notification_opt_outs#create"
 
-  # Device webhooks authenticate with a per-device token (Settings → Webhook Devices).
-  post "/webhooks/devices/parking_permits", to: "device_webhooks#parking_permit", as: :device_parking_permit_webhook
   post "/webhooks/:slug", to: "webhooks#receive", as: :webhook_receive
 
   # No-login parking permit form reached from a device-issued email link.
@@ -446,6 +444,18 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :api_tokens, only: %i[index new create] do
+    member do
+      post :renew
+      post :suspend
+      post :resume
+      post :revoke
+    end
+  end
+  resources :managed_api_tokens, path: 'settings/api_tokens', only: %i[index new create edit update] do
+    collection { patch :lifetime }
+  end
+
   resources :credentials, only: %i[index new create] do
     member do
       post :revoke
@@ -467,12 +477,6 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :webhook_devices, path: "settings/webhook_devices" do
-    member do
-      post :toggle
-      post :regenerate_token
-    end
-  end
 
   resources :access_controller_types, only: [:index, :new, :create, :edit, :update, :destroy] do
     member do
@@ -553,6 +557,48 @@ Rails.application.routes.draw do
   get "/reports/:key", to: "reports#show", as: :report
   get "/member-map", to: "member_maps#show", as: :member_map
   get "/api/users/search", to: "api/users#search", as: :api_users_search
+
+  # Token-authenticated API. docs/api/openapi.yaml is the reference; docs/api.md the guide.
+  get '/llms.txt', to: 'api_docs#llms_index', as: :llms_txt
+  get '/api/docs', to: 'api_docs#reference', as: :api_docs
+  namespace :api do
+    namespace :v1 do
+      get 'openapi.json', to: 'specs#show', as: :openapi, defaults: { format: :json }
+      get 'llms-full.txt', to: '/api_docs#llms_full', as: :llms_full
+      get 'me', to: 'me#show'
+      resources :members, only: %i[index show], constraints: { id: /\d+/ }
+
+      namespace :parking do
+        resources :notices, only: %i[index show create update] do
+          member do
+            post :clear
+            post :notes
+            get :pdf
+            post :print
+          end
+          resources :photos, only: %i[show create destroy]
+        end
+        resources :printers, only: :index
+        resources :permit_requests, only: :create
+      end
+
+      namespace :me do
+        namespace :parking do
+          resources :notices, only: %i[index show create update] do
+            member do
+              post :close
+              post :request_clearance
+              post :notes
+              get :pdf
+              post :print
+            end
+            resources :photos, only: %i[show create destroy]
+          end
+        end
+      end
+      match '*path', to: 'errors#not_found', via: :all
+    end
+  end
   
   require 'sidekiq/web'
   mount Sidekiq::Web => '/goh7zeeNiezoozaingothu4'

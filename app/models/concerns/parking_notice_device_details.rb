@@ -4,7 +4,8 @@ module ParkingNoticeDeviceDetails
   extend ActiveSupport::Concern
 
   included do
-    belongs_to :webhook_device, optional: true
+    # The API token of the device that issued the permit, if a device did.
+    belongs_to :api_token, optional: true
     has_many :parking_permit_links, dependent: :delete_all
 
     before_save :mark_details_completed, if: :awaiting_details?

@@ -7,7 +7,7 @@ class ParkingPermitDetailsEligibilityTest < ActiveSupport::TestCase
     set_reminder_cadence('parking_permit_details', enabled: true, start_offset_days: 1, interval_days: 2,
                                                    max_reminders: 3)
     @member = users(:one)
-    @device = WebhookDevice.create!(name: 'Front door kiosk')
+    @device = kiosk_api_token
   end
 
   test 'a blank permit is due a day after it was issued' do
@@ -70,7 +70,7 @@ class ParkingPermitDetailsEligibilityTest < ActiveSupport::TestCase
 
   def blank_permit(issued_at:)
     ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [@member], issued_by: @member,
-                          webhook_device: @device, expires_at: issued_at + 2.weeks,
+                          api_token: @device, expires_at: issued_at + 2.weeks,
                           details_requested_at: issued_at)
   end
 end

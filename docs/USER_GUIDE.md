@@ -147,6 +147,14 @@ It goes to reviewers rather than to the applicant, so there is nobody to opt out
 
 **Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
 
+### API token expiry reminder
+
+Warns before an API token expires, so a token still in use gets extended and an abandoned one is left to lapse. **This reminder ships enabled** and members cannot opt out of it: it is the only warning before something stops working.
+
+It goes to the token's **contact** — for a member's own token, the member. When the contact is no longer an active member (or a service-account token has none), it goes to everyone who holds *Manage service-account API tokens* instead.
+
+**Timing** counts back from the expiry date: 14 days before, then every 7, at most 3. Extending a token moves its expiry and starts the sequence over.
+
 ## Application backlog on the admin dashboard
 
 The admin dashboard's **Applications** column draws every application still waiting on a decision as one bar, with the total above it:
@@ -159,9 +167,12 @@ Click a segment or its legend line to open the application list filtered to that
 
 ## Parking permits from access control devices
 
-Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. Each device needs a token, issued under **Settings → Webhook devices** (requires the *Manage access controllers* privilege). The token is shown **once**, when the device is created or its token is regenerated; copy it into the device's configuration then. Regenerating or disabling a device stops its old token working immediately, and the device page shows when and from where it last called.
+Access control devices — a kiosk by the door, say — can issue parking permits for the member who badges in. A device calls the Member Zone API with a [service account token](#service-account-tokens-and-administration):
 
-The device calls `POST /webhooks/devices/parking_permits` with its token in an `Authorization: Bearer …` header (or an `X-Device-Token` header, or a `token` parameter), identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
+1. Create a service account for the device, and give it a role that confers *Issue permits for members who badge in at a kiosk* (`parking.issue_for_members`). That privilege lets the device act for whoever badges in, and nothing more — it cannot see or change other parking notices.
+2. Under **Settings → API tokens**, create a token for the service account with the `parking.issue_for_members` scope, and choose a contact to be warned before it expires. The token is shown **once**; copy it into the device's configuration then. Suspending or revoking the token stops the device at once, and the token list shows when it was last used.
+
+The device calls `POST /api/v1/parking/permit_requests` with `Authorization: Bearer mz_…`, identifies the member by `rfid`, `username`, or full `email`, and picks a `mode`:
 
 - **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
 - **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.
@@ -217,6 +228,27 @@ Your credentials are revoked automatically when your membership stops being acti
 - Providers and revocations that need attention appear on the settings page, the admin dashboard and the urgent digest. A revocation that fails is retried daily, backing off up to a day.
 
 See `docs/credentials.md` for how programs are written, and the `Credentials administrator` role for the four `credentials.*` privileges.
+
+## API tokens
+
+API tokens let scripts, devices, and integrations use the Member Zone API. A token is sent as `Authorization: Bearer mz_…`; the API reference is at `/api/v1/openapi.json`.
+
+### Your own tokens (members)
+
+**API tokens** on your dashboard lists your tokens. **+ New token** asks what it is for and what it may do — you can only tick things you can do yourself, and a token never does more than its ticks *or* more than you can do at the moment it is used. The next page shows the token **once**; copy it before leaving.
+
+Each token lasts the maximum lifetime (365 days unless changed) and we email you two weeks before it expires. **Extend** pushes the expiry out again and keeps the same token, so whatever uses it needs no change — this works on an expired token too. **Suspend** stops a token until you **Resume** it; **Revoke** stops it for good. While your membership is not active your tokens are refused, and they work again if you come back.
+
+### Service account tokens and administration
+
+**Settings → API tokens** (needs *Manage service-account API tokens and see every token*) lists every token, with filters for tokens expiring within 30 days, tokens with nobody to remind, suspended, expired, and revoked, and for member versus service-account tokens.
+
+- **+ Service account token** makes a token for a device or integration. It belongs to the service account rather than to you, so it keeps working when you leave. The service account can only use privileges it holds through its roles, like any member, so give it a role first. Choose a **contact** to be warned before it expires.
+- **Edit** renames a token or reassigns its contact. To change what a token may do, create a new one and revoke the old.
+- **Extend**, **Suspend**, **Resume**, and **Revoke** work on any token from here.
+- **Token lifetime** sets the maximum lifetime in days. New tokens and extensions use it; existing tokens keep their expiry.
+
+Tokens cannot be created or changed while viewing as a member.
 
 ## Membership states
 

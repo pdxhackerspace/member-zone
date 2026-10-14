@@ -1,6 +1,5 @@
 class ParkingNoticesController < AuthenticatedController
   include Pagy::Method
-  include ParkingNoticeMemberParams
   include ParkingNoticePrinting
 
   before_action -> { require_privilege!(:'parking.manage_notices') }
@@ -44,57 +43,49 @@ class ParkingNoticesController < AuthenticatedController
   end
 
   def create
-    @parking_notice = ParkingNotice.new(parking_notice_params)
-    @parking_notice.issued_by = current_user
-    @parking_notice.event_actor = current_user
-    @parking_notice.build_members_from_ids!(resolve_admin_member_ids(member_ids_param))
+    result = ParkingNotices::Issue.call(
+      actor: current_user, attributes: parking_notice_params, member_ids: member_ids_param
+    )
+    @parking_notice = result.notice
 
-    if @parking_notice.save
-      journal_action = @parking_notice.permit? ? 'parking_permit_issued' : 'parking_ticket_issued'
-
-      @parking_notice.record_journal_entry!(journal_action, actor: current_user)
-      @parking_notice.notify_issued!
-
-      if print_and_create_another_permit?
-        redirect_after_print_and_create_another_permit
-        return
-      end
-
-      if create_another_permit?
-        redirect_to new_parking_notice_path(type: 'permit', parking_notice: parking_notice_prefill_params),
-                    notice: 'Parking permit created successfully.'
-        return
-      end
-
-      redirect_to parking_notice_path(@parking_notice),
-                  notice: "Parking #{@parking_notice.notice_type} created successfully."
-    else
+    unless result.success?
       load_form_data
       render :new, status: :unprocessable_content
+      return
     end
+
+    if print_and_create_another_permit?
+      redirect_after_print_and_create_another_permit
+      return
+    end
+
+    if create_another_permit?
+      redirect_to new_parking_notice_path(type: 'permit', parking_notice: parking_notice_prefill_params),
+                  notice: 'Parking permit created successfully.'
+      return
+    end
+
+    redirect_to parking_notice_path(@parking_notice),
+                notice: "Parking #{@parking_notice.notice_type} created successfully."
   end
 
   def update
-    @parking_notice.event_actor = current_user
-    newly_added = []
-    ParkingNotice.transaction do
-      @parking_notice.update!(parking_notice_params)
-      if params[:parking_notice]&.key?(:member_ids)
-        newly_added = @parking_notice.replace_members!(resolve_admin_member_ids(member_ids_param))
-      end
+    result = ParkingNotices::Update.call(
+      notice: @parking_notice, actor: current_user, attributes: parking_notice_params,
+      member_ids: submitted_member_ids
+    )
+
+    if result.success?
+      redirect_to parking_notice_path(@parking_notice),
+                  notice: "Parking #{@parking_notice.notice_type} updated successfully."
+    else
+      load_form_data
+      render :edit, status: :unprocessable_content
     end
-    @parking_notice.notify_issued!(newly_added) if newly_added.any?
-    redirect_to parking_notice_path(@parking_notice),
-                notice: "Parking #{@parking_notice.notice_type} updated successfully."
-  rescue ActiveRecord::RecordInvalid
-    load_form_data
-    render :edit, status: :unprocessable_content
   end
 
   def clear
-    @parking_notice.event_actor = current_user
-    @parking_notice.clear!(current_user)
-    @parking_notice.record_journal_entry!('parking_notice_cleared', actor: current_user)
+    ParkingNotices::Clear.call(notice: @parking_notice, actor: current_user)
 
     # Return to the list the admin was viewing rather than the cleared notice.
     redirect_to url_from(params[:return_to]) || parking_notices_path,
@@ -102,15 +93,13 @@ class ParkingNoticesController < AuthenticatedController
   end
 
   def add_note
-    note = params[:note].to_s.strip
+    result = ParkingNotices::AddNote.call(notice: @parking_notice, actor: current_user, note: params[:note])
 
-    if note.blank?
+    if result.success?
+      redirect_to parking_notice_path(@parking_notice), notice: 'Note added.'
+    else
       redirect_to parking_notice_path(@parking_notice), alert: 'Note cannot be blank.'
-      return
     end
-
-    @parking_notice.log_event!('note', actor: current_user, note: note)
-    redirect_to parking_notice_path(@parking_notice), notice: 'Note added.'
   end
 
   def download_pdf
@@ -125,20 +114,10 @@ class ParkingNoticesController < AuthenticatedController
   end
 
   def print_notice
-    unless @parking_notice.active?
-      redirect_to parking_notice_path(@parking_notice),
-                  alert: 'Expired or cleared notices cannot be printed.'
-      return
-    end
-
     printer = Printer.find(params[:printer_id])
-    job_id = print_parking_notice_to_printer(@parking_notice, printer)
+    result = print_parking_notice_to_printer(@parking_notice, printer)
 
-    redirect_to parking_notice_path(@parking_notice),
-                notice: "Printed to #{printer.name} (job #{job_id})."
-  rescue CupsService::PrintError => e
-    redirect_to parking_notice_path(@parking_notice),
-                alert: "Print failed: #{e.message}"
+    redirect_to parking_notice_path(@parking_notice), print_flash(result, printer)
   end
 
   def remove_photo
@@ -197,12 +176,27 @@ class ParkingNoticesController < AuthenticatedController
     params.dig(:parking_notice, :member_ids)
   end
 
+  # nil when the form left the member list out, so the update leaves members alone.
+  def submitted_member_ids
+    Array(member_ids_param) if params[:parking_notice]&.key?(:member_ids)
+  end
+
+  def print_flash(result, printer)
+    case result.error
+    when nil then { notice: "Printed to #{printer.name} (job #{result.job_id})." }
+    when :not_printable then { alert: 'Expired or cleared notices cannot be printed.' }
+    else { alert: "Print failed: #{result.message}" }
+    end
+  end
+
   def apply_prefill_members!(notice)
     return if params[:parking_notice].blank?
 
     prefill = parking_notice_prefill_params
     notice.assign_attributes(prefill.except(:member_ids))
-    notice.build_members_from_ids!(resolve_admin_member_ids(prefill[:member_ids])) if prefill[:member_ids].present?
+    return if prefill[:member_ids].blank?
+
+    notice.build_members_from_ids!(ParkingNotices::MemberResolution.normalize(prefill[:member_ids]))
   end
 
   def create_another_permit?
@@ -224,13 +218,13 @@ class ParkingNoticesController < AuthenticatedController
       return
     end
 
-    job_id = print_parking_notice_to_printer(@parking_notice, printer)
+    result = print_parking_notice_to_printer(@parking_notice, printer)
 
-    redirect_to redirect_path,
-                notice: "Parking permit created and printed to #{printer.name} (job #{job_id})."
-  rescue CupsService::PrintError => e
-    redirect_to redirect_path,
-                notice: 'Parking permit created successfully.',
-                alert: "Print failed: #{e.message}"
+    if result.success?
+      redirect_to redirect_path, notice: "Parking permit created and printed to #{printer.name} (job #{result.job_id})."
+    else
+      redirect_to redirect_path,
+                  notice: 'Parking permit created successfully.', alert: "Print failed: #{result.message}"
+    end
   end
 end

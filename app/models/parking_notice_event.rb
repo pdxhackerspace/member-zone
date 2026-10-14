@@ -3,6 +3,10 @@ class ParkingNoticeEvent < ApplicationRecord
 
   belongs_to :parking_notice
   belongs_to :actor, class_name: 'User', optional: true
+  # Set when the change came in through the API, so the history says so.
+  belongs_to :api_token, optional: true
+
+  before_create { self.api_token ||= Current.api_token }
 
   validates :event_type, presence: true, inclusion: { in: EVENT_TYPES }
   validates :note, presence: true, if: -> { event_type == 'note' }

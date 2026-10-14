@@ -40,6 +40,7 @@ class User < ApplicationRecord
   has_many :parking_notice_members, dependent: :destroy
   has_many :parking_notices, through: :parking_notice_members
   has_many :parking_permit_links, dependent: :delete_all
+  has_many :api_tokens, dependent: :destroy
   has_many :membership_applications, -> { newest_first }, dependent: :nullify, inverse_of: :user
   has_many :invitations, dependent: :nullify
   has_many :sent_invitations, class_name: 'Invitation', foreign_key: 'invited_by_id', dependent: :nullify
@@ -129,6 +130,19 @@ class User < ApplicationRecord
     errors.add(:email, :taken) if relation.exists?
   end
 
+  # The member picker's search: a substring of name, username, or alias, or a whole email address.
+  # Email is encrypted, so it cannot be matched by substring like the other fields; a whole
+  # address still resolves through the lookup digest.
+  scope :search_for_picker, lambda { |query|
+    pattern = "%#{sanitize_sql_like(query.to_s.strip.downcase)}%"
+    where(
+      "LOWER(COALESCE(full_name, '')) LIKE :p " \
+      "OR LOWER(COALESCE(username, '')) LIKE :p " \
+      'OR EXISTS (SELECT 1 FROM unnest(aliases) AS a WHERE LOWER(a) LIKE :p)',
+      p: pattern
+    ).or(by_any_email(query.to_s.strip))
+  }
+
   # Find a user whose full_name or any alias exactly matches the given name (case-insensitive).
   # No prefix or partial matching — the whole stored name must equal the query string.
   scope :by_name_or_alias, lambda { |name|
@@ -217,8 +231,10 @@ class User < ApplicationRecord
     handle.present? ? "#{username} @#{handle}" : username.to_s
   end
 
+  # Not while acting through an API token: a token does what its scopes say, so the
+  # administrator shortcuts that models take (ParkingNotice#clearable_by?, say) must not apply.
   def admin?
-    is_admin?
+    is_admin? && !acting_through_api_token?
   end
 
   # Does this member hold a privilege? Admins always do: is_admin is a permanent
@@ -226,10 +242,21 @@ class User < ApplicationRecord
   #
   # Global privileges apply once any held topic confers them. Topic-scoped privileges
   # apply only for the topic that conferred them, so callers must pass that topic.
+  #
+  # During an API request the token's holder is limited to the token's scopes wherever the
+  # question is asked — controller, model, or service — so no check made deeper down can hand
+  # a token more than it was given.
   def can?(privilege_key, topic: nil)
+    return false if acting_through_api_token? && Current.api_token.scopes.exclude?(privilege_key.to_s)
     return true if is_admin?
 
     privilege_conferred?(privilege_key, topic: topic)
+  end
+
+  # True while this user is the holder of the API token authenticating the current request.
+  def acting_through_api_token?
+    token = Current.api_token
+    token.present? && token.user_id == id
   end
 
   # The same question with the is_admin bypass left out: does a role this member actually

@@ -119,6 +119,14 @@ class NotificationCategory
       opt_out: true,
       mailer_actions: %w[credential_expiring_soon credential_expired credentials_revoked]
     },
+    # Not opt-out-able by default: it is the only warning before a token stops working.
+    'api_tokens' => {
+      name: 'API token expiry warnings',
+      description: 'Warnings before an API token you are responsible for expires.',
+      group: 'Account',
+      reminder_key: 'api_token_expiry',
+      mailer_actions: %w[api_token_expiring_soon]
+    },
     'account_security' => {
       name: 'Account security',
       description: 'Login links and related account access emails.',

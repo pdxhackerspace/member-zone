@@ -125,6 +125,8 @@ end
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem 'capybara'
+  # Validates API responses against docs/api/openapi.yaml in the contract tests.
+  gem 'json_schemer'
   gem 'minitest', '~> 6.0'
   gem 'selenium-webdriver'
 end

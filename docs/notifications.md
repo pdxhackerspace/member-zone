@@ -30,6 +30,7 @@ The **anchor** is the timestamp a reminder counts from, and each `Reminders::*El
 | `parking_permit_details` | `parking_notices.details_requested_at` | +1, every 2, max 3 |
 | `lapsed_access` | the earliest visit not yet mentioned | +0, daily, unlimited |
 | `staff_application` | `submitted_at` or `created_at` | +7, every 3, unlimited |
+| `api_token_expiry` | `api_tokens.expires_at` | −14, every 7, max 3 |
 
 `Reminders::Schedule` turns those numbers into dates (`next_due_at`, `due?`, `exhausted?`) and `Reminders::DeliveryScope` expresses the same predicates as a `LEFT JOIN` so candidate queries narrow in SQL instead of loading every row. Eligibility services keep only their domain questions — is the member still overdue, is the notice cleared, does the applicant still have no application — and `extend Reminders::Cadence` for the timing.
 

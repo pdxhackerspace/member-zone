@@ -1,6 +1,6 @@
 # A short-lived, no-login link that lets a member fill in a parking permit and print it.
 #
-# Links come from device webhooks. A +create_permit+ link creates a new permit when the member
+# Links come from access control devices calling the API. A +create_permit+ link creates a new permit when the member
 # submits the form; a +complete_permit+ link fills in the details of a blank permit the device
 # already issued. Either way the link only ever touches that one permit — it does not sign
 # anybody in.
@@ -13,7 +13,8 @@ class ParkingPermitLink < ApplicationRecord
   PURPOSES = %w[create_permit complete_permit].freeze
 
   belongs_to :user
-  belongs_to :webhook_device, optional: true
+  # The API token of the device the member asked at.
+  belongs_to :api_token, optional: true
   belongs_to :parking_notice, optional: true
 
   validates :token_digest, presence: true, uniqueness: true
@@ -35,13 +36,13 @@ class ParkingPermitLink < ApplicationRecord
     find_by(token_digest: digest(token))
   end
 
-  def self.issue_for_new_permit!(user:, webhook_device: nil, now: Time.current)
-    create!(purpose: 'create_permit', user: user, webhook_device: webhook_device, expires_at: now + LIFETIME)
+  def self.issue_for_new_permit!(user:, api_token: nil, now: Time.current)
+    create!(purpose: 'create_permit', user: user, api_token: api_token, expires_at: now + LIFETIME)
   end
 
   def self.issue_for_blank_permit!(parking_notice, user:, now: Time.current)
     create!(purpose: 'complete_permit', parking_notice: parking_notice, user: user,
-            webhook_device: parking_notice.webhook_device, expires_at: now + LIFETIME)
+            api_token: parking_notice.api_token, expires_at: now + LIFETIME)
   end
 
   def create_permit?

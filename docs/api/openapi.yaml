@@ -1,0 +1,1414 @@
+openapi: 3.1.0
+info:
+  title: Member Zone API
+  version: 1.0.0
+  summary: Programmatic access to Member Zone, the makerspace membership system.
+  description: |
+    The Member Zone API lets members, devices, and integrations work with Member Zone over HTTPS.
+
+    **Authentication.** Every request except `GET /openapi.json` carries an API token in the
+    `Authorization` header: `Authorization: Bearer mz_…`. Members create personal tokens from
+    their profile (API tokens tab); administrators create tokens for service accounts such as
+    kiosks and printers. A token is shown once, when it is created.
+
+    **Scopes.** A token carries scopes, which are Member Zone privilege keys such as
+    `parking.manage_notices`. A request succeeds only if the token has the scope the operation
+    names *and* the token's holder currently holds that privilege. If the holder loses a role,
+    their tokens lose that power immediately. Each operation lists its scope under
+    `x-required-scope`.
+
+    **Personal and service tokens.** A personal token acts for the member who holds it: parking
+    calls under `/me/...` apply to that member, implicitly. A service-account token acts for
+    others and names the member in the request (for example `member_ids`).
+
+    **Token lifetime.** Tokens expire, at most a configurable number of days (default 365) after
+    they are created or last extended. Holders are emailed before a token expires. An expired
+    token can be extended and keeps working with the same secret; a revoked token is gone for
+    good; a suspended token is refused until it is resumed. A token whose holder is no longer an
+    active member is refused while they are inactive.
+
+    **Errors.** Every error has the same shape: `{"error": {"code", "message", "details"}}`.
+    `code` is stable and machine-readable; `message` is for people. A token that is missing,
+    unknown, expired, suspended, revoked, or whose holder is inactive always gets the same
+    `401 invalid_token`, deliberately without saying which.
+
+    **Pagination.** List endpoints take `page` (from 1) and `per_page` (1–100, default 25),
+    return totals in `meta`, and send RFC 8288 `Link` headers (`first`, `prev`, `next`, `last`).
+
+    **Rate limits.** 120 requests a minute per token, and 600 a minute per client address; beyond that, `429 rate_limited` with a
+    `Retry-After` header.
+
+    **Times** are ISO 8601 in UTC.
+
+    A narrative guide with worked examples is at `docs/api.md`; an index for language models is
+    at `/llms.txt`.
+servers:
+  - url: /api/v1
+security:
+  - bearerToken: []
+tags:
+  - name: Tokens
+    description: The token making the request.
+  - name: Members
+    description: Finding members to act for.
+  - name: Parking (staff)
+    description: Every parking permit and ticket, for staff and service accounts acting for members.
+  - name: Parking (your own)
+    description: The token holder's own permits and tickets, as a member manages them on the website.
+  - name: Parking (kiosks)
+    description: Permits for whoever badges in at an access control device.
+paths:
+  /openapi.json:
+    get:
+      operationId: getOpenApiSpec
+      summary: This API description
+      description: Returns this OpenAPI document as JSON. Needs no token.
+      security: []
+      tags: [Tokens]
+      responses:
+        '200':
+          description: The OpenAPI document.
+          content:
+            application/json:
+              schema:
+                type: object
+  /me:
+    get:
+      operationId: getCurrentToken
+      summary: Describe the token making the request
+      description: |
+        Returns the token's holder, its scopes, the subset of those scopes the holder can use
+        right now (`effective_scopes`), and when it expires. Any valid token may call this; use
+        it to check that a client is configured correctly.
+      tags: [Tokens]
+      x-required-scope: null
+      responses:
+        '200':
+          description: The token.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Token'
+              example:
+                data:
+                  id: 12
+                  name: Front desk kiosk
+                  hint: x9Qa
+                  kind: service
+                  scopes: [parking.issue_for_members]
+                  effective_scopes: [parking.issue_for_members]
+                  expires_at: '2027-10-14T17:00:00Z'
+                  holder:
+                    id: 431
+                    name: Front Desk Kiosk
+                    username: kiosk-front
+                    email: null
+                    active: true
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+  /members:
+    get:
+      operationId: searchMembers
+      summary: Find members
+      description: |
+        Finds up to 20 members whose name, username, or alias contains `q`, or whose email
+        address is exactly `q` (email is stored encrypted, so it matches only in full). Members
+        whose profiles are private are left out unless the token also has `members.view_profile`.
+        Use the returned `id` wherever a request takes a member id.
+      tags: [Members]
+      x-required-scope: api.users.search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Part of a name, username, or alias; or a whole email address.
+          schema:
+            type: string
+            minLength: 1
+          example: ada
+      responses:
+        '200':
+          description: Matching members, by display name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Member'
+              example:
+                data:
+                  - id: 42
+                    name: Ada Lovelace
+                    username: ada
+                    email: ada@example.com
+                    active: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+  /members/{id}:
+    get:
+      operationId: getMember
+      summary: Get one member
+      description: Returns one member by id, subject to the same profile visibility as search.
+      tags: [Members]
+      x-required-scope: api.users.search
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: The member.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /parking/notices:
+    get:
+      operationId: listParkingNotices
+      summary: List parking notices
+      description: |
+        Every parking permit and ticket, newest first. Filter by `type`, `status`, or the member
+        a notice is for. Notices in the list leave out their history; fetch one for that.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      parameters:
+        - $ref: '#/components/parameters/NoticeType'
+        - $ref: '#/components/parameters/NoticeStatus'
+        - name: member_id
+          in: query
+          description: Only notices this member is on.
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createParkingNotice
+      summary: Issue a permit or ticket
+      description: |
+        Issues a parking permit or ticket and emails the members on it. A permit needs at least
+        one member; a ticket may be for nobody yet (an unattended project). Staff are not held to
+        the two-week limit members have on their own permits.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffNoticeInput'
+            example:
+              notice_type: permit
+              description: Bookshelf glue-up
+              location: Woodshop
+              location_detail: Bench B
+              expires_at: '2026-10-21T17:00:00Z'
+              member_ids: [42]
+      responses:
+        '201':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /parking/notices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getParkingNotice
+      summary: Get a parking notice
+      description: One permit or ticket, with its history.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateParkingNotice
+      summary: Change a parking notice
+      description: |
+        Changes any of the notice's fields. Send `member_ids` to replace the member list (members
+        newly added are emailed); leave it out, or send `null`, to keep the members as they are. Changing
+        `expires_at` is recorded as a renewal. `PUT` is accepted as a synonym.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffNoticeInput'
+            example:
+              expires_at: '2026-10-28T17:00:00Z'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /parking/notices/{id}/clear:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: clearParkingNotice
+      summary: Clear a parking notice
+      description: |
+        Marks the notice cleared. A notice flagged `requires_admin_clearance` can only be cleared
+        by a token that also has `parking.clear_admin_required`; otherwise the answer is
+        `403 forbidden`.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /parking/notices/{id}/notes:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: addParkingNoticeNote
+      summary: Add a note to a notice's history
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /parking/notices/{id}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getParkingNoticePdf
+      summary: Download a notice as PDF
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      responses:
+        '200':
+          $ref: '#/components/responses/Pdf'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /parking/notices/{id}/print:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: printParkingNotice
+      summary: Print a notice
+      description: |
+        Sends an active notice to one of the printers from `GET /parking/printers`. Thermal
+        receipt printers get the narrow layout unless `layout` is `letter`.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintInput'
+            example:
+              printer_id: 3
+      responses:
+        '200':
+          $ref: '#/components/responses/PrintJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/PrintFailed'
+  /parking/notices/{notice_id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/NoticeId'
+    post:
+      operationId: addParkingNoticePhotos
+      summary: Add photos to a notice
+      description: |
+        Uploads up to 10 images (each under 15 MB) as `multipart/form-data`, in a field named
+        `photos[]`. Answers with all of the notice's photos.
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PhotoUpload'
+      responses:
+        '201':
+          $ref: '#/components/responses/PhotoList'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /parking/notices/{notice_id}/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/NoticeId'
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getParkingNoticePhoto
+      summary: Download a photo
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      responses:
+        '200':
+          $ref: '#/components/responses/PhotoFile'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteParkingNoticePhoto
+      summary: Remove a photo
+      tags: [Parking (staff)]
+      x-required-scope: parking.manage_notices
+      responses:
+        '204':
+          description: Removed.
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /parking/printers:
+    get:
+      operationId: listPrinters
+      summary: List printers
+      description: The printers a notice can be sent to. Either parking scope will do.
+      tags: [Parking (staff), Parking (your own)]
+      x-required-scope: parking.manage_notices or parking.own_permits
+      responses:
+        '200':
+          description: Printers, in their configured order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Printer'
+              example:
+                data:
+                  - id: 3
+                    name: Front desk
+                    description: Receipt printer by the door
+                    default: true
+                    thermal: true
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+  /parking/permit_requests:
+    post:
+      operationId: requestParkingPermitForMember
+      summary: Request a permit for a member at a kiosk
+      description: |
+        For an access control device acting for the member who just badged in. Identify the member
+        by exactly one of `rfid` (their key fob), `username`, or full `email`, and choose a `mode`:
+
+        - `link` emails the member a link, good for 12 hours, to a form where they describe the
+          permit, choose an expiry of up to two weeks, and print it. The link does not sign them in.
+          Nothing is created until they submit it.
+        - `blank` issues a permit at once, valid for two weeks, for the member to hand-write. They
+          are emailed a link to record the details online and reminded until they do.
+
+        The response never contains the form link; it goes only to the member's inbox. Banned
+        members and members with no email address (for `link`) get `422 ineligible_member`.
+      tags: [Parking (kiosks)]
+      x-required-scope: parking.issue_for_members
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              additionalProperties: false
+              properties:
+                mode:
+                  type: string
+                  enum: [link, blank]
+                rfid:
+                  type: string
+                  description: The key fob the member badged with.
+                username:
+                  type: string
+                email:
+                  type: string
+                  description: The member's full email address.
+            example:
+              rfid: '0012345678'
+              mode: blank
+      responses:
+        '201':
+          description: The link was emailed, or the blank permit issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [mode, member, email_sent, link_expires_at, permit]
+                    additionalProperties: false
+                    properties:
+                      mode:
+                        type: string
+                        enum: [link, blank]
+                      member:
+                        type: object
+                        required: [name]
+                        additionalProperties: false
+                        properties:
+                          name:
+                            type: string
+                      email_sent:
+                        type: boolean
+                      link_expires_at:
+                        type: [string, 'null']
+                        format: date-time
+                        description: When the emailed form link stops working (link mode).
+                      permit:
+                        description: The permit issued (blank mode).
+                        oneOf:
+                          - type: 'null'
+                          - type: object
+                            required: [id, expires_at]
+                            additionalProperties: false
+                            properties:
+                              id:
+                                type: integer
+                              expires_at:
+                                type: string
+                                format: date-time
+              example:
+                data:
+                  mode: blank
+                  member:
+                    name: Ada Lovelace
+                  email_sent: true
+                  link_expires_at: null
+                  permit:
+                    id: 512
+                    expires_at: '2026-10-28T17:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: More than one member matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: The member cannot have a permit (banned, or no email address for a link).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ineligible_member
+                  message: Member is not eligible for a parking permit.
+                  details: {}
+  /me/parking/notices:
+    get:
+      operationId: listOwnParkingNotices
+      summary: List your parking notices
+      description: |
+        The permits and tickets you are on, newest first. Personal tokens only; a service-account
+        token gets `403 forbidden` and uses `/parking/notices` instead.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      parameters:
+        - $ref: '#/components/parameters/NoticeType'
+        - $ref: '#/components/parameters/NoticeStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createOwnParkingPermit
+      summary: Give yourself a parking permit
+      description: |
+        Creates a permit with you on it, lasting at most two weeks. `member_ids` may add other
+        members whose profiles you can see.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnPermitInput'
+            example:
+              description: Bookshelf glue-up
+              location: Woodshop
+              expires_at: '2026-10-21T17:00:00Z'
+      responses:
+        '201':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /me/parking/notices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getOwnParkingNotice
+      summary: Get one of your parking notices
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateOwnParkingPermit
+      summary: Change one of your permits
+      description: |
+        Permits only; tickets are managed by staff (`403 forbidden`). The expiry may not be moved
+        past two weeks from when the permit was created. Send `member_ids` to change who is on it:
+        you can add members whose profiles you can see, and only the permit's issuer can take
+        people off. `PUT` is accepted as a synonym.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnPermitInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /me/parking/notices/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: closeOwnParkingNotice
+      summary: Clear one of your notices
+      description: |
+        Marks the notice cleared. A notice flagged as needing staff clearance answers
+        `403 forbidden`; ask for clearance with `request_clearance` instead.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /me/parking/notices/{id}/request_clearance:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: requestOwnParkingNoticeClearance
+      summary: Ask staff to clear one of your notices
+      description: For a notice flagged as needing staff clearance. Asking twice answers `409 conflict`.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /me/parking/notices/{id}/notes:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: addOwnParkingNoticeNote
+      summary: Add a note to one of your notices
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/ParkingNoticeDetail'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /me/parking/notices/{id}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getOwnParkingNoticePdf
+      summary: Download one of your permits as PDF
+      description: Permits only; a ticket answers `403 forbidden`.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '200':
+          $ref: '#/components/responses/Pdf'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /me/parking/notices/{id}/print:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: printOwnParkingNotice
+      summary: Print one of your permits
+      description: Permits only; a ticket answers `403 forbidden`.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrintJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/PrintFailed'
+  /me/parking/notices/{notice_id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/NoticeId'
+    post:
+      operationId: addOwnParkingNoticePhotos
+      summary: Add photos to one of your permits
+      description: Permits only. Same limits as the staff upload.
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PhotoUpload'
+      responses:
+        '201':
+          $ref: '#/components/responses/PhotoList'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /me/parking/notices/{notice_id}/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/NoticeId'
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getOwnParkingNoticePhoto
+      summary: Download a photo from one of your notices
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '200':
+          $ref: '#/components/responses/PhotoFile'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteOwnParkingNoticePhoto
+      summary: Remove a photo from one of your permits
+      tags: [Parking (your own)]
+      x-required-scope: parking.own_permits
+      responses:
+        '204':
+          description: Removed.
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      description: A Member Zone API token, beginning `mz_`.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    Page:
+      name: page
+      in: query
+      description: Page number, from 1.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      description: Records per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    NoticeId:
+      name: notice_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    NoticeType:
+      name: type
+      in: query
+      description: Only permits or only tickets.
+      schema:
+        type: string
+        enum: [permit, ticket]
+    NoticeStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [active, expired, cleared]
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum: [bad_request, invalid_token, insufficient_scope, forbidden, not_found, conflict,
+                     validation_failed, ineligible_member, rate_limited, print_failed]
+              description: Stable, machine-readable error code.
+            message:
+              type: string
+              description: Human-readable explanation.
+            details:
+              type: object
+              description: |
+                Extra context. `insufficient_scope` gives `required_scope`; `validation_failed`
+                gives `fields`, a map of field name to error messages.
+    PaginationMeta:
+      type: object
+      required: [page, per_page, total]
+      additionalProperties: false
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+    Member:
+      type: object
+      required: [id, name, username, email, active]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          description: Display name.
+        username:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+        active:
+          type: boolean
+          description: Whether the member currently has active membership.
+    Token:
+      type: object
+      required: [id, name, hint, kind, scopes, effective_scopes, expires_at, holder]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        hint:
+          type: string
+          description: The token's last four characters.
+        kind:
+          type: string
+          enum: [personal, service]
+        scopes:
+          type: array
+          items:
+            type: string
+        effective_scopes:
+          type: array
+          description: The scopes the holder can use right now.
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+        holder:
+          $ref: '#/components/schemas/Member'
+    Person:
+      type: object
+      description: Someone named on a notice, without contact details.
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    Photo:
+      type: object
+      required: [id, filename, content_type, byte_size, download_path]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        filename:
+          type: string
+        content_type:
+          type: string
+        byte_size:
+          type: integer
+        download_path:
+          type: string
+          description: Where to GET the photo, with the same token.
+    ParkingEvent:
+      type: object
+      required: [event_type, note, actor, via_api, created_at]
+      additionalProperties: false
+      properties:
+        event_type:
+          type: string
+          enum: [opened, renewed, cleared, expired, clearance_requested, note]
+        note:
+          type: [string, 'null']
+        actor:
+          oneOf:
+            - $ref: '#/components/schemas/Person'
+            - type: 'null'
+        via_api:
+          type: boolean
+          description: Whether the change came in through the API.
+        created_at:
+          type: string
+          format: date-time
+    ParkingNotice:
+      type: object
+      description: |
+        A parking permit (permission to leave a project in the space) or ticket (a project left
+        without one). `events`, the notice's history, is included when fetching one notice.
+      required: [id, notice_type, status, description, location, location_detail, expires_at,
+                 requires_admin_clearance, clearance_requested_at, cleared_at, created_at, updated_at,
+                 issued_by, cleared_by, members, photos]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        notice_type:
+          type: string
+          enum: [permit, ticket]
+        status:
+          type: string
+          enum: [active, expired, cleared]
+        description:
+          type: [string, 'null']
+          description: What is parked.
+        location:
+          type: [string, 'null']
+        location_detail:
+          type: [string, 'null']
+        expires_at:
+          type: string
+          format: date-time
+        requires_admin_clearance:
+          type: boolean
+          description: Only staff with parking.clear_admin_required may clear it.
+        clearance_requested_at:
+          type: [string, 'null']
+          format: date-time
+        cleared_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        issued_by:
+          $ref: '#/components/schemas/Person'
+        cleared_by:
+          oneOf:
+            - $ref: '#/components/schemas/Person'
+            - type: 'null'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingEvent'
+    StaffNoticeInput:
+      type: object
+      description: |
+        Fields for a staff-issued notice. On create, `notice_type` and `expires_at` are required.
+        On update, send only what changes.
+      additionalProperties: false
+      properties:
+        notice_type:
+          type: string
+          enum: [permit, ticket]
+        description:
+          type: string
+        location:
+          type: string
+        location_detail:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        requires_admin_clearance:
+          type: boolean
+        member_ids:
+          type: array
+          description: Members the notice is for. Replaces the list on update.
+          items:
+            type: integer
+    OwnPermitInput:
+      type: object
+      description: Fields for a permit of your own. On create, `expires_at` is required.
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        location:
+          type: string
+        location_detail:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          description: At most two weeks after the permit was created.
+        member_ids:
+          type: array
+          description: Other members to put on the permit. You are always on it.
+          items:
+            type: integer
+    NoteInput:
+      type: object
+      required: [note]
+      additionalProperties: false
+      properties:
+        note:
+          type: string
+          minLength: 1
+    PrintInput:
+      type: object
+      required: [printer_id]
+      additionalProperties: false
+      properties:
+        printer_id:
+          type: integer
+        layout:
+          type: string
+          enum: [letter]
+          description: Force a full page on a thermal receipt printer.
+    PhotoUpload:
+      type: object
+      required: ['photos[]']
+      properties:
+        photos[]:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            format: binary
+    Printer:
+      type: object
+      required: [id, name, description, default, thermal]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        default:
+          type: boolean
+        thermal:
+          type: boolean
+          description: A narrow receipt printer.
+  responses:
+    BadRequest:
+      description: The request is malformed or missing a required parameter.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: bad_request
+              message: q is required.
+              details: {}
+    InvalidToken:
+      description: |
+        The token is missing, unknown, expired, suspended, revoked, or belongs to someone who is
+        no longer an active member. The response does not say which.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer realm="Member Zone", error="invalid_token"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: invalid_token
+              message: The access token is missing, invalid, or no longer active.
+              details: {}
+    InsufficientScope:
+      description: The token lacks the operation's scope, or its holder lacks the privilege.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: insufficient_scope
+              message: This token needs the parking.manage_notices scope, and its holder the privilege.
+              details:
+                required_scope: parking.manage_notices
+    Forbidden:
+      description: |
+        The token may not do this: it lacks the operation's scope, or may use the operation but
+        not on this record (a ticket, a notice needing staff clearance), or is a service-account
+        token on an endpoint for personal tokens.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: forbidden
+              message: This notice needs staff clearance.
+              details: {}
+    NotFound:
+      description: No such record, or not one this token may see.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: not_found
+              message: Not found.
+              details: {}
+    ValidationFailed:
+      description: The record could not be saved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: validation_failed
+              message: Expires at must be within 2 weeks
+              details:
+                fields:
+                  expires_at: [must be within 2 weeks]
+    RateLimited:
+      description: Too many requests.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ParkingNoticeDetail:
+      description: The notice, with its history.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            additionalProperties: false
+            properties:
+              data:
+                $ref: '#/components/schemas/ParkingNotice'
+          example:
+            data:
+              id: 501
+              notice_type: permit
+              status: active
+              description: Bookshelf glue-up
+              location: Woodshop
+              location_detail: Bench B
+              expires_at: '2026-10-21T17:00:00Z'
+              requires_admin_clearance: false
+              clearance_requested_at: null
+              cleared_at: null
+              created_at: '2026-10-14T17:00:00Z'
+              updated_at: '2026-10-14T17:00:00Z'
+              issued_by:
+                id: 42
+                name: Ada Lovelace
+              cleared_by: null
+              members:
+                - id: 42
+                  name: Ada Lovelace
+              photos: []
+              events:
+                - event_type: opened
+                  note: null
+                  actor:
+                    id: 42
+                    name: Ada Lovelace
+                  via_api: true
+                  created_at: '2026-10-14T17:00:00Z'
+    ParkingNoticeList:
+      description: A page of notices, newest first.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, meta]
+            additionalProperties: false
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ParkingNotice'
+              meta:
+                $ref: '#/components/schemas/PaginationMeta'
+    PhotoList:
+      description: All of the notice's photos.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            additionalProperties: false
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+    PhotoFile:
+      description: The photo.
+      content:
+        image/*:
+          schema:
+            type: string
+            format: binary
+    Pdf:
+      description: The notice as a PDF.
+      content:
+        application/pdf:
+          schema:
+            type: string
+            format: binary
+    PrintJob:
+      description: The print job was accepted.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            additionalProperties: false
+            properties:
+              data:
+                type: object
+                required: [printer_id, job_id]
+                additionalProperties: false
+                properties:
+                  printer_id:
+                    type: integer
+                  job_id:
+                    type: string
+          example:
+            data:
+              printer_id: 3
+              job_id: front_desk-118
+    Conflict:
+      description: The notice is not in a state that allows this (already cleared, not active, already requested).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: conflict
+              message: This notice has already been cleared.
+              details: {}
+    PrintFailed:
+      description: The printer did not accept the job.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

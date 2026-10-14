@@ -489,6 +489,21 @@ class MemberMailer < ApplicationMailer
     mail(to: user.email, subject: "#{@organization}: #{@match_count} audit log alert(s) from #{source.name}")
   end
 
+  # Sent to whoever is responsible for an API token: its contact, or a token manager when the
+  # contact cannot be reached. Queued with just the token's id, so the details are current
+  # when it is delivered.
+  def api_token_expiring_soon(user, opts = {})
+    token = ApiToken.find_by(id: opts[:api_token_id] || opts['api_token_id'])
+    return if token.nil? || user.email.blank?
+
+    @user = user
+    @organization = organization_name
+    @variables = ApiTokenMailVariables.call(token, recipient: user)
+    return if send_from_template('api_token_expiring_soon', user, @variables)
+
+    mail(to: user.email, subject: "#{@organization}: API token \"#{token.name}\" expires soon")
+  end
+
   def credential_expiring_soon(user, opts = {})
     credential_notice('credential_expiring_soon', user, opts, 'Your credential expires soon')
   end

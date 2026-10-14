@@ -21,7 +21,7 @@ class EmailTemplate
         .merge(blocked_recipient)
         .merge(AuditLogPreviewVariables.all)
         .merge(CredentialPreviewVariables.all)
-        .merge(ParkingPermitDevicePreviewVariables.all)
+        .merge(ParkingPermitDevicePreviewVariables.all).merge(ApiTokenPreviewVariables.all)
     end
 
     def member

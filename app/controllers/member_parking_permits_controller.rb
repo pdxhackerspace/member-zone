@@ -1,8 +1,5 @@
 class MemberParkingPermitsController < AuthenticatedController
-  include ParkingNoticeMemberParams
   include ParkingNoticePrinting
-
-  MAX_MEMBER_PERMIT_DURATION = ParkingNotice::MAX_SELF_SERVICE_DURATION
 
   before_action :set_owned_notice, only: %i[show edit update close request_clearance add_note print_notice]
   before_action :require_owned_permit, only: %i[edit update print_notice]
@@ -23,16 +20,12 @@ class MemberParkingPermitsController < AuthenticatedController
   def edit; end
 
   def create
-    @parking_notice = ParkingNotice.new(member_parking_permit_params)
-    @parking_notice.notice_type = 'permit'
-    @parking_notice.issued_by = current_user
-    @parking_notice.status = 'active'
-    @parking_notice.build_members_from_ids!(resolve_member_permit_member_ids(member_ids_param, current_user))
-    validate_member_permit_duration
+    result = ParkingNotices::Issue.call(
+      actor: current_user, attributes: member_parking_permit_params, member_ids: member_ids_param, self_service: true
+    )
+    @parking_notice = result.notice
 
-    if @parking_notice.errors.empty? && @parking_notice.save
-      @parking_notice.record_journal_entry!('parking_permit_issued', actor: current_user)
-      @parking_notice.notify_issued!
+    if result.success?
       redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit created successfully.'
     else
       render :new, status: :unprocessable_content
@@ -40,25 +33,13 @@ class MemberParkingPermitsController < AuthenticatedController
   end
 
   def update
-    @parking_notice.event_actor = current_user
-    @parking_notice.assign_attributes(member_parking_permit_params)
-    validate_member_permit_duration
+    result = ParkingNotices::Update.call(
+      notice: @parking_notice, actor: current_user, attributes: member_parking_permit_params,
+      member_ids: submitted_member_ids, self_service: true
+    )
 
-    if @parking_notice.errors.empty?
-      newly_added = []
-      begin
-        ParkingNotice.transaction do
-          @parking_notice.save!
-          if params[:parking_notice]&.key?(:member_ids)
-            member_ids = resolve_member_permit_member_ids(member_ids_param, current_user, @parking_notice)
-            newly_added = @parking_notice.replace_members!(member_ids)
-          end
-        end
-        @parking_notice.notify_issued!(newly_added) if newly_added.any?
-        redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit updated.'
-      rescue ActiveRecord::RecordInvalid
-        render :edit, status: :unprocessable_content
-      end
+    if result.success?
+      redirect_to user_path(current_user, tab: :parking), notice: 'Parking permit updated.'
     else
       render :edit, status: :unprocessable_content
     end
@@ -67,7 +48,8 @@ class MemberParkingPermitsController < AuthenticatedController
   def member_search
     query = params[:q].to_s.strip
     users = if query.length >= 1
-              member_pickable_for_member(current_user)
+              ParkingNotices::MemberResolution
+                .pickable_for(current_user)
                 .where('username ILIKE ?', "#{User.sanitize_sql_like(query)}%")
                 .order(:username)
                 .limit(10)
@@ -81,70 +63,52 @@ class MemberParkingPermitsController < AuthenticatedController
   # Members may clear their own active or expired notices unless admin
   # clearance is required.
   def close
-    if @parking_notice.cleared?
-      redirect_to close_return_path, alert: 'This parking notice has already been cleared.'
-      return
-    end
+    result = ParkingNotices::Clear.call(notice: @parking_notice, actor: current_user)
 
-    unless @parking_notice.clearable_by?(current_user)
+    case result.error
+    when nil
+      redirect_to close_return_path, notice: "Parking #{@parking_notice.notice_type} cleared."
+    when :already_cleared
+      redirect_to close_return_path, alert: 'This parking notice has already been cleared.'
+    else
       redirect_to close_return_path,
                   alert: 'This parking notice must be cleared by an admin. You can request clearance instead.'
-      return
     end
-
-    @parking_notice.event_actor = current_user
-    @parking_notice.clear!(current_user)
-    @parking_notice.record_journal_entry!('parking_notice_cleared', actor: current_user)
-    redirect_to close_return_path,
-                notice: "Parking #{@parking_notice.notice_type} cleared."
   end
 
   # Members ask an admin to clear a notice that requires admin clearance.
   def request_clearance
-    if @parking_notice.cleared? || !@parking_notice.requires_admin_clearance?
-      redirect_to user_path(current_user, tab: :parking),
-                  alert: 'This parking notice does not need an admin clearance request.'
-      return
-    end
+    result = ParkingNotices::RequestClearance.call(notice: @parking_notice, actor: current_user)
 
-    if @parking_notice.clearance_requested?
-      redirect_to user_path(current_user, tab: :parking), notice: 'Clearance has already been requested.'
-      return
-    end
-
-    @parking_notice.request_clearance!(current_user)
-    redirect_to user_path(current_user, tab: :parking),
-                notice: 'Clearance requested. An admin will review your request.'
+    flash_args = case result.error
+                 when nil then { notice: 'Clearance requested. An admin will review your request.' }
+                 when :already_requested then { notice: 'Clearance has already been requested.' }
+                 else { alert: 'This parking notice does not need an admin clearance request.' }
+                 end
+    redirect_to user_path(current_user, tab: :parking), flash_args
   end
 
   def print_notice
-    unless @parking_notice.active?
-      redirect_to member_parking_permit_path(@parking_notice),
-                  alert: 'Expired or cleared permits cannot be printed.'
-      return
-    end
-
     printer = Printer.find(params[:printer_id])
-    job_id = print_parking_notice_to_printer(@parking_notice, printer)
+    result = print_parking_notice_to_printer(@parking_notice, printer)
 
-    redirect_to member_parking_permit_path(@parking_notice),
-                notice: "Printed to #{printer.name} (job #{job_id})."
-  rescue CupsService::PrintError => e
-    redirect_to member_parking_permit_path(@parking_notice),
-                alert: "Print failed: #{e.message}"
+    flash_args = case result.error
+                 when nil then { notice: "Printed to #{printer.name} (job #{result.job_id})." }
+                 when :not_printable then { alert: 'Expired or cleared permits cannot be printed.' }
+                 else { alert: "Print failed: #{result.message}" }
+                 end
+    redirect_to member_parking_permit_path(@parking_notice), flash_args
   end
 
   # Members may add a note to the history of their own notice.
   def add_note
-    note = params[:note].to_s.strip
+    result = ParkingNotices::AddNote.call(notice: @parking_notice, actor: current_user, note: params[:note])
 
-    if note.blank?
+    if result.success?
+      redirect_to member_parking_permit_path(@parking_notice), notice: 'Note added.'
+    else
       redirect_to member_parking_permit_path(@parking_notice), alert: 'Note cannot be blank.'
-      return
     end
-
-    @parking_notice.log_event!('note', actor: current_user, note: note)
-    redirect_to member_parking_permit_path(@parking_notice), notice: 'Note added.'
   end
 
   private
@@ -181,31 +145,8 @@ class MemberParkingPermitsController < AuthenticatedController
     params.dig(:parking_notice, :member_ids)
   end
 
-  def validate_member_permit_duration
-    return if @parking_notice.expires_at.blank?
-    # Staff extensions and legacy permits may expire after the self-service cap;
-    # members may edit other fields without touching expiration.
-    return if @parking_notice.persisted? && !member_changed_expires_at?
-
-    return if @parking_notice.expires_at <= member_permit_max_expires_at
-
-    @parking_notice.errors.add(:expires_at, 'must be within 2 weeks')
-  end
-
-  def member_changed_expires_at?
-    new_at = @parking_notice.expires_at
-    old_at = @parking_notice.expires_at_in_database
-    return true if old_at.nil?
-
-    member_expires_at_minute(new_at) != member_expires_at_minute(old_at)
-  end
-
-  def member_expires_at_minute(time)
-    time.in_time_zone.change(sec: 0, usec: 0)
-  end
-
-  def member_permit_max_expires_at
-    anchor = @parking_notice.persisted? ? @parking_notice.created_at : Time.current
-    anchor + MAX_MEMBER_PERMIT_DURATION
+  # nil when the form left the member list out, so the update leaves members alone.
+  def submitted_member_ids
+    Array(member_ids_param) if params[:parking_notice]&.key?(:member_ids)
   end
 end

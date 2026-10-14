@@ -18,8 +18,8 @@ module ParkingPermits
       new(...).call
     end
 
-    def initialize(device:, mode:, member_params:, now: Time.current)
-      @device = device
+    def initialize(api_token:, mode:, member_params:, now: Time.current)
+      @api_token = api_token
       @mode = mode.to_s.strip.downcase
       @member_params = member_params
       @now = now
@@ -33,7 +33,7 @@ module ParkingPermits
         permit_form_url: link.url,
         permit_form_expires_at: link.expires_at.in_time_zone.strftime('%B %-d, %Y at %-l:%M %p'),
         permit_expires_at: notice&.expires_at&.strftime('%B %d, %Y').to_s,
-        device_name: link.webhook_device&.name.to_s
+        device_name: link.api_token&.name.to_s
       }
     end
 
@@ -58,7 +58,7 @@ module ParkingPermits
     def issue_link(user)
       return failure(:unprocessable_content, 'member has no email address to send the link to') if user.email.blank?
 
-      link = ParkingPermitLink.issue_for_new_permit!(user: user, webhook_device: @device, now: @now)
+      link = ParkingPermitLink.issue_for_new_permit!(user: user, api_token: @api_token, now: @now)
       MemberMailer.parking_permit_form_link(user, **link_mail_args(link)).deliver_later
       Result.new(status: :created, error: nil, mode: @mode, user: user, parking_notice: nil, link: link)
     end
@@ -79,10 +79,10 @@ module ParkingPermits
 
     def create_blank_permit!(user)
       notice = ParkingNotice.create!(
-        notice_type: 'permit', status: 'active', members: [user], issued_by: user, webhook_device: @device,
+        notice_type: 'permit', status: 'active', members: [user], issued_by: user, api_token: @api_token,
         expires_at: @now + ParkingNotice::MAX_SELF_SERVICE_DURATION, details_requested_at: @now
       )
-      notice.log_event!('note', note: "Blank permit issued by #{@device.name}.")
+      notice.log_event!('note', note: "Blank permit issued by #{@api_token.name}.")
       notice
     end
 

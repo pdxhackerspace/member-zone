@@ -497,7 +497,7 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
   test 'show lists blank parking permits due a details reminder' do
     member = users(:one)
     ParkingNotice.create!(notice_type: 'permit', status: 'active', members: [member], issued_by: member,
-                          webhook_device: WebhookDevice.create!(name: 'Front door kiosk'),
+                          api_token: kiosk_api_token,
                           expires_at: 12.days.from_now, details_requested_at: 2.days.ago)
 
     get reminder_setting_url('parking_permit_details')

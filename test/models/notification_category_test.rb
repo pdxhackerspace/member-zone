@@ -18,11 +18,12 @@ class NotificationCategoryTest < ActiveSupport::TestCase
   end
 
   # Parking is compliance mail a member cannot decline; staff_application goes to reviewers,
-  # not to members, so there is nobody holding a preference for it. Everything else is
+  # not to members, so there is nobody holding a preference for it; api_token_expiry is the
+  # only warning before a token stops working, and often goes to staff. Everything else is
   # optional by default.
-  test 'only parking notices and the staff application reminder disable opt-out by default' do
+  test 'only parking notices, staff application, and API token expiry reminders disable opt-out by default' do
     ReminderSetting.seed_defaults!
-    mandatory = %w[parking_notices staff_application]
+    mandatory = %w[parking_notices staff_application api_token_expiry]
 
     mandatory.each do |key|
       assert_not ReminderSetting.find_by!(key: key).allow_opt_out?, "expected #{key} to disallow opt-out"

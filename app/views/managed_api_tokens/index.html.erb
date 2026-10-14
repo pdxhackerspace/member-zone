@@ -1,0 +1,113 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">API tokens</h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="text-body"><%= @counts['active'] %></span> active
+      <% if @counts['expiring'].positive? %>· <span class="text-warning"><%= @counts['expiring'] %></span> expiring within 30 days<% end %>
+      <% if @counts['no_contact'].positive? %>· <span class="text-warning"><%= @counts['no_contact'] %></span> with nobody to remind<% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= link_to "+ Service account token", new_managed_api_token_path, class: "btn btn-primary btn-sm" %>
+    <%= link_to "API reference", api_v1_openapi_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <%= link_to "All", managed_api_tokens_path(kind: params[:kind]),
+              class: "filter-chip text-decoration-none #{'active' if @filter.nil?}" %>
+  <% { 'active' => 'Active', 'expiring' => 'Expiring soon', 'no_contact' => 'Nobody to remind', 'suspended' => 'Suspended',
+       'expired' => 'Expired', 'revoked' => 'Revoked' }.each do |key, label| %>
+    <% variant = 'warning' if %w[expiring no_contact].include?(key) && @counts[key].positive? %>
+    <%= link_to managed_api_tokens_path(filter: key, kind: params[:kind]),
+                class: ["filter-chip text-decoration-none", variant, ('active' if @filter == key),
+                        ('muted' if @counts[key].zero?)].compact.join(' ') do %>
+      <%= label %> <span class="count"><%= @counts[key] %></span>
+    <% end %>
+  <% end %>
+  <span class="text-secondary text-12 align-self-center ms-2">Holder:</span>
+  <% [[nil, 'Anyone'], ['service', 'Service accounts'], ['personal', 'Members']].each do |kind, label| %>
+    <%= link_to label, managed_api_tokens_path(filter: @filter, kind: kind),
+                class: "filter-chip text-decoration-none #{'active' if params[:kind] == kind}" %>
+  <% end %>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <% if @api_tokens.any? %>
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Token</th>
+            <th scope="col">Holder</th>
+            <th scope="col">Scopes</th>
+            <th scope="col">Contact</th>
+            <th scope="col">Status</th>
+            <th scope="col">Expires</th>
+            <th scope="col">Last used</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @api_tokens.each do |token| %>
+            <tr class="<%= 'text-secondary' if token.revoked? %>">
+              <td>
+                <div class="fw-medium"><%= token.name %></div>
+                <div class="text-12 text-secondary">ends <code><%= token.token_hint %></code></div>
+              </td>
+              <td>
+                <%= link_to token.user.display_name, user_path(token.user), class: "text-decoration-none" %>
+                <% if token.service? %><div class="text-12 text-secondary">Service account</div><% end %>
+              </td>
+              <td class="text-12">
+                <% if token.scopes.any? %>
+                  <% token.scopes.each do |key| %><code class="d-block"><%= key %></code><% end %>
+                <% else %>
+                  <span class="text-secondary">None</span>
+                <% end %>
+              </td>
+              <td>
+                <% if Reminders::ApiTokenExpiryEligibility.contact_unreachable?(token) && !token.revoked? %>
+                  <span class="badge text-bg-warning-subtle" title="Expiry warnings go to token managers instead">
+                    <%= token.contact_user ? "#{token.contact_user.display_name} (inactive)" : 'Nobody' %>
+                  </span>
+                <% else %>
+                  <span class="text-secondary"><%= token.contact_user&.display_name %></span>
+                <% end %>
+              </td>
+              <td><%= api_token_state(token) %></td>
+              <td><%= api_token_expiry(token) %></td>
+              <td class="text-secondary"><%= api_token_last_used(token) %></td>
+              <td class="text-end">
+                <%= render 'api_tokens/actions', token: token, edit_path: edit_managed_api_token_path(token) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <% if @pagy.pages > 1 %>
+      <div class="p-3 border-top"><%== pagy_bootstrap_nav(@pagy) %></div>
+    <% end %>
+  <% else %>
+    <div class="card-body text-center py-4 text-secondary">No tokens match.</div>
+  <% end %>
+</div>
+
+<div class="h-section-label mb-2">Token lifetime</div>
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <%= form_with url: lifetime_managed_api_tokens_path, method: :patch, class: "d-flex align-items-end gap-2 flex-wrap" do %>
+      <div>
+        <label class="form-label text-13" for="api_token_max_lifetime_days">Maximum lifetime, in days</label>
+        <%= number_field_tag :api_token_max_lifetime_days, @default_setting.api_token_max_lifetime_days,
+                             min: 1, max: 3650, class: "form-control form-control-sm", required: true %>
+      </div>
+      <%= submit_tag "Save", class: "btn btn-outline-secondary btn-sm" %>
+      <div class="text-12 text-secondary w-100">
+        New tokens and extensions last this long. Existing tokens keep their current expiry.
+        Holders are reminded before expiry under <%= link_to "Reminders", reminder_settings_path %>.
+      </div>
+    <% end %>
+  </div>
+</div>

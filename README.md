@@ -282,6 +282,17 @@ Members can request API keys, app passwords and similar credentials from externa
 rails credentials:reconcile_preview   # dry run: what the daily reconcile would do
 ```
 
+## API
+
+Member Zone has a token-authenticated JSON API under `/api/v1` (`app/controllers/api/v1/`). Clients send `Authorization: Bearer mz_…`; members create personal tokens under **API tokens**, and holders of `api.tokens.manage` create service-account tokens under **Settings → API tokens**. A token's scopes are privilege keys, and while a request is authenticated by one, `User#can?` for its holder is limited to those scopes, so checks made anywhere — controller, model, or service — cannot exceed the token. Tokens expire (`DefaultSetting.api_token_max_lifetime_days`), are refused while their holder is inactive, and the `api_token_expiry` reminder warns before they lapse.
+
+The documentation is generated from two sources, and contract tests hold the API to them:
+
+- `docs/api/openapi.yaml` — the OpenAPI 3.1 reference, served at `/api/v1/openapi.json` and rendered at `/api/docs`. Every route under `/api/v1` must appear in it, and request tests validate live responses against its schemas.
+- `docs/api.md` — the guide, with worked examples.
+
+`/llms.txt` (an index) and `/api/v1/llms-full.txt` (guide, every endpoint, and every schema) are built from both by `ApiReference::LlmsText`. When adding an endpoint, add it to the spec with `x-required-scope`, and gate the controller with `require_scope!`.
+
 ## Roles and Privileges
 
 Privileges bundle into roles, roles attach to training topics, and holding a topic confers that topic's roles. Members are never granted privileges directly. `is_admin` remains a superuser bypass, so a misconfigured role cannot lock administrators out.
