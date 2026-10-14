@@ -6,7 +6,8 @@
 <% can_train_topic_ids = can_train_topics.map(&:id) %>
 <% all_training_topics = TrainingTopic.order(:name).to_a %>
 <% untrained_topics = all_training_topics.reject { |topic| trained_topic_ids.include?(topic.id) } %>
-<% grantable_topics = all_training_topics.reject { |topic| can_train_topic_ids.include?(topic.id) } %>
+<% manageable_topic_ids = @profile_caps[:grant_trainer] ? current_user.manageable_trainer_topics.map(&:id) : [] %>
+<% grantable_topics = all_training_topics.select { |topic| manageable_topic_ids.include?(topic.id) && !can_train_topic_ids.include?(topic.id) } %>
 <%# Recording training and appointing trainers are trainers' work, not the profile viewer's.
     These mirror TrainingsController#require_trainer_or_admin at the coarse level; that
     controller still decides topic by topic. %>
@@ -230,7 +231,7 @@
               <% can_train_topics.each do |topic| %>
                 <span class="cert-pill d-inline-flex align-items-center">
                   <%= topic.name %>
-                  <% if can_grant_trainer %><%= button_to remove_trainer_capability_path(user_id: user.id, topic_id: topic.id, return_to: 'profile'),
+                  <% if can_grant_trainer && manageable_topic_ids.include?(topic.id) %><%= button_to remove_trainer_capability_path(user_id: user.id, topic_id: topic.id, return_to: 'profile'),
                       method: :delete,
                       class: "btn-link-danger ms-1 p-0 border-0 bg-transparent lh-1",
                       title: "Revoke #{topic.name} trainer capability",
