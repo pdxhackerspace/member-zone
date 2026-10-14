@@ -18,7 +18,7 @@ Branch: `feature/api` (off `staging`). Status: in progress — see the PR sequen
 | Token holder | Every token belongs to a `User`: a member (personal token) or a service account (`users.service_account`). A service-account token survives its creator leaving. |
 | Issuing | Members create personal tokens for themselves. Service-account tokens are managed by holders of `api.tokens.manage`. No cap on active tokens. |
 | Scopes | A subset of `Privilege::CATALOG` keys the holder currently has. Global-scoped privileges only in v1; topic-scoped privileges are rejected as scopes until an API needs them. |
-| Effective authority | Token scopes **∩** the holder's privileges *at request time*. Losing a role shrinks every token at once. `is_admin?` does not widen a token past its scopes. |
+| Effective authority | Token scopes **∩** what the holder can do *at request time* (`User#can?`). Losing a role shrinks every token at once. An administrator's token is still limited to its scopes. |
 | Holder inactive | Token is rejected as invalid while the holder is inactive (members: `effective_membership_state`, so elapsed deadlines count before the 4 AM tick; service accounts: `active`). It works again if the holder becomes active again. |
 | Temporary disable | Suspend / resume. |
 | Permanent disable | Revoke. Irreversible. |
@@ -54,7 +54,7 @@ Token format: `mz_` + `SecureRandom.urlsafe_base64(32)`. The prefix makes leaks 
 ### `ApiToken` model
 
 - `ApiToken.authenticate(raw)` → token or nil. Digest lookup (like `WebhookDevice` today), then: not revoked, not suspended, not expired, holder active.
-- `#allows?(key, user:)` → `scopes.include?(key) && user.privilege_conferred?(key)`. The admin bypass is deliberately not used here.
+- `#allows?(key)` → `scopes.include?(key) && holder can use key` (`User#can?`, or an active non-service member for `ApiToken::MEMBERSHIP_SCOPES`).
 - `#extend!(by:)`, `#suspend!(by:, reason:)`, `#resume!(by:)`, `#revoke!(by:, reason:)`, `#record_use!(ip:)`.
 - Validations: every scope is a global key in the catalog; on create/scope change, the issuer must hold each scope (so must the holder); `expires_at` within the max lifetime.
 - `#state` → `active` / `suspended` / `expired` / `revoked` (for UI; not exposed by the 401 path).
@@ -65,9 +65,9 @@ Token format: `mz_` + `SecureRandom.urlsafe_base64(32)`. The prefix makes leaks 
 - `DefaultSetting.api_token_max_lifetime_days` (integer, not null, default 365).
 - New privileges in `Privilege::CATALOG`:
   - `api.tokens.manage`: manage service-account tokens and see all tokens.
-  - `parking.own_permits`: self-service permits. Treated as held by every active, non-service-account member, so it doesn't need a role.
+  - `parking.own_permits`: self-service permits. Listed in `ApiToken::MEMBERSHIP_SCOPES`: held by every active, non-service-account member, so it doesn't need a role.
   - `parking.issue_for_members`: the kiosk flow (look up a member by badge/username/email and issue a permit or link for them).
-- `ApiToken` gets a category in the privilege editor ("API").
+- `api.tokens.manage` gets a category in the privilege editor ("API"). It is added with the UI that enforces it (PR 3), since the catalog coverage test refuses keys nothing reads.
 
 ## 2. Request pipeline
 

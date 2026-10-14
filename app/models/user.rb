@@ -40,6 +40,7 @@ class User < ApplicationRecord
   has_many :parking_notice_members, dependent: :destroy
   has_many :parking_notices, through: :parking_notice_members
   has_many :parking_permit_links, dependent: :delete_all
+  has_many :api_tokens, dependent: :destroy
   has_many :membership_applications, -> { newest_first }, dependent: :nullify, inverse_of: :user
   has_many :invitations, dependent: :nullify
   has_many :sent_invitations, class_name: 'Invitation', foreign_key: 'invited_by_id', dependent: :nullify
@@ -128,6 +129,19 @@ class User < ApplicationRecord
     relation = relation.where.not(id: id) if persisted?
     errors.add(:email, :taken) if relation.exists?
   end
+
+  # The member picker's search: a substring of name, username, or alias, or a whole email address.
+  # Email is encrypted, so it cannot be matched by substring like the other fields; a whole
+  # address still resolves through the lookup digest.
+  scope :search_for_picker, lambda { |query|
+    pattern = "%#{sanitize_sql_like(query.to_s.strip.downcase)}%"
+    where(
+      "LOWER(COALESCE(full_name, '')) LIKE :p " \
+      "OR LOWER(COALESCE(username, '')) LIKE :p " \
+      'OR EXISTS (SELECT 1 FROM unnest(aliases) AS a WHERE LOWER(a) LIKE :p)',
+      p: pattern
+    ).or(by_any_email(query.to_s.strip))
+  }
 
   # Find a user whose full_name or any alias exactly matches the given name (case-insensitive).
   # No prefix or partial matching — the whole stored name must equal the query string.

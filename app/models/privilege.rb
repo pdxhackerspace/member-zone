@@ -110,6 +110,8 @@ class Privilege < ApplicationRecord
     { key: 'text_fragments.manage', label: 'Manage text fragments', category: 'Communications & content' },
     { key: 'webhooks.incoming.manage', label: 'Manage incoming webhooks', category: 'Communications & content' },
     { key: 'parking.manage_notices', label: 'Issue and clear parking notices', category: 'Parking & operations' },
+    { key: 'parking.own_permits', label: 'Manage your own parking permits (every active member)',
+      category: 'Parking & operations' },
     { key: 'parking.clear_admin_required', label: 'Clear notices needing staff clearance', category: 'Parking & operations' },
     { key: 'parking.manage_rooms', label: 'Manage rooms and locations', category: 'Parking & operations' },
     { key: 'parking.manage_printers', label: 'Manage printers', category: 'Parking & operations' },
@@ -142,6 +144,10 @@ class Privilege < ApplicationRecord
     { key: 'api.users.search', label: 'Use the member picker API', category: 'Reports & audit' },
     { key: 'help.admin_faq', label: 'View the admin FAQ', category: 'Reports & audit' }
   ].freeze
+
+  def self.catalog_entry(key)
+    CATALOG.find { |entry| entry[:key] == key.to_s }
+  end
 
   def global?
     privilege_scope == 'global'

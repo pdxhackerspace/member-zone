@@ -30,17 +30,21 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     # Per-device bearer token checked by DeviceWebhooksController#authenticate_device!.
     'device_webhooks' => %w[parking_permit],
     # The emailed 12-hour link: the token reaches one permit and signs nobody in.
-    'parking_permit_forms' => %w[show update pdf]
+    'parking_permit_forms' => %w[show update pdf],
+    # The API reference describes the API and grants nothing; clients read it before holding a token.
+    'api/v1/specs' => %w[show],
+    # Unknown /api/v1 paths, answered in the API's error envelope.
+    'api/v1/errors' => %w[not_found]
   }.freeze
 
   FILTER_NAMES = %w[require_authenticated_user! require_admin! require_privilege!
-                    require_true_admin!].freeze
+                    require_true_admin! authenticate_api_token!].freeze
 
   # Filters that decide *who* may act, as opposed to merely that someone is signed in.
   AUTHORIZATION_FILTERS = %w[require_admin! require_privilege! require_true_admin!].freeze
 
   # Both forms of privilege check, for the lambda filters that are the usual shape.
-  PRIVILEGE_CALLS = %w[require_privilege! require_any_privilege!].freeze
+  PRIVILEGE_CALLS = %w[require_privilege! require_any_privilege! require_scope!].freeze
 
   # Controllers where being signed in is the whole rule, because access follows from the
   # record rather than from a privilege: your own profile, your own messages, the training
@@ -53,7 +57,7 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     users messages profile_setup member_parking_permits user_links search
     training_catalog training_requests documents rag membership_plans trainings
     training_topics training_topic_links settings login_links notification_preferences
-    credentials
+    credentials api/v1/me
   ].freeze
 
   test 'every routed action is authenticated, admin gated, or privilege gated' do

@@ -3,6 +3,8 @@ class Current < ActiveSupport::CurrentAttributes
   attribute :user
   # The account actually signed in. Differs from `user` only while impersonating.
   attribute :true_user
+  # The API token authenticating this request, when it came in through the API.
+  attribute :api_token
   attribute :skip_authentik_sync
   # Set while replaying history. State-entry mail describes something that just happened;
   # a backfill is catching up on something that happened months ago and must stay quiet.
