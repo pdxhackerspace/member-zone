@@ -32,7 +32,9 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     # The API reference describes the API and grants nothing; clients read it before holding a token.
     'api/v1/specs' => %w[show],
     # Unknown /api/v1 paths, answered in the API's error envelope.
-    'api/v1/errors' => %w[not_found]
+    'api/v1/errors' => %w[not_found],
+    # The guide, the llms.txt index, and the rendered reference: documentation, granting nothing.
+    'api_docs' => %w[llms_index llms_full reference]
   }.freeze
 
   FILTER_NAMES = %w[require_authenticated_user! require_admin! require_privilege!
