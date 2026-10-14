@@ -27,8 +27,6 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     'slack_account_links' => %w[new callback],
     # Signature/allowlist verified inside the action rather than by a filter.
     'webhooks' => %w[receive],
-    # Per-device bearer token checked by DeviceWebhooksController#authenticate_device!.
-    'device_webhooks' => %w[parking_permit],
     # The emailed 12-hour link: the token reaches one permit and signs nobody in.
     'parking_permit_forms' => %w[show update pdf],
     # The API reference describes the API and grants nothing; clients read it before holding a token.

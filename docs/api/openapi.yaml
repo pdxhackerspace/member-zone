@@ -55,6 +55,8 @@ tags:
     description: Every parking permit and ticket, for staff and service accounts acting for members.
   - name: Parking (your own)
     description: The token holder's own permits and tickets, as a member manages them on the website.
+  - name: Parking (kiosks)
+    description: Permits for whoever badges in at an access control device.
 paths:
   /openapi.json:
     get:
@@ -481,6 +483,126 @@ paths:
           $ref: '#/components/responses/InvalidToken'
         '403':
           $ref: '#/components/responses/InsufficientScope'
+  /parking/permit_requests:
+    post:
+      operationId: requestParkingPermitForMember
+      summary: Request a permit for a member at a kiosk
+      description: |
+        For an access control device acting for the member who just badged in. Identify the member
+        by exactly one of `rfid` (their key fob), `username`, or full `email`, and choose a `mode`:
+
+        - `link` emails the member a link, good for 12 hours, to a form where they describe the
+          permit, choose an expiry of up to two weeks, and print it. The link does not sign them in.
+          Nothing is created until they submit it.
+        - `blank` issues a permit at once, valid for two weeks, for the member to hand-write. They
+          are emailed a link to record the details online and reminded until they do.
+
+        The response never contains the form link; it goes only to the member's inbox. Banned
+        members and members with no email address (for `link`) get `422 ineligible_member`.
+      tags: [Parking (kiosks)]
+      x-required-scope: parking.issue_for_members
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              additionalProperties: false
+              properties:
+                mode:
+                  type: string
+                  enum: [link, blank]
+                rfid:
+                  type: string
+                  description: The key fob the member badged with.
+                username:
+                  type: string
+                email:
+                  type: string
+                  description: The member's full email address.
+            example:
+              rfid: '0012345678'
+              mode: blank
+      responses:
+        '201':
+          description: The link was emailed, or the blank permit issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [mode, member, email_sent, link_expires_at, permit]
+                    additionalProperties: false
+                    properties:
+                      mode:
+                        type: string
+                        enum: [link, blank]
+                      member:
+                        type: object
+                        required: [name]
+                        additionalProperties: false
+                        properties:
+                          name:
+                            type: string
+                      email_sent:
+                        type: boolean
+                      link_expires_at:
+                        type: [string, 'null']
+                        format: date-time
+                        description: When the emailed form link stops working (link mode).
+                      permit:
+                        description: The permit issued (blank mode).
+                        oneOf:
+                          - type: 'null'
+                          - type: object
+                            required: [id, expires_at]
+                            additionalProperties: false
+                            properties:
+                              id:
+                                type: integer
+                              expires_at:
+                                type: string
+                                format: date-time
+              example:
+                data:
+                  mode: blank
+                  member:
+                    name: Ada Lovelace
+                  email_sent: true
+                  link_expires_at: null
+                  permit:
+                    id: 512
+                    expires_at: '2026-10-28T17:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: More than one member matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: The member cannot have a permit (banned, or no email address for a link).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ineligible_member
+                  message: Member is not eligible for a parking permit.
+                  details: {}
   /me/parking/notices:
     get:
       operationId: listOwnParkingNotices
@@ -813,7 +935,7 @@ components:
             code:
               type: string
               enum: [bad_request, invalid_token, insufficient_scope, forbidden, not_found, conflict,
-                     validation_failed, rate_limited, print_failed]
+                     validation_failed, ineligible_member, rate_limited, print_failed]
               description: Stable, machine-readable error code.
             message:
               type: string

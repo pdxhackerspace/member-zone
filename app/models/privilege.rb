@@ -112,6 +112,8 @@ class Privilege < ApplicationRecord
     { key: 'parking.manage_notices', label: 'Issue and clear parking notices', category: 'Parking & operations' },
     { key: 'parking.own_permits', label: 'Manage your own parking permits (every active member)',
       category: 'Parking & operations' },
+    { key: 'parking.issue_for_members', label: 'Issue permits for members who badge in at a kiosk',
+      category: 'Parking & operations' },
     { key: 'parking.clear_admin_required', label: 'Clear notices needing staff clearance', category: 'Parking & operations' },
     { key: 'parking.manage_rooms', label: 'Manage rooms and locations', category: 'Parking & operations' },
     { key: 'parking.manage_printers', label: 'Manage printers', category: 'Parking & operations' },

@@ -354,7 +354,7 @@
                       <%= ', ' if index.positive? %><%= link_to member.display_name, user_path(member), class: "text-decoration-none fw-medium" %>
                     <% end %>
                   </td>
-                  <td class="text-secondary"><%= notice.webhook_device&.name || '—' %></td>
+                  <td class="text-secondary"><%= notice.api_token&.name || '—' %></td>
                   <td><%= admin_profile_time(notice.details_requested_at) %></td>
                   <td><%= admin_profile_time(notice.expires_at) %></td>
                   <td class="num"><%= reminder_sent_count_display(notice, @reminder_setting) %></td>
