@@ -13,9 +13,11 @@ module ApiTokenMailVariables
     }
   end
 
-  # A member's own token is extended from their tokens page; anyone else's from the settings page.
+  # The holder and the contact extend a token from their own tokens page; a token manager warned
+  # in their place uses the settings page.
   def tokens_url(token, recipient)
     base = ENV.fetch('APP_BASE_URL', 'http://localhost:3000').chomp('/')
-    token.user_id == recipient.id ? "#{base}/api_tokens" : "#{base}/settings/api_tokens"
+    answerable = recipient.id.in?([token.user_id, token.contact_user_id])
+    answerable ? "#{base}/api_tokens" : "#{base}/settings/api_tokens"
   end
 end

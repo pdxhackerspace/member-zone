@@ -80,6 +80,28 @@ class ManagedApiTokensControllerTest < ActionDispatch::IntegrationTest
     assert_match(/mz_[A-Za-z0-9_-]+/, response.body)
   end
 
+  test 'a token can be created with nobody as its contact' do
+    sign_in_as_manager
+    post managed_api_tokens_path, params: { api_token: { user_id: @kiosk.id, name: 'Kiosk', contact_user_id: '' } }
+
+    assert_response :success
+    assert_nil @kiosk.api_tokens.last.contact_user
+  end
+
+  test 'the nobody-to-remind filter uses the same rule as the reminder' do
+    manager = sign_in_as_manager
+    blocked = users(:two)
+    ApiToken.create!(user: @kiosk, created_by: manager, contact_user: blocked, name: 'Banned contact token')
+    blocked.update_columns(membership_state: 'banned_member')
+    ApiToken.create!(user: @kiosk, created_by: manager, contact_user: manager, name: 'Fine token')
+
+    get managed_api_tokens_path(filter: 'no_contact')
+
+    assert_includes response.body, 'Banned contact token'
+    assert_not_includes response.body, 'Fine token'
+    assert_includes response.body, '1</span> with nobody to remind'
+  end
+
   test 'only service accounts can be chosen' do
     sign_in_as_manager
 
