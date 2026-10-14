@@ -1,0 +1,9 @@
+Your API token expires soon
+
+Hello <%= @user.display_name %>,
+
+The API token "<%= @variables[:api_token_name] %>" (ending <%= @variables[:api_token_hint] %>, held by <%= @variables[:api_token_holder] %>) expires on <%= @variables[:api_token_expires_at] %>.
+
+If it is still in use, extend it before then. It keeps the same secret, so nothing using it needs to change. If nothing uses it any more, you can let it lapse.
+
+Open API tokens: <%= @variables[:api_tokens_url] %>

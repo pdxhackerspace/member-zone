@@ -1,0 +1,46 @@
+<%= form_with model: @api_token, url: (@api_token.persisted? ? managed_api_token_path(@api_token) : managed_api_tokens_path),
+              data: { turbo: false } do |form| %>
+  <% if @api_token.errors.any? %>
+    <div class="alert alert-danger text-13"><%= @api_token.errors.full_messages.to_sentence %></div>
+  <% end %>
+  <% if @api_token.new_record? %>
+    <div class="mb-3">
+      <%= form.label :user_id, "Service account", class: "form-label" %>
+      <%= form.collection_select :user_id, @service_accounts, :id, :display_name, { include_blank: "Choose…" },
+                                 class: "form-select", required: true %>
+      <div class="form-text">
+        The token acts as this account, so it can only use privileges the account holds through its roles.
+      </div>
+    </div>
+  <% else %>
+    <div class="mb-3 text-13">
+      Held by <%= link_to @api_token.user.display_name, user_path(@api_token.user) %> ·
+      ends <code><%= @api_token.token_hint %></code>
+    </div>
+  <% end %>
+  <div class="mb-3">
+    <%= form.label :name, class: "form-label" %>
+    <%= form.text_field :name, class: "form-control", required: true, maxlength: 100,
+                        placeholder: "e.g. Front desk printer" %>
+  </div>
+  <div class="mb-3">
+    <%= form.label :description, "Notes (optional)", class: "form-label" %>
+    <%= form.text_area :description, class: "form-control", rows: 2 %>
+  </div>
+  <div class="mb-3">
+    <%= form.label :contact_user_id, "Contact", class: "form-label" %>
+    <%= form.collection_select :contact_user_id, @contacts, :id, :display_name, { include_blank: "Nobody" },
+                               class: "form-select" %>
+    <div class="form-text">Warned before the token expires. With no active contact, token managers are warned.</div>
+  </div>
+  <% if @api_token.new_record? %>
+    <div class="mb-3">
+      <div class="form-label">Scopes</div>
+      <%= render 'api_tokens/scope_fields', options: @scope_options, selected: @api_token.scopes %>
+    </div>
+  <% end %>
+  <div class="d-flex gap-2">
+    <%= form.submit (@api_token.new_record? ? "Create token" : "Save"), class: "btn btn-primary btn-sm" %>
+    <%= link_to "Cancel", managed_api_tokens_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+<% end %>

@@ -62,10 +62,19 @@ class EmailTemplate < ApplicationRecord
     '{{credential_names_text}}' => 'Plain-text list of the credentials that were revoked (credentials revoked only)',
     '{{credential_reason}}' => 'Why the credentials were revoked, e.g. "your membership is no longer active" ' \
                                '(credentials revoked only)',
-    '{{credentials_url}}' => 'Link to the member\'s credentials page (credential emails only)'
+    '{{credentials_url}}' => 'Link to the member\'s credentials page (credential emails only)',
+    '{{api_token_name}}' => 'Name of the API token (API token emails only)',
+    '{{api_token_hint}}' => 'Last four characters of the API token (API token emails only)',
+    '{{api_token_holder}}' => 'Member or service account holding the API token (API token emails only)',
+    '{{api_token_expires_at}}' => 'Date the API token expires (API token emails only)',
+    '{{api_tokens_url}}' => 'Link to the page where the recipient can extend the token (API token emails only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
+    'api_token_expiring_soon' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{api_token_name}} {{api_token_hint}} {{api_token_holder}}
+      {{api_token_expires_at}} {{api_tokens_url}}
+    ],
     'credential_expiring_soon' => %w[
       {{member_name}} {{organization_name}} {{date}} {{credential_name}} {{credential_expires_at}} {{credentials_url}}
     ],
@@ -505,6 +514,29 @@ class EmailTemplate < ApplicationRecord
         {{audit_matches_text}}
 
         Open this log in Member Zone: {{audit_log_url}}
+      TEXT
+    },
+    'api_token_expiring_soon' => {
+      name: 'API Token Expiring Soon',
+      description: 'Sent before an API token expires, to its contact or to the token managers',
+      subject: '{{organization_name}}: API token "{{api_token_name}}" expires soon',
+      body_html: <<~HTML,
+        <h1>Your API token expires soon</h1>
+        <p>Hello {{member_name}},</p>
+        <p>The API token <strong>{{api_token_name}}</strong> (ending <code>{{api_token_hint}}</code>, held by {{api_token_holder}}) expires on {{api_token_expires_at}}.</p>
+        <p>If it is still in use, extend it before then — it keeps the same secret, so nothing using it needs to change. If nothing uses it any more, you can let it lapse.</p>
+        <p><a href="{{api_tokens_url}}">Open API tokens</a></p>
+      HTML
+      body_text: <<~TEXT
+        Your API token expires soon
+
+        Hello {{member_name}},
+
+        The API token "{{api_token_name}}" (ending {{api_token_hint}}, held by {{api_token_holder}}) expires on {{api_token_expires_at}}.
+
+        If it is still in use, extend it before then. It keeps the same secret, so nothing using it needs to change. If nothing uses it any more, you can let it lapse.
+
+        Open API tokens: {{api_tokens_url}}
       TEXT
     },
     'credential_expiring_soon' => {

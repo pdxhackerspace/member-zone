@@ -147,6 +147,14 @@ It goes to reviewers rather than to the applicant, so there is nobody to opt out
 
 **Timing** counts from the day the application was submitted: 7 days, then every 3, with no limit. It stops when the application is reviewed.
 
+### API token expiry reminder
+
+Warns before an API token expires, so a token still in use gets extended and an abandoned one is left to lapse. **This reminder ships enabled** and members cannot opt out of it: it is the only warning before something stops working.
+
+It goes to the token's **contact** — for a member's own token, the member. When the contact is no longer an active member (or a service-account token has none), it goes to everyone who holds *Manage service-account API tokens* instead.
+
+**Timing** counts back from the expiry date: 14 days before, then every 7, at most 3. Extending a token moves its expiry and starts the sequence over.
+
 ## Application backlog on the admin dashboard
 
 The admin dashboard's **Applications** column draws every application still waiting on a decision as one bar, with the total above it:
@@ -217,6 +225,27 @@ Your credentials are revoked automatically when your membership stops being acti
 - Providers and revocations that need attention appear on the settings page, the admin dashboard and the urgent digest. A revocation that fails is retried daily, backing off up to a day.
 
 See `docs/credentials.md` for how programs are written, and the `Credentials administrator` role for the four `credentials.*` privileges.
+
+## API tokens
+
+API tokens let scripts, devices, and integrations use the Member Zone API. A token is sent as `Authorization: Bearer mz_…`; the API reference is at `/api/v1/openapi.json`.
+
+### Your own tokens (members)
+
+**API tokens** on your dashboard lists your tokens. **+ New token** asks what it is for and what it may do — you can only tick things you can do yourself, and a token never does more than its ticks *or* more than you can do at the moment it is used. The next page shows the token **once**; copy it before leaving.
+
+Each token lasts the maximum lifetime (365 days unless changed) and we email you two weeks before it expires. **Extend** pushes the expiry out again and keeps the same token, so whatever uses it needs no change — this works on an expired token too. **Suspend** stops a token until you **Resume** it; **Revoke** stops it for good. While your membership is not active your tokens are refused, and they work again if you come back.
+
+### Service account tokens and administration
+
+**Settings → API tokens** (needs *Manage service-account API tokens and see every token*) lists every token, with filters for tokens expiring within 30 days, tokens with nobody to remind, suspended, expired, and revoked, and for member versus service-account tokens.
+
+- **+ Service account token** makes a token for a device or integration. It belongs to the service account rather than to you, so it keeps working when you leave. The service account can only use privileges it holds through its roles, like any member, so give it a role first. Choose a **contact** to be warned before it expires.
+- **Edit** renames a token or reassigns its contact. To change what a token may do, create a new one and revoke the old.
+- **Extend**, **Suspend**, **Resume**, and **Revoke** work on any token from here.
+- **Token lifetime** sets the maximum lifetime in days. New tokens and extensions use it; existing tokens keep their expiry.
+
+Tokens cannot be created or changed while viewing as a member.
 
 ## Membership states
 

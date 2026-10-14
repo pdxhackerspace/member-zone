@@ -1,0 +1,24 @@
+<%# One visible action — Extend — and the rest in a menu, revoke last. %>
+<% unless token.revoked? %>
+  <div class="d-flex gap-2 justify-content-end">
+    <%= button_to "Extend", renew_api_token_path(token), method: :post, class: "btn btn-outline-secondary btn-sm",
+                  title: "Push the expiry out to #{pluralize(DefaultSetting.instance.api_token_max_lifetime_days, 'day')} from now" %>
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" title="More actions" style="line-height: 1;">⋯</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <% if token.suspended? %>
+          <li><%= button_to "Resume", resume_api_token_path(token), method: :post, class: "dropdown-item" %></li>
+        <% else %>
+          <li><%= button_to "Suspend", suspend_api_token_path(token), method: :post, class: "dropdown-item",
+                            data: { turbo_confirm: "Suspend this token? Anything using it stops working until you resume it." } %></li>
+        <% end %>
+        <% if local_assigns[:edit_path] %>
+          <li><%= link_to "Edit", edit_path, class: "dropdown-item" %></li>
+        <% end %>
+        <li><hr class="dropdown-divider"></li>
+        <li><%= button_to "Revoke", revoke_api_token_path(token), method: :post, class: "dropdown-item text-danger",
+                          data: { turbo_confirm: "Revoke this token for good? Anything using it stops working, and it cannot be brought back." } %></li>
+      </ul>
+    </div>
+  </div>
+<% end %>

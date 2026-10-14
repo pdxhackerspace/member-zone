@@ -1,0 +1,36 @@
+<%# Turbo keeps its own snapshot of pages for back/forward; this one holds a secret. %>
+<% content_for :head, tag.meta(name: 'turbo-cache-control', content: 'no-cache') %>
+
+<div class="mb-3">
+  <h1 class="h-page-title mb-0">Your new API token</h1>
+  <div class="text-13 text-secondary mt-1">
+    <%= @api_token.name %>
+    <% if @api_token.user != current_user %>· for <%= @api_token.user.display_name %><% end %>
+    · expires <%= l(@api_token.expires_at.to_date, format: :long) %>
+  </div>
+</div>
+
+<div class="alert alert-warning text-13">
+  <strong>Copy this now.</strong> It is shown only once and cannot be recovered. If you lose it, revoke it and create
+  a new one.
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <div class="mb-3" data-controller="copy">
+      <label class="form-label" for="api-token-secret">Token</label>
+      <div class="input-group">
+        <input type="text" id="api-token-secret" class="form-control font-monospace" readonly autocomplete="off"
+               value="<%= @api_token.token %>" data-copy-target="source">
+        <button type="button" class="btn btn-outline-secondary" data-action="copy#copy"
+                data-copy-target="button">Copy</button>
+      </div>
+    </div>
+    <div class="text-13 text-secondary">
+      Try it: <code>curl -H "Authorization: Bearer <%= @api_token.token %>" <%= api_v1_me_url %></code>
+    </div>
+  </div>
+</div>
+
+<%= link_to "I've saved this", (@api_token.personal? ? api_tokens_path : managed_api_tokens_path),
+            class: "btn btn-primary btn-sm" %>

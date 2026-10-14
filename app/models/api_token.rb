@@ -137,6 +137,26 @@ class ApiToken < ApplicationRecord
     user.can?(key)
   end
 
+  # Membership privileges come with being an active member rather than with a role, so roles
+  # cannot answer for them.
+  def self.granter_has?(granter, key)
+    return true if granter.is_admin?
+    return granter.active? if membership_scope?(key)
+
+    granter.can?(key)
+  end
+
+  # The catalog entries +granter+ could put on a token for +holder+ (or for any holder, when nil),
+  # in catalog order. Topic-scoped privileges are never offered.
+  def self.grantable_scopes(granter:, holder: nil)
+    Privilege::CATALOG.select do |entry|
+      next false if entry[:privilege_scope] == 'topic'
+      next false if holder && !holder_has?(holder, entry[:key])
+
+      granter_has?(granter, entry[:key])
+    end
+  end
+
   # Pushes the expiry out by the maximum lifetime from now. Works on an expired token too, and
   # keeps the secret, so the client using it needs no change.
   def extend!(by:, now: Time.current)
@@ -220,17 +240,8 @@ class ApiToken < ApplicationRecord
         next errors.add(:scopes, "#{key} is not held by #{user.display_name}")
       end
 
-      errors.add(:scopes, "#{key} is not yours to grant") if granter && !granter_has?(granter, key)
+      errors.add(:scopes, "#{key} is not yours to grant") if granter && !self.class.granter_has?(granter, key)
     end
-  end
-
-  # Membership privileges come with being an active member rather than with a role, so roles
-  # cannot answer for them.
-  def granter_has?(granter, key)
-    return true if granter.is_admin?
-    return granter.active? if self.class.membership_scope?(key)
-
-    granter.can?(key)
   end
 
   def expiry_within_max_lifetime

@@ -1,0 +1,36 @@
+<div class="mb-3">
+  <h1 class="h-page-title mb-0">New API token</h1>
+  <div class="text-13 text-secondary mt-1">
+    A token can only do what you can do, and only the things you tick here. It lasts
+    <%= pluralize(DefaultSetting.instance.api_token_max_lifetime_days, 'day') %>, and you can extend it.
+  </div>
+</div>
+
+<div class="row"><div class="col-lg-7">
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <%= form_with model: @api_token, url: api_tokens_path, data: { turbo: false } do |form| %>
+      <% if @api_token.errors.any? %>
+        <div class="alert alert-danger text-13"><%= @api_token.errors.full_messages.to_sentence %></div>
+      <% end %>
+      <div class="mb-3">
+        <%= form.label :name, "What is it for?", class: "form-label" %>
+        <%= form.text_field :name, class: "form-control", required: true, maxlength: 100,
+                            placeholder: "e.g. My parking permit script" %>
+      </div>
+      <div class="mb-3">
+        <%= form.label :description, "Notes (optional)", class: "form-label" %>
+        <%= form.text_area :description, class: "form-control", rows: 2 %>
+      </div>
+      <div class="mb-3">
+        <div class="form-label">What it may do</div>
+        <%= render 'api_tokens/scope_fields', options: @scope_options, selected: @api_token.scopes %>
+      </div>
+      <div class="d-flex gap-2">
+        <%= form.submit "Create token", class: "btn btn-primary btn-sm" %>
+        <%= link_to "Cancel", api_tokens_path, class: "btn btn-outline-secondary btn-sm" %>
+      </div>
+    <% end %>
+  </div>
+</div>
+</div></div>

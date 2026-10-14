@@ -142,6 +142,7 @@ class Privilege < ApplicationRecord
     { key: 'member_map.view', label: 'View the member map', category: 'Reports & audit' },
     { key: 'search.admin', label: 'Search all record types', category: 'Reports & audit' },
     { key: 'api.users.search', label: 'Use the member picker API', category: 'Reports & audit' },
+    { key: 'api.tokens.manage', label: 'Manage service-account API tokens and see every token', category: 'API' },
     { key: 'help.admin_faq', label: 'View the admin FAQ', category: 'Reports & audit' }
   ].freeze
 

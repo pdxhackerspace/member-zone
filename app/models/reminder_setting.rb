@@ -137,6 +137,25 @@ class ReminderSetting < ApplicationRecord
       # queued mail back to this reminder; the job records its own sends.
       reminder_mailer_actions: [],
       email_template_keys: %w[staff_application_reminder]
+    },
+    'api_token_expiry' => {
+      name: 'API token expiry reminder',
+      description: 'Warns whoever is responsible for an API token before it expires, so a token still in use ' \
+                   'gets extended and an abandoned one is left to lapse. Service-account tokens whose contact ' \
+                   'is no longer active are reported to the token managers instead.',
+      # Ships on: a token that lapses without warning breaks whatever depends on it.
+      enabled: true,
+      # The only notice before something stops working, and it often goes to staff rather than to
+      # the token's holder, so there is no preference to honour.
+      allow_opt_out: false,
+      anchor_description: 'expiry',
+      start_offset_days: -14,
+      interval_days: 7,
+      max_reminders: 3,
+      # Sent straight to the recipients rather than through the mail queue, so the job records
+      # its own sends.
+      reminder_mailer_actions: [],
+      email_template_keys: %w[api_token_expiring_soon]
     }
   }.freeze
 
