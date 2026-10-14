@@ -139,6 +139,7 @@ class TrainingsController < AuthenticatedController
     return if current_user.trainer_capabilities.any?
     return if current_user.can_for_any_topic?(:'training.record')
     return if current_user.can?(:'training.grant_trainer')
+    return if current_user.can_for_any_topic?(:'training.subtopics.grant_trainer')
 
     redirect_to root_path, alert: "You don't have permission to train members."
   end
@@ -206,10 +207,15 @@ class TrainingsController < AuthenticatedController
     @recording_users = recording_user_options
     @initial_trainee_ids = initial_trainee_ids_from_params
     @initial_topic_id = params[:topic_id].presence
-    return unless current_user_admin?
+    prepare_trainer_capabilities_panel
+  end
+
+  # Admins, directors and stewards each see the topics they may appoint trainers for.
+  def prepare_trainer_capabilities_panel
+    @manageable_trainer_topics = current_user.manageable_trainer_topics
+    return if @manageable_trainer_topics.empty?
 
     @trainer_manage_user = User.find_by(id: params[:trainer_user_id]) if params[:trainer_user_id].present?
-    @all_training_topics = TrainingTopic.order(:name)
     @users_for_search = User.ordered_by_display_name
   end
 

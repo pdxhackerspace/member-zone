@@ -81,6 +81,8 @@ class Privilege < ApplicationRecord
     { key: 'training.record', label: 'Record training for others', category: 'Training & topic resources', privilege_scope: 'topic' },
     { key: 'training.revoke', label: 'Revoke training records', category: 'Training & topic resources', privilege_scope: 'topic' },
     { key: 'training.grant_trainer', label: 'Grant and revoke trainer capability', category: 'Training & topic resources' },
+    { key: 'training.subtopics.grant_trainer', label: 'Grant and revoke trainer capability for subtopics',
+      category: 'Training & topic resources', privilege_scope: 'topic' },
     { key: 'training.respond_requests', label: 'Respond to training requests', category: 'Training & topic resources', privilege_scope: 'topic' },
     { key: 'training.documents.manage', label: 'Manage topic documents', category: 'Training & topic resources', privilege_scope: 'topic' },
     { key: 'training.documents.view_all', label: 'View all documents', category: 'Training & topic resources' },

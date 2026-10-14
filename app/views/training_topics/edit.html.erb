@@ -416,11 +416,14 @@
     </div>
   </div>
 
-  <% if current_user_admin? %>
+  <% if current_user_admin? || current_user.may_manage_trainer_capability?(@training_topic) %>
     <div class="col-md-6">
       <div class="card shadow-sm border-0">
         <div class="card-body">
           <h2 class="h5 mb-3">Users Who Can Train This Topic</h2>
+          <p class="text-13 text-secondary">
+            <%= link_to 'Appoint a trainer', record_training_path(topic_id: @training_topic.id, anchor: 'trainer-capabilities-panel') %>
+          </p>
           <% if @trainer_users.any? %>
             <ul class="list-unstyled mb-0">
               <% @trainer_users.each do |user| %>

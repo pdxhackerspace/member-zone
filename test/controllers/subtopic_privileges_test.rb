@@ -193,4 +193,49 @@ class SubtopicPrivilegesTest < ActionDispatch::IntegrationTest
     member.update!(is_admin: true)
     member
   end
+
+  test 'a steward can appoint a trainer for a subtopic' do
+    steward = sign_in_as_plain_member
+    grant_privileges(steward, 'training.subtopics.grant_trainer', 'training.record', topic: @parent)
+    trainee = users(:regular_member) if respond_to?(:users)
+    trainee ||= User.where.not(id: steward.id).first
+
+    assert_difference 'TrainerCapability.count', 1 do
+      post add_trainer_capability_path(user_id: trainee.id, topic_id: @subtopic.id)
+    end
+    assert TrainerCapability.exists?(user: trainee, training_topic: @subtopic)
+  end
+
+  test 'a steward cannot appoint a trainer for the parent topic or an unrelated topic' do
+    steward = sign_in_as_plain_member
+    grant_privileges(steward, 'training.subtopics.grant_trainer', 'training.record', topic: @parent)
+    trainee = User.where.not(id: steward.id).first
+
+    assert_no_difference 'TrainerCapability.count' do
+      post add_trainer_capability_path(user_id: trainee.id, topic_id: @parent.id)
+      post add_trainer_capability_path(user_id: trainee.id, topic_id: @unrelated.id)
+    end
+  end
+
+  test 'a steward can remove a subtopic trainer and sees the panel listing only their subtopics' do
+    steward = sign_in_as_plain_member
+    grant_privileges(steward, 'training.subtopics.grant_trainer', 'training.record', topic: @parent)
+    trainee = User.where.not(id: steward.id).first
+    TrainerCapability.create!(user: trainee, training_topic: @subtopic)
+
+    get record_training_path
+    assert_select '#trainer-capabilities-panel'
+
+    assert_difference 'TrainerCapability.count', -1 do
+      delete remove_trainer_capability_path(user_id: trainee.id, topic_id: @subtopic.id)
+    end
+  end
+
+  test 'a curator without the grant privilege sees no trainer panel' do
+    lead = sign_in_as_plain_member
+    grant_privileges(lead, 'training.record', topic: @parent)
+
+    get record_training_path
+    assert_select '#trainer-capabilities-panel', count: 0
+  end
 end
