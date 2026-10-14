@@ -20,8 +20,11 @@
               <% if event.note.present? %>
                 <div class="text-13"><%= simple_format(event.note, {}, wrapper_tag: 'span') %></div>
               <% end %>
-              <% if event.actor.present? %>
-                <div class="text-12 text-secondary">by <%= event.actor.display_name %></div>
+              <% if event.actor.present? || event.api_token.present? %>
+                <div class="text-12 text-secondary">
+                  <% if event.actor.present? %>by <%= event.actor.display_name %><% end %>
+                  <% if event.api_token.present? %>via API token “<%= event.api_token.name %>”<% end %>
+                </div>
               <% end %>
             </div>
           </li>

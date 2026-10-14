@@ -94,6 +94,7 @@ Token format: `mz_` + `SecureRandom.urlsafe_base64(32)`. The prefix makes leaks 
 
 - Pagination: `?page=&per_page=` (max 100), with `meta: { page, per_page, total }` and a `Link` header.
 - JSON via Jbuilder partials under `app/views/api/v1/`; timestamps ISO 8601 UTC.
+- **Scopes reach the models.** While `Current.api_token` is set, `User#can?` for its holder also requires the key to be in the token's scopes, and `User#admin?` is false, so a privilege check made deep in a model or service (e.g. `ParkingNotice#clearable_by?`) cannot hand a token more than it was given. History entries record `api_token_id`.
 - `PrivilegeCoverageTest` learns that `Api::V1::*` actions are covered by `authenticate_token!` + `require_scope!` (it should assert every v1 action calls `require_scope!`, not merely authenticate).
 
 ## 3. Shared parking services
@@ -136,13 +137,13 @@ Scope `parking.manage_notices`. Service accounts pass `member_ids` explicitly.
 | `PATCH /api/v1/parking/notices/:id` | |
 | `POST /api/v1/parking/notices/:id/clear` | Also needs `clearable_by?`. |
 | `POST /api/v1/parking/notices/:id/notes` | |
-| `POST /api/v1/parking/notices/:id/photos` | Multipart; existing content-type/size validations. |
-| `DELETE /api/v1/parking/notices/:id/photos/:photo_id` | |
+| `POST /api/v1/parking/notices/:notice_id/photos` | Multipart `photos[]`; images only, ≤10 per request, ≤15 MB each. |
+| `GET`/`DELETE /api/v1/parking/notices/:notice_id/photos/:id` | |
 | `GET /api/v1/parking/notices/:id/pdf` | `application/pdf`. |
 | `POST /api/v1/parking/notices/:id/print` | Body: `printer_id`, optional `force_letter`. |
 | `GET /api/v1/parking/printers` | Scope `parking.manage_notices` or `parking.own_permits`. |
 
-Photo metadata includes a short-lived signed download URL.
+Photo metadata includes a `download_path`: an API endpoint that serves the photo to the same token, rather than a bearer-free signed URL.
 
 ### Parking: self-service (holder's own notices)
 
@@ -151,14 +152,14 @@ Scope `parking.own_permits`. Personal tokens only; a service-account token gets 
 | Method & path | Notes |
 | --- | --- |
 | `GET /api/v1/me/parking/notices` | The holder's permits and tickets. |
-| `POST /api/v1/me/parking/permits` | 2-week cap. |
+| `POST /api/v1/me/parking/notices` | Always a permit; 2-week cap; the holder is always on it. |
 | `GET /api/v1/me/parking/notices/:id` | |
-| `PATCH /api/v1/me/parking/permits/:id` | Own permits only. |
+| `PATCH /api/v1/me/parking/notices/:id` | Permits only. |
 | `POST /api/v1/me/parking/notices/:id/close` | Or 403 pointing at `request_clearance`. |
 | `POST /api/v1/me/parking/notices/:id/request_clearance` | |
 | `POST /api/v1/me/parking/notices/:id/notes` | |
-| `POST /api/v1/me/parking/permits/:id/photos`, `DELETE …/photos/:photo_id` | |
-| `GET /api/v1/me/parking/permits/:id/pdf`, `POST …/print` | |
+| `POST /api/v1/me/parking/notices/:notice_id/photos`, `GET`/`DELETE …/photos/:id` | Upload and remove on permits only. |
+| `GET /api/v1/me/parking/notices/:id/pdf`, `POST …/print` | |
 
 ### Parking: kiosk flow (replaces the device webhook)
 

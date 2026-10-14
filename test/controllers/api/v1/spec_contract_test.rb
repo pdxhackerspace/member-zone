@@ -7,6 +7,7 @@ module Api
     class SpecContractTest < ActionDispatch::IntegrationTest
       # Routes that exist for plumbing rather than as operations.
       UNDOCUMENTED_ROUTES = ['* /*path'].freeze
+      HTTP_METHODS = %w[get put post delete options head patch trace].freeze
 
       test 'the spec is served as JSON without a token' do
         get api_v1_openapi_path
@@ -24,8 +25,10 @@ module Api
 
       test 'every API route is documented and every documented operation is routed' do
         routed = api_routes.to_set { |verb, path| "#{verb} #{path}" }
+        # Rails routes PUT alongside PATCH for updates; the spec documents PATCH and says so.
+        routed.reject! { |route| route.start_with?('PUT ') && routed.include?(route.sub('PUT ', 'PATCH ')) }
         documented = ApiTestHelper.spec['paths'].flat_map do |path, operations|
-          operations.keys.map { |verb| "#{verb.upcase} #{path}" }
+          operations.keys.intersection(HTTP_METHODS).map { |verb| "#{verb.upcase} #{path}" }
         end.to_set
 
         assert_empty (routed - documented - UNDOCUMENTED_ROUTES).sort, 'routes missing from docs/api/openapi.yaml'
@@ -68,7 +71,7 @@ module Api
 
       def each_operation(&)
         ApiTestHelper.spec['paths'].each do |path, operations|
-          operations.each { |verb, operation| yield("#{verb.upcase} #{path}", operation) }
+          operations.slice(*HTTP_METHODS).each { |verb, operation| yield("#{verb.upcase} #{path}", operation) }
         end
       end
 

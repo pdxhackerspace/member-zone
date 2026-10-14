@@ -572,6 +572,34 @@ Rails.application.routes.draw do
       get 'openapi.json', to: 'specs#show', as: :openapi, defaults: { format: :json }
       get 'me', to: 'me#show'
       resources :members, only: %i[index show], constraints: { id: /\d+/ }
+
+      namespace :parking do
+        resources :notices, only: %i[index show create update] do
+          member do
+            post :clear
+            post :notes
+            get :pdf
+            post :print
+          end
+          resources :photos, only: %i[show create destroy]
+        end
+        resources :printers, only: :index
+      end
+
+      namespace :me do
+        namespace :parking do
+          resources :notices, only: %i[index show create update] do
+            member do
+              post :close
+              post :request_clearance
+              post :notes
+              get :pdf
+              post :print
+            end
+            resources :photos, only: %i[show create destroy]
+          end
+        end
+      end
       match '*path', to: 'errors#not_found', via: :all
     end
   end
