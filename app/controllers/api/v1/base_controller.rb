@@ -19,13 +19,14 @@ module Api
       ADDRESS_RATE_LIMIT = 600
       MAX_PER_PAGE = 100
 
-      rate_limit to: ADDRESS_RATE_LIMIT, within: 1.minute, name: 'api-v1-address', store: RateLimiting.store,
-                 by: -> { request.remote_ip }, with: -> { render_rate_limited }
+      # Both limits count across the whole API (scope), not per controller, which is Rails' default.
+      rate_limit to: ADDRESS_RATE_LIMIT, within: 1.minute, name: 'address', scope: 'api-v1',
+                 store: RateLimiting.store, by: -> { request.remote_ip }, with: -> { render_rate_limited }
 
       before_action :authenticate_api_token!
 
-      rate_limit to: RATE_LIMIT, within: 1.minute, name: 'api-v1', store: RateLimiting.store,
-                 by: -> { "token-#{current_api_token.id}" }, with: -> { render_rate_limited }
+      rate_limit to: RATE_LIMIT, within: 1.minute, name: 'token', scope: 'api-v1', store: RateLimiting.store,
+                 by: -> { current_api_token.id }, with: -> { render_rate_limited }
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
       rescue_from ActionController::ParameterMissing, with: :render_bad_request
