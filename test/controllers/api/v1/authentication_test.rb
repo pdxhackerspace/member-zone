@@ -110,6 +110,14 @@ module Api
         assert_equal '60', response.headers['Retry-After']
       end
 
+      test 'requests without a valid token are rate limited by address' do
+        BaseController::ADDRESS_RATE_LIMIT.times { get api_v1_me_path, headers: api_headers('mz_guess') }
+        assert_api_error :unauthorized, 'invalid_token'
+
+        get api_v1_me_path, headers: api_headers('mz_guess')
+        assert_api_error :too_many_requests, 'rate_limited'
+      end
+
       private
 
       def refused_token_cases
