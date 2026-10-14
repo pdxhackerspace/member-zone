@@ -131,6 +131,20 @@ module Api
         assert_matches_spec :patch, '/me/parking/notices/{id}'
       end
 
+      test 'cannot download or print a ticket' do
+        ticket = parking_notices(:expired_ticket)
+        ParkingNoticeMember.create!(parking_notice: ticket, user: @member)
+        printer = Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk')
+
+        get pdf_api_v1_me_parking_notice_path(ticket), headers: api_headers(@raw)
+        assert_api_error :forbidden, 'forbidden'
+
+        post print_api_v1_me_parking_notice_path(ticket), params: { printer_id: printer.id }, as: :json,
+                                                          headers: api_headers(@raw)
+        assert_api_error :forbidden, 'forbidden'
+        assert_matches_spec :post, '/me/parking/notices/{id}/print'
+      end
+
       test 'clears your notice' do
         post close_api_v1_me_parking_notice_path(parking_notices(:active_permit)), headers: api_headers(@raw)
 
