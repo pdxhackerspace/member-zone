@@ -52,6 +52,8 @@ class ApiToken < ApplicationRecord
   scope :personal, -> { joins(:user).where(users: { service_account: false }) }
   scope :service, -> { joins(:user).where(users: { service_account: true }) }
   scope :newest_first, -> { order(created_at: :desc) }
+  # Tokens someone is answerable for: their own, and service-account tokens they are the contact for.
+  scope :looked_after_by, ->(user) { where(user: user).or(where(contact_user: user)) }
 
   def self.digest(token)
     OpenSSL::Digest::SHA256.hexdigest(token.to_s)
@@ -216,8 +218,10 @@ class ApiToken < ApplicationRecord
     self.token_hint = @token.last(4)
   end
 
+  # A member is the contact for their own token. A service-account token's contact is whoever
+  # its creator chose, and may be nobody, in which case token managers are reminded.
   def default_contact
-    self.contact_user ||= created_by
+    self.contact_user = user if contact_user.nil? && user && !user.service_account?
   end
 
   def default_expiry

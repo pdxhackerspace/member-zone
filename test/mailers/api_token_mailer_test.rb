@@ -41,6 +41,16 @@ class ApiTokenMailerTest < ActionMailer::TestCase
     assert_includes mail.text_part.body.to_s, '/settings/api_tokens'
   end
 
+  test "links a service token's contact to their own tokens page" do
+    admin = users(:one)
+    admin.update_columns(is_admin: true)
+    token = ApiToken.create!(user: create_service_account, created_by: admin, contact_user: @member, name: 'Kiosk')
+    mail = MemberMailer.api_token_expiring_soon(@member, api_token_id: token.id)
+
+    assert_includes mail.text_part.body.to_s, '/api_tokens'
+    assert_not_includes mail.text_part.body.to_s, '/settings/api_tokens'
+  end
+
   test 'falls back to the view when the template is disabled' do
     EmailTemplate.find_by!(key: 'api_token_expiring_soon').update!(enabled: false)
     mail = MemberMailer.api_token_expiring_soon(@member, api_token_id: @token.id)

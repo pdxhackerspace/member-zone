@@ -102,6 +102,23 @@ class ApiTokensControllerTest < ActionDispatch::IntegrationTest
     assert_match(/revoked token cannot be extended/, flash[:alert])
   end
 
+  test 'you can see and extend service tokens you are the contact for' do
+    member = sign_in_as_plain_member
+    admin = users(:one)
+    admin.update_columns(is_admin: true)
+    kiosk = create_service_account(full_name: 'Front Desk Kiosk')
+    token = ApiToken.create!(user: kiosk, created_by: admin, contact_user: member, name: 'Kiosk token')
+    token.update_columns(expires_at: 1.day.from_now)
+
+    get api_tokens_path
+    assert_includes response.body, 'Tokens you look after'
+    assert_includes response.body, 'Kiosk token'
+
+    post renew_api_token_path(token)
+    assert_redirected_to api_tokens_path
+    assert token.reload.expires_at > 300.days.from_now
+  end
+
   test "you cannot touch someone else's token" do
     sign_in_as_plain_member
     other = users(:two)

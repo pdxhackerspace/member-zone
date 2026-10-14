@@ -1,6 +1,8 @@
 # A member's own API tokens: creating one, and extending, suspending, resuming, and revoking
-# them. Token managers (api.tokens.manage) may also act on anyone's token from here, which is
-# where the settings page's buttons post.
+# them. The same actions work on service-account tokens the member is the contact for — they are
+# the one warned before such a token expires, so they have to be able to extend it. Token
+# managers (api.tokens.manage) may act on anyone's token from here, which is where the settings
+# page's buttons post.
 class ApiTokensController < AuthenticatedController
   include ApiTokenIssuing
 
@@ -16,6 +18,8 @@ class ApiTokensController < AuthenticatedController
 
   def index
     @api_tokens = current_user.api_tokens.includes(:contact_user).newest_first
+    @contact_tokens = ApiToken.where(contact_user: current_user).where.not(user: current_user)
+                              .includes(:user).newest_first
     @max_lifetime_days = DefaultSetting.instance.api_token_max_lifetime_days
   end
 
@@ -64,7 +68,7 @@ class ApiTokensController < AuthenticatedController
   end
 
   def set_api_token
-    scope = can?(:'api.tokens.manage') ? ApiToken.all : current_user.api_tokens
+    scope = can?(:'api.tokens.manage') ? ApiToken.all : ApiToken.looked_after_by(current_user)
     @api_token = scope.find(params[:id])
   end
 

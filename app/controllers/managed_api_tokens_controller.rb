@@ -91,16 +91,18 @@ class ManagedApiTokensController < AuthenticatedController
     when 'suspended' then tokens.suspended
     when 'expired' then tokens.expired(now)
     when 'revoked' then tokens.revoked
-    when 'no_contact' then tokens.not_revoked.where(id: tokens_without_contact.select(:id))
+    when 'no_contact' then tokens.where(id: tokens_without_contact)
     else tokens
     end
   end
 
-  # Tokens whose expiry warning cannot reach anyone on the token: no contact, or a contact who
-  # is no longer an active member.
+  # Tokens whose expiry warning cannot reach anyone on the token, by the same rule the reminder
+  # uses. Worked out in Ruby because that rule (blocked recipients, service-account contacts)
+  # does not reduce to a query; the table holds a handful of rows per member at most.
   def tokens_without_contact
-    ApiToken.left_joins(:contact_user)
-            .where(contact_user_id: nil).or(ApiToken.left_joins(:contact_user).where(users: { active: false }))
+    @tokens_without_contact ||= ApiToken.not_revoked.includes(:contact_user).select do |token|
+      Reminders::ApiTokenExpiryEligibility.contact_unreachable?(token)
+    end.map(&:id)
   end
 
   def filter_counts
@@ -111,7 +113,7 @@ class ManagedApiTokensController < AuthenticatedController
       'suspended' => ApiToken.suspended.count,
       'expired' => ApiToken.expired(now).count,
       'revoked' => ApiToken.revoked.count,
-      'no_contact' => ApiToken.not_revoked.where(id: tokens_without_contact.select(:id)).count
+      'no_contact' => tokens_without_contact.size
     }
   end
 

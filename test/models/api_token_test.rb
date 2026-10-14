@@ -17,6 +17,26 @@ class ApiTokenTest < ActiveSupport::TestCase
     assert_equal @member, token.contact_user
   end
 
+  test "a member's own token is looked after by the member, whoever created it" do
+    token = ApiToken.create!(user: @member, created_by: @admin, name: 'Laptop')
+
+    assert_equal @member, token.contact_user
+  end
+
+  test 'a service account token may have nobody to look after it' do
+    token = ApiToken.create!(user: create_service_account, created_by: @admin, name: 'Kiosk')
+
+    assert_nil token.contact_user
+  end
+
+  test 'looked_after_by covers your own tokens and those you are the contact for' do
+    own = ApiToken.create!(user: @member, created_by: @member, name: 'Mine')
+    kiosk = ApiToken.create!(user: create_service_account, created_by: @admin, contact_user: @member, name: 'Kiosk')
+    ApiToken.create!(user: create_service_account, created_by: @admin, contact_user: @admin, name: 'Other')
+
+    assert_equal [own, kiosk].map(&:id).sort, ApiToken.looked_after_by(@member).ids.sort
+  end
+
   test 'the plaintext is not available once reloaded' do
     token = ApiToken.create!(user: @member, created_by: @member, name: 'Laptop')
 

@@ -58,6 +58,44 @@
   </div>
 <% end %>
 
+<% if @contact_tokens.any? %>
+  <div class="h-section-label mb-2">Tokens you look after</div>
+  <div class="text-13 text-secondary mb-2">
+    Service-account tokens you are the contact for. We'll email you before they expire so you can extend them.
+  </div>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Token</th>
+            <th scope="col">Used by</th>
+            <th scope="col">Status</th>
+            <th scope="col">Expires</th>
+            <th scope="col">Last used</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @contact_tokens.each do |token| %>
+            <tr class="<%= 'text-secondary' if token.revoked? %>">
+              <td>
+                <div class="fw-medium"><%= token.name %></div>
+                <div class="text-12 text-secondary">ends <code><%= token.token_hint %></code></div>
+              </td>
+              <td><%= token.user.display_name %></td>
+              <td><%= api_token_state(token) %></td>
+              <td><%= api_token_expiry(token) %></td>
+              <td class="text-secondary"><%= api_token_last_used(token) %></td>
+              <td class="text-end"><%= render 'api_tokens/actions', token: token %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
 <div class="text-13 text-secondary">
   Send a token in the <code>Authorization</code> header: <code>Authorization: Bearer mz_…</code>.
   The <%= link_to "API reference", api_v1_openapi_path %> lists what each scope allows.
