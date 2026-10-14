@@ -15,7 +15,8 @@ module Reminders
         'parking_notices' => ParkingNoticeEligibility,
         'parking_permit_details' => ParkingPermitDetailsEligibility,
         'lapsed_access' => LapsedAccessEligibility,
-        'staff_application' => StaleApplicationEligibility
+        'staff_application' => StaleApplicationEligibility,
+        'api_token_expiry' => ApiTokenExpiryEligibility
       }[reminder_key.to_s]
     end
 
@@ -32,6 +33,7 @@ module Reminders
       case reminder_key.to_s
       when 'parking_notices', 'parking_permit_details' then ParkingNotice.find_by(id: args['parking_notice_id'])
       when 'application_link' then ApplicationVerification.find_by(id: args['application_verification_id'])
+      when 'api_token_expiry' then ApiToken.find_by(id: args['api_token_id'])
       else recipient
       end
     end

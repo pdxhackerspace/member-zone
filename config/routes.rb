@@ -446,6 +446,18 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :api_tokens, only: %i[index new create] do
+    member do
+      post :renew
+      post :suspend
+      post :resume
+      post :revoke
+    end
+  end
+  resources :managed_api_tokens, path: 'settings/api_tokens', only: %i[index new create edit update] do
+    collection { patch :lifetime }
+  end
+
   resources :credentials, only: %i[index new create] do
     member do
       post :revoke

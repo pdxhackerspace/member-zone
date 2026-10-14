@@ -1,6 +1,7 @@
 class ReminderSettingsController < AdminController
   include Pagy::Method
   include ParkingPermitDetailsReminderData
+  include ApiTokenExpiryReminderData
 
   PER_PAGE = 50
 
@@ -12,7 +13,8 @@ class ReminderSettingsController < AdminController
     'parking_notices' => Reminders::NotifyParkingNotices,
     'parking_permit_details' => Reminders::NotifyParkingPermitDetails,
     'lapsed_access' => Reminders::NotifyLapsedAccess,
-    'staff_application' => MembershipApplications::NotifyDirectorsOfStaleApplications
+    'staff_application' => MembershipApplications::NotifyDirectorsOfStaleApplications,
+    'api_token_expiry' => Reminders::NotifyApiTokenExpiry
   }.freeze
 
   # The one template that headlines each reminder's card, where its own list of templates is
@@ -25,7 +27,8 @@ class ReminderSettingsController < AdminController
     'parking_notices' => 'parking_permit_expiring_soon',
     'parking_permit_details' => 'parking_permit_details_reminder',
     'lapsed_access' => 'lapsed_access_reminder',
-    'staff_application' => 'staff_application_reminder'
+    'staff_application' => 'staff_application_reminder',
+    'api_token_expiry' => 'api_token_expiring_soon'
   }.freeze
 
   before_action :set_reminder_setting, only: %i[show update send_now]
@@ -101,7 +104,8 @@ class ReminderSettingsController < AdminController
       'parking_notices' => parking_notice_counts,
       'parking_permit_details' => parking_permit_details_counts,
       'lapsed_access' => lapsed_access_counts,
-      'staff_application' => staff_application_counts
+      'staff_application' => staff_application_counts,
+      'api_token_expiry' => api_token_expiry_counts
     }
   end
 
@@ -180,6 +184,7 @@ class ReminderSettingsController < AdminController
     when 'parking_permit_details' then load_parking_permit_details_show_data
     when 'lapsed_access' then load_lapsed_access_show_data
     when 'staff_application' then load_staff_application_show_data
+    when 'api_token_expiry' then load_api_token_expiry_show_data
     end
   end
 

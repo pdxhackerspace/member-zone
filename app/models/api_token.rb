@@ -41,7 +41,7 @@ class ApiToken < ApplicationRecord
 
   before_validation :normalize_scopes
   before_validation :issue_token, on: :create
-  before_validation :default_contact, on: :create
+  before_validation :default_contact
   before_validation :default_expiry, on: :create
 
   scope :revoked, -> { where.not(revoked_at: nil) }
@@ -52,6 +52,11 @@ class ApiToken < ApplicationRecord
   scope :personal, -> { joins(:user).where(users: { service_account: false }) }
   scope :service, -> { joins(:user).where(users: { service_account: true }) }
   scope :newest_first, -> { order(created_at: :desc) }
+  # Tokens someone is answerable for: their own, and service-account tokens they are the contact
+  # for. A personal token's contact is always its holder, so contact access never reaches one.
+  scope :looked_after_by, lambda { |user|
+    where(user: user).or(where(contact_user: user, user_id: User.service_accounts.select(:id)))
+  }
 
   def self.digest(token)
     OpenSSL::Digest::SHA256.hexdigest(token.to_s)
@@ -137,6 +142,26 @@ class ApiToken < ApplicationRecord
     user.can?(key)
   end
 
+  # Membership privileges come with being an active member rather than with a role, so roles
+  # cannot answer for them.
+  def self.granter_has?(granter, key)
+    return true if granter.is_admin?
+    return granter.active? if membership_scope?(key)
+
+    granter.can?(key)
+  end
+
+  # The catalog entries +granter+ could put on a token for +holder+ (or for any holder, when nil),
+  # in catalog order. Topic-scoped privileges are never offered.
+  def self.grantable_scopes(granter:, holder: nil)
+    Privilege::CATALOG.select do |entry|
+      next false if entry[:privilege_scope] == 'topic'
+      next false if holder && !holder_has?(holder, entry[:key])
+
+      granter_has?(granter, entry[:key])
+    end
+  end
+
   # Pushes the expiry out by the maximum lifetime from now. Works on an expired token too, and
   # keeps the secret, so the client using it needs no change.
   def extend!(by:, now: Time.current)
@@ -196,8 +221,10 @@ class ApiToken < ApplicationRecord
     self.token_hint = @token.last(4)
   end
 
+  # A member is always the contact for their own token. A service-account token's contact is
+  # whoever its creator chose, and may be nobody, in which case token managers are reminded.
   def default_contact
-    self.contact_user ||= created_by
+    self.contact_user = user if user && !user.service_account?
   end
 
   def default_expiry
@@ -220,17 +247,8 @@ class ApiToken < ApplicationRecord
         next errors.add(:scopes, "#{key} is not held by #{user.display_name}")
       end
 
-      errors.add(:scopes, "#{key} is not yours to grant") if granter && !granter_has?(granter, key)
+      errors.add(:scopes, "#{key} is not yours to grant") if granter && !self.class.granter_has?(granter, key)
     end
-  end
-
-  # Membership privileges come with being an active member rather than with a role, so roles
-  # cannot answer for them.
-  def granter_has?(granter, key)
-    return true if granter.is_admin?
-    return granter.active? if self.class.membership_scope?(key)
-
-    granter.can?(key)
   end
 
   def expiry_within_max_lifetime

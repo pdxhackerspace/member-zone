@@ -1,0 +1,17 @@
+<%# Scope checkboxes, grouped by privilege category. options: catalog entries the viewer may grant. %>
+<% if options.empty? %>
+  <div class="text-13 text-secondary">There are no privileges you can give a token yet.</div>
+<% else %>
+  <% options.group_by { |entry| entry[:category] }.each do |category, entries| %>
+    <div class="h-section-label mt-2 mb-1"><%= category %></div>
+    <% entries.each do |entry| %>
+      <div class="form-check">
+        <%= check_box_tag 'api_token[scopes][]', entry[:key], selected.include?(entry[:key]),
+                          id: "scope_#{entry[:key].parameterize(separator: '_')}", class: 'form-check-input' %>
+        <label class="form-check-label text-13" for="scope_<%= entry[:key].parameterize(separator: '_') %>">
+          <%= entry[:label] %> <code class="text-12 text-secondary ms-1"><%= entry[:key] %></code>
+        </label>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>
