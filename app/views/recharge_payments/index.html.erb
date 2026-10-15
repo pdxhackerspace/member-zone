@@ -103,9 +103,11 @@
         </tr>
       <% end %>
     <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/payment_empty', icon: 'arrow-repeat', message: 'No Recharge payments match these filters.' %>
   <% else %>
     <%= render 'shared/payment_empty', icon: 'arrow-repeat',
-               message: 'No Recharge payments match these filters.' %>
+               message: 'No Recharge payments have been synced yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>

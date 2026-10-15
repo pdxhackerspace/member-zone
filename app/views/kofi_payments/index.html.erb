@@ -140,9 +140,11 @@
         </tr>
       <% end %>
     <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/payment_empty', icon: 'cup-hot', message: 'No Ko-fi payments match these filters.' %>
   <% else %>
     <%= render 'shared/payment_empty', icon: 'cup-hot',
-               message: 'No Ko-fi payments match these filters.' %>
+               message: 'No Ko-fi payments have been imported yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>

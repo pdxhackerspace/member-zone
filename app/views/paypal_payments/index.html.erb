@@ -4,26 +4,26 @@
     <%= button_to 'Sync now', sync_paypal_payments_path, method: :post,
                   class: 'btn btn-primary btn-sm', data: { turbo: false } %>
   <% end %>
-  <% if can?(:'payments.import_export') || current_user_admin? %>
-    <div class="dropdown">
-      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
-              aria-expanded="false" aria-label="More actions">&hellip;</button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><%= link_to 'View unique subjects', unmatched_subjects_paypal_payments_path, class: 'dropdown-item' %></li>
-        <% if can?(:'payments.import_export') %>
-          <li><%= link_to 'Export JSON', export_paypal_payments_path, class: 'dropdown-item', data: { turbo: false } %></li>
-          <li>
-            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importModal">
-              Import JSON
-            </button>
-          </li>
-        <% end %>
-        <% if current_user_admin? %>
-          <li><%= link_to 'Test', test_paypal_payments_path, class: 'dropdown-item' %></li>
-        <% end %>
-      </ul>
-    </div>
-  <% end %>
+  <%# The kebab always opens: reading the unique subjects is part of payments.view, which
+      everyone on this page holds, so it must not hide behind the import/export keys. %>
+  <div class="dropdown">
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+            aria-expanded="false" aria-label="More actions">&hellip;</button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><%= link_to 'View unique subjects', unmatched_subjects_paypal_payments_path, class: 'dropdown-item' %></li>
+      <% if can?(:'payments.import_export') %>
+        <li><%= link_to 'Export JSON', export_paypal_payments_path, class: 'dropdown-item', data: { turbo: false } %></li>
+        <li>
+          <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importModal">
+            Import JSON
+          </button>
+        </li>
+      <% end %>
+      <% if current_user_admin? %>
+        <li><%= link_to 'Test', test_paypal_payments_path, class: 'dropdown-item' %></li>
+      <% end %>
+    </ul>
+  </div>
 <% end %>
 
 <% if @filter_active || @show_unmatched %>
@@ -115,9 +115,11 @@
         </tr>
       <% end %>
     <% end %>
+  <% elsif @filter_active || @show_unmatched %>
+    <%= render 'shared/payment_empty', icon: 'paypal', message: 'No PayPal payments match these filters.' %>
   <% else %>
     <%= render 'shared/payment_empty', icon: 'paypal',
-               message: 'No PayPal payments match these filters.' %>
+               message: 'No PayPal payments have been synced yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>
