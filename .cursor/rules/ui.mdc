@@ -61,6 +61,9 @@ Apply these rules to any HTML/template/CSS Cursor writes for this project. The s
 ## Tables
 
 - Apply `.table-compact` class for 13px text and tight padding.
+- Index pages whose table *is* the page (the payment lists) use `.table-list` instead: same header
+  and border treatment, 15px text and roomier padding, because a wall of 13px rows is what those
+  pages are made of and it reads as cramped.
 - Headers: 11px uppercase muted with letter-spacing.
 - Whole rows clickable when there's a detail view (no separate Details button).
 - One outline action button max per row. Multiple actions → kebab menu.
@@ -135,7 +138,9 @@ Already defined in `refresh.css`:
 - `.status-dot` with `.status-success/.status-danger/.status-warning/.status-muted`
 - `.filter-chip` with `.active/.warning/.danger/.muted`
 - `.kpi-tile` with `.clickable/.active/.warning`
-- `.table-compact`, `.list-compact`
+- `.table-compact`, `.table-list`, `.list-compact`
+- `.row-attention` on a `tr` — tints a row the admin still has to deal with
+- `.cell-truncate` — one-line free-text cell, full text in `title`
 - `.settings-nav`, `.settings-nav-item` with `.active/.attention`
 - `.action-card` for labeled action grids
 - `.status-panel` with `.status-clear/.status-attention`

@@ -1,23 +1,39 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Ko-Fi Payments</h1>
-    <p class="text-muted mb-0">
-      <strong><%= @payment_count %></strong> records —
-      Total <strong>$<%= number_to_currency(@total_amount || 0, unit: "") %> USD</strong>
-    </p>
-  </div>
-  <div class="d-flex gap-2">
-    <% if can?(:'payments.import_export') %>
-    <%= link_to "Export JSON", export_kofi_payments_path, class: "btn btn-outline-primary", data: { turbo: false } %>
-    <% end %>
-    <% if can?(:'payments.import_export') %>
-    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importJsonModal">Import JSON</button>
-    <% end %>
-    <% if can?(:'payments.import_export') %>
-    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCsvModal">Import CSV</button>
-    <% end %>
-  </div>
-</div>
+<%= render layout: 'shared/payment_index_header',
+           locals: { title: 'Ko-fi payments', count: @payment_count, total_amount: @total_amount } do %>
+  <% if can?(:'payments.import_export') %>
+    <div class="dropdown">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+              aria-expanded="false" aria-label="More actions">&hellip;</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><%= link_to 'Export JSON', export_kofi_payments_path, class: 'dropdown-item', data: { turbo: false } %></li>
+        <li>
+          <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importJsonModal">
+            Import JSON
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importCsvModal">
+            Import CSV
+          </button>
+        </li>
+      </ul>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @filter_active %>
+  <% filter_label = { 'yes' => 'Linked', 'no' => 'Unlinked' }[params[:linked]] %>
+  <%= render 'shared/payment_filter_banner', label: "#{filter_label || 'Searched'} payments",
+             shown: @payment_count, total: @total_count, clear_path: kofi_payments_path %>
+<% end %>
+
+<%= render 'shared/payment_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: kofi_payments_path, active: params[:linked].blank? },
+      { label: 'Linked', count: @linked_count, path: kofi_payments_path(linked: 'yes'),
+        active: params[:linked] == 'yes' },
+      { label: 'Unlinked', count: @unlinked_count, path: kofi_payments_path(linked: 'no'),
+        active: params[:linked] == 'no', variant: 'warning' }
+    ] %>
 
 <!-- Import JSON Modal -->
 <div class="modal fade" id="importJsonModal" tabindex="-1" aria-labelledby="importJsonModalLabel" aria-hidden="true">
@@ -73,106 +89,60 @@
   </div>
 </div>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <div class="d-flex gap-2">
-      <input type="text" id="kofi_search" class="form-control" placeholder="Search by transaction ID, name, type, or message…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <button type="button" id="clear_kofi_search" class="btn btn-outline-secondary d-none">Clear</button>
-    </div>
-  </div>
-</div>
+<%= render 'shared/payment_search', url: kofi_payments_path, frame: 'kofi_payments_results',
+           placeholder: 'Search by transaction ID, supporter name, full email, type, or message…' %>
 
-<div class="card shadow-sm border-0">
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="bg-body-tertiary">
-        <tr>
-          <th scope="col">Transaction</th>
-          <th scope="col">Type</th>
-          <th scope="col">Amount</th>
-          <th scope="col">From</th>
-          <th scope="col">Message</th>
-          <th scope="col">Date</th>
+<%= turbo_frame_tag 'kofi_payments_results' do %>
+  <% if @payments.any? %>
+    <%= render layout: 'shared/payment_table',
+               locals: { body_id: 'kofi_payments_table_body',
+                         headers: ['Transaction', 'Type', ['Amount', 'num'], 'Member', 'Message', 'Date'] } do %>
+      <% @payments.each do |payment| %>
+        <% unlinked = payment.user.blank? %>
+        <tr class="kofi-payment-row <%= 'row-attention' if unlinked %>"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              payment.kofi_transaction_id,
+              payment.from_name,
+              payment.payment_type,
+              payment.message,
+              payment.tier_name,
+              payment.user&.display_name,
+              payment.user_id.present? ? 'linked' : 'unlinked'
+            ].compact.join(' ').downcase %>">
+          <td>
+            <%= link_to payment.kofi_transaction_id.to_s.truncate(20), kofi_payment_path(payment),
+                        class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
+          </td>
+          <td>
+            <span class="badge text-bg-<%= payment_type_badge_class(payment.payment_type) %>-subtle">
+              <%= payment.payment_type.presence || 'Unknown' %>
+            </span>
+            <% if payment.tier_name.present? %>
+              <div class="text-secondary text-12"><%= payment.tier_name %></div>
+            <% end %>
+          </td>
+          <td class="num"><%= payment_money_tag(payment.amount, payment.currency) %></td>
+          <td class="kofi-payment-supporter">
+            <%= render 'shared/payment_member_cell', payment: payment, name: payment.from_name,
+                       link_path: kofi_payment_path(payment), unlinked: unlinked,
+                       empty_label: 'Unnamed supporter' %>
+          </td>
+          <td>
+            <% if payment.message.present? %>
+              <span class="text-secondary cell-truncate"
+                    title="<%= payment.message %>"><%= payment.message.truncate(60) %></span>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+          <td><%= payment_time_tag(payment.timestamp) %></td>
         </tr>
-      </thead>
-      <tbody id="kofi_payments_table_body">
-        <% @payments.each do |payment| %>
-          <tr class="kofi-payment-row"
-              data-search-text="<%= [
-                payment.kofi_transaction_id,
-                payment.from_name,
-                payment.payment_type,
-                payment.message,
-                payment.tier_name,
-                payment.amount_with_currency
-              ].compact.join(' ').downcase %>">
-            <td class="fw-semibold"><%= link_to payment.kofi_transaction_id.to_s.truncate(20), kofi_payment_path(payment) %></td>
-            <td>
-              <span class="badge text-bg-<%= payment_type_badge_class(payment.payment_type) %>">
-                <%= payment.payment_type.presence || "Unknown" %>
-              </span>
-              <% if payment.tier_name.present? %>
-                <div class="text-muted small"><%= payment.tier_name %></div>
-              <% end %>
-            </td>
-            <td><%= payment.amount_with_currency || "—" %></td>
-            <td>
-              <% if payment.from_name.present? %>
-                <div><strong><%= payment.from_name %></strong></div>
-              <% end %>
-            </td>
-            <td>
-              <% if payment.message.present? %>
-                <span class="text-truncate d-inline-block" style="max-width: 200px;" title="<%= payment.message %>">
-                  <%= payment.message.truncate(50) %>
-                </span>
-              <% else %>
-                <span class="text-muted">—</span>
-              <% end %>
-            </td>
-            <td><%= payment.timestamp ? l(payment.timestamp, format: :long) : "n/a" %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-  (function() {
-    const searchInput = document.getElementById('kofi_search');
-    const clearButton = document.getElementById('clear_kofi_search');
-    const tableBody = document.getElementById('kofi_payments_table_body');
-
-    if (!searchInput || !tableBody) return;
-
-    function filterPayments() {
-      const searchTerm = searchInput.value.toLowerCase().trim();
-      const rows = tableBody.querySelectorAll('.kofi-payment-row');
-
-      rows.forEach(function(row) {
-        const searchText = row.getAttribute('data-search-text');
-        if (searchText && searchText.includes(searchTerm)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-
-      // Show/hide clear button
-      if (clearButton) {
-        clearButton.classList.toggle('d-none', searchTerm === '');
-      }
-    }
-
-    searchInput.addEventListener('input', filterPayments);
-
-    if (clearButton) {
-      clearButton.addEventListener('click', function() {
-        searchInput.value = '';
-        filterPayments();
-        searchInput.focus();
-      });
-    }
-  })();
-</script>
+      <% end %>
+    <% end %>
+  <% else %>
+    <%= render 'shared/payment_empty', icon: 'cup-hot',
+               message: 'No Ko-fi payments match these filters.' %>
+  <% end %>
+  <%= render 'shared/pagination', pagy: @pagy %>
+<% end %>

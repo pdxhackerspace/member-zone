@@ -18,7 +18,7 @@ class PaypalPaymentsControllerTest < ActionDispatch::IntegrationTest
   test 'shows index' do
     get paypal_payments_path
     assert_response :success
-    assert_select 'h1', /PayPal Payments/
+    assert_select 'h1', /PayPal payments/i
     assert_match @payment.paypal_id, response.body
   end
 
@@ -87,7 +87,9 @@ class PaypalPaymentsControllerTest < ActionDispatch::IntegrationTest
                   text: @payment.user.display_name
   end
 
-  test 'index falls back to payer email when payment is unlinked' do
+  # An unlinked payment shows the name PayPal gave us and the way to link it, never the payer's
+  # email address: that is encrypted at rest, and the detail page is where it gets revealed.
+  test 'index shows the payer name and a link affordance when a payment is unlinked' do
     payment = PaypalPayment.create!(
       paypal_id: 'PAY-UNLINKED-PAYER',
       status: 'COMPLETED',
@@ -104,8 +106,9 @@ class PaypalPaymentsControllerTest < ActionDispatch::IntegrationTest
     get paypal_payments_path(q: payment.paypal_id)
 
     assert_response :success
-    assert_select 'td.paypal-payment-payer a[href=?]', 'mailto:unlinked-payer@example.com',
-                  text: 'unlinked-payer@example.com'
+    assert_select 'td.paypal-payment-payer', text: /Unlinked Payer/
+    assert_no_match(/unlinked-payer@example\.com/, response.body)
+    assert_select 'td.paypal-payment-payer a[href=?]', paypal_payment_path(payment), text: 'Link member…'
   end
 
   test 'payment search paginates the filtered result set' do

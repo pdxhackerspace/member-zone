@@ -181,6 +181,16 @@ The device gets back JSON with the member's name and, for a blank permit, its id
 
 Permits issued this way show up on the member's profile like any other, and record which device issued them.
 
+## Payment lists
+
+**Payments** in the navbar lists each source separately — PayPal, Recharge, Ko-fi and cash — and the four pages work the same way.
+
+The counts across the top are the filters: click **Unlinked** to see only the payments nobody has tied to a member yet, **All** to go back. An unlinked row is tinted and carries a **Link member…** button straight to the payment, so the page lists the work rather than just the history. PayPal adds a second row of filters for the plan-matching side of things: payments **matching a plan**, and the **unmatched subjects** that need a plan before they count as dues. Cash has no processor to reconcile against, so its filters are periods instead: **This month** and **This year**.
+
+The search box takes a transaction or charge ID, a payer or member name, a plan, a note, or a status, and narrows the list on the server as you type — so it searches every payment, not just the page in front of you. Email addresses are encrypted, so a search matches only a **whole** address, never part of one. The count line under the page title always describes what you are looking at: the number of payments shown and what they add up to.
+
+Payment lists never show a payer's email address. Open a payment to reveal the contact details behind it.
+
 ## Member notification preferences
 
 Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off. Staff who receive audit log alerts also see an *Audit log alerts* row they can switch off.

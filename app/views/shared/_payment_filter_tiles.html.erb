@@ -1,0 +1,14 @@
+<%# The bucket row across the top of a payment index. Each tile is a count that filters the
+    list. Locals: tiles — an array of { label:, count:, path:, active:, variant: } hashes. %>
+<div class="row g-2 mb-3">
+  <% tiles.each do |tile| %>
+    <div class="col-6 col-lg">
+      <% classes = ['kpi-tile', 'clickable', 'd-block', 'text-decoration-none', 'h-100',
+                    tile[:variant], ('active' if tile[:active])].compact.join(' ') %>
+      <%= link_to tile[:path], class: classes do %>
+        <div class="kpi-label"><%= tile[:label] %></div>
+        <div class="kpi-value"><%= number_with_delimiter(tile[:count]) %></div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

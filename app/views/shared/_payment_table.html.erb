@@ -1,0 +1,19 @@
+<%# Card-wrapped list table shared by the payment index pages. The caller's block supplies
+    the rows. Locals: headers — labels, or [label, css class] pairs; body_id. %>
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-list mb-0 align-middle">
+      <thead>
+        <tr>
+          <% headers.each do |header| %>
+            <% label, css = Array(header) %>
+            <th scope="col" class="<%= css %>"><%= label %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody id="<%= body_id %>">
+        <%= yield %>
+      </tbody>
+    </table>
+  </div>
+</div>

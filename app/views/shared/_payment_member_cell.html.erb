@@ -1,0 +1,22 @@
+<%# The member column of a payment index: the linked member, or the name the processor gave
+    us plus the way to link it. The payer's email address never appears here — it is encrypted
+    at rest and the detail page is where it gets revealed.
+    Locals: payment, name, link_path, unlinked; optional empty_label. %>
+<% if payment.user.present? %>
+  <%= link_to payment.user.display_name, user_path(payment.user),
+              class: 'text-decoration-none', data: { turbo_frame: '_top' } %>
+<% else %>
+  <% if name.present? %>
+    <div class="<%= 'mb-1' if unlinked %>"><%= name %></div>
+  <% else %>
+    <div class="text-secondary fst-italic <%= 'mb-1' if unlinked %>">
+      <%= local_assigns[:empty_label] || 'Unnamed payer' %>
+    </div>
+  <% end %>
+  <% if unlinked %>
+    <%= gate :'payments.link' do %>
+      <%= link_to 'Link member…', link_path, class: 'btn btn-sm btn-outline-warning',
+                  data: { turbo_frame: '_top' } %>
+    <% end %>
+  <% end %>
+<% end %>
