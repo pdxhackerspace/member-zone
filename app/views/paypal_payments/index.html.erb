@@ -117,6 +117,14 @@
     <% end %>
   <% elsif @filter_active || @show_unmatched %>
     <%= render 'shared/payment_empty', icon: 'paypal', message: 'No PayPal payments match these filters.' %>
+  <% elsif @unmatched_plan_count.positive? %>
+    <%# The default list is the payments matching a plan, so an empty one with unmatched
+        payments waiting means the subjects need plans, not that the sync found nothing. %>
+    <% unmatched_action = link_to 'View unmatched subjects', paypal_payments_path(show_unmatched: 'true'),
+                                  class: 'btn btn-outline-secondary btn-sm' %>
+    <% waiting = pluralize(@unmatched_plan_count, 'payment') %>
+    <%= render 'shared/payment_empty', icon: 'paypal', action: unmatched_action,
+               message: "No PayPal payment matches a membership plan yet — #{waiting} waiting on a subject no plan claims." %>
   <% else %>
     <%= render 'shared/payment_empty', icon: 'paypal',
                message: 'No PayPal payments have been synced yet.' %>

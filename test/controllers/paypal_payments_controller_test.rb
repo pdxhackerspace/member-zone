@@ -22,6 +22,27 @@ class PaypalPaymentsControllerTest < ActionDispatch::IntegrationTest
     assert_match @payment.paypal_id, response.body
   end
 
+  # The default list is the payments matching a plan. When every payment has a subject no plan
+  # claims, the page says so and offers the unmatched view, rather than claiming nothing synced.
+  test 'empty matched list points at the subjects waiting for a plan' do
+    PaypalPayment.update_all(matches_plan: false)
+
+    get paypal_payments_path
+
+    assert_response :success
+    assert_select 'turbo-frame#paypal_payments_results', text: /No PayPal payment matches a membership plan yet/
+    assert_select 'a[href=?]', paypal_payments_path(show_unmatched: 'true'), text: 'View unmatched subjects'
+  end
+
+  test 'empty list with nothing synced at all says so' do
+    PaypalPayment.delete_all
+
+    get paypal_payments_path
+
+    assert_response :success
+    assert_select 'turbo-frame#paypal_payments_results', text: /No PayPal payments have been synced yet/
+  end
+
   test 'shows payment' do
     get paypal_payment_path(@payment)
     assert_response :success
