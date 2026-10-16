@@ -1,4 +1,4 @@
-<%= render layout: 'shared/payment_index_header',
+<%= render layout: 'shared/list_page_header',
            locals: { title: 'Cash payments', count: @payment_count, total_amount: @total_amount } do %>
   <%= gate :'payments.manage_cash' do %>
     <%= link_to 'Record payment', new_cash_payment_path, class: 'btn btn-primary btn-sm' %>
@@ -7,11 +7,11 @@
 
 <% if @filter_active %>
   <% filter_label = { 'month' => 'This month', 'year' => 'This year' }[params[:period]] %>
-  <%= render 'shared/payment_filter_banner', label: "#{filter_label || 'Searched'} payments",
+  <%= render 'shared/list_filter_banner', label: "#{filter_label || 'Searched'} payments",
              shown: @payment_count, total: @total_count, clear_path: cash_payments_path %>
 <% end %>
 
-<%= render 'shared/payment_filter_tiles', tiles: [
+<%= render 'shared/list_filter_tiles', tiles: [
       { label: 'All', count: @total_count, path: cash_payments_path, active: params[:period].blank? },
       { label: 'This month', count: @month_count, path: cash_payments_path(period: 'month'),
         active: params[:period] == 'month' },
@@ -19,12 +19,12 @@
         active: params[:period] == 'year' }
     ] %>
 
-<%= render 'shared/payment_search', url: cash_payments_path, frame: 'cash_payments_results',
+<%= render 'shared/list_search', url: cash_payments_path, frame: 'cash_payments_results',
            placeholder: 'Search by member name, full email, plan, or notes…' %>
 
 <%= turbo_frame_tag 'cash_payments_results' do %>
   <% if @cash_payments.any? %>
-    <%= render layout: 'shared/payment_table',
+    <%= render layout: 'shared/list_table',
                locals: { body_id: 'cash_payments_table_body',
                          headers: ['Member', 'Plan', ['Amount', 'num'], 'Date', 'Notes', 'Recorded by',
                                    ['', 'text-end']] } do %>
@@ -42,8 +42,8 @@
                         class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
           </td>
           <td><span class="text-secondary"><%= payment.membership_plan&.name %></span></td>
-          <td class="num"><%= payment_money_tag(payment.amount, 'USD') %></td>
-          <td><%= payment_time_tag(payment.paid_on) %></td>
+          <td class="num"><%= list_money_tag(payment.amount, 'USD') %></td>
+          <td><%= list_time_tag(payment.paid_on) %></td>
           <td>
             <% if payment.notes.present? %>
               <span class="text-secondary cell-truncate" title="<%= payment.notes %>">
@@ -70,14 +70,14 @@
       <% end %>
     <% end %>
   <% elsif @filter_active %>
-    <%= render 'shared/payment_empty', icon: 'cash-coin', message: 'No cash payments match these filters.' %>
+    <%= render 'shared/list_empty', icon: 'cash-coin', message: 'No cash payments match these filters.' %>
   <% else %>
     <% first_payment_action = gate :'payments.manage_cash' do %>
       <%# Breaks out of the results frame: the form is a page of its own, not a swap of the table. %>
       <%= link_to 'Record first payment', new_cash_payment_path, class: 'btn btn-primary btn-sm',
                   data: { turbo_frame: '_top' } %>
     <% end %>
-    <%= render 'shared/payment_empty', icon: 'cash-coin', action: first_payment_action,
+    <%= render 'shared/list_empty', icon: 'cash-coin', action: first_payment_action,
                message: 'No cash payments have been recorded yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>

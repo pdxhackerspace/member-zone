@@ -1,21 +1,21 @@
 <% ma_nav = { q: params[:q].presence }.compact %>
 <% mask_contact = membership_application_mask_contact_pii? %>
 
-<div class="d-flex align-items-end justify-content-between mb-3">
-  <div>
-    <h1 class="h-page-title mb-0">Membership Applications</h1>
-    <div class="text-13 text-secondary mt-1">
-      <% if @processing_time_stats[:count].positive? %>
-        Average processing time (last month):
-        <span class="text-body"><%= @processing_time_stats[:average_label] %></span>
-        <span class="text-secondary"> · <%= @processing_time_stats[:count] %> approved or rejected</span>
-      <% else %>
-        <span class="text-secondary">No applications approved or rejected in the last month</span>
-      <% end %>
-    </div>
-  </div>
-  <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importApplicationsCsvModal">Import CSV</button>
-</div>
+<% applications_summary = capture do %>
+  <% if @processing_time_stats[:count].positive? %>
+    Average processing time (last month):
+    <span class="text-body"><%= @processing_time_stats[:average_label] %></span>
+    · <%= @processing_time_stats[:count] %> approved or rejected
+  <% else %>
+    No applications approved or rejected in the last month
+  <% end %>
+<% end %>
+
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Membership applications', summary: applications_summary } do %>
+  <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+          data-bs-target="#importApplicationsCsvModal">Import CSV</button>
+<% end %>
 
 <div class="modal fade" id="importApplicationsCsvModal" tabindex="-1" aria-labelledby="importApplicationsCsvModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -50,50 +50,34 @@
 </div>
 
 <%= turbo_frame_tag 'membership_applications_table', data: { turbo_action: 'advance' } do %>
-  <ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'submitted')),
-          class: "nav-link #{@current_status == 'submitted' ? 'active' : ''}" do %>
-        Open <span class="badge bg-primary"><%= @status_counts[:submitted] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'under_review')),
-          class: "nav-link #{@current_status == 'under_review' ? 'active' : ''}" do %>
-        Under Review <span class="badge bg-warning text-dark"><%= @status_counts[:under_review] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'approved')),
-          class: "nav-link #{@current_status == 'approved' ? 'active' : ''}" do %>
-        Approved <span class="badge bg-success"><%= @status_counts[:approved] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'rejected')),
-          class: "nav-link #{@current_status == 'rejected' ? 'active' : ''}" do %>
-        Rejected <span class="badge bg-danger"><%= @status_counts[:rejected] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'initiated')),
-          class: "nav-link #{@current_status == 'initiated' ? 'active' : ''}" do %>
-        Initiated <span class="badge bg-secondary"><%= @status_counts[:initiated] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'unlinked')),
-          class: "nav-link #{@current_status == 'unlinked' ? 'active' : ''}" do %>
-        Unlinked <span class="badge bg-warning text-dark"><%= @status_counts[:unlinked] %></span>
-      <% end %>
-    </li>
-    <li class="nav-item">
-      <%= link_to membership_applications_path(ma_nav.merge(status: 'all')),
-          class: "nav-link #{@current_status == 'all' ? 'active' : ''}" do %>
-        All <span class="badge bg-secondary"><%= @status_counts[:all] %></span>
-      <% end %>
-    </li>
-  </ul>
+  <%# Seven buckets is more than a tile row carries, so the status axis is a chip row. %>
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <%= render 'shared/list_filter_chip_row', label: 'Status', chips: [
+            { label: 'Open', count: @status_counts[:submitted],
+              path: membership_applications_path(ma_nav.merge(status: 'submitted')),
+              active: @current_status == 'submitted' },
+            { label: 'Under review', count: @status_counts[:under_review],
+              path: membership_applications_path(ma_nav.merge(status: 'under_review')),
+              active: @current_status == 'under_review', variant: 'warning' },
+            { label: 'Approved', count: @status_counts[:approved],
+              path: membership_applications_path(ma_nav.merge(status: 'approved')),
+              active: @current_status == 'approved' },
+            { label: 'Rejected', count: @status_counts[:rejected],
+              path: membership_applications_path(ma_nav.merge(status: 'rejected')),
+              active: @current_status == 'rejected' },
+            { label: 'Initiated', count: @status_counts[:initiated],
+              path: membership_applications_path(ma_nav.merge(status: 'initiated')),
+              active: @current_status == 'initiated' },
+            { label: 'Unlinked', count: @status_counts[:unlinked],
+              path: membership_applications_path(ma_nav.merge(status: 'unlinked')),
+              active: @current_status == 'unlinked', variant: 'warning' },
+            { label: 'All', count: @status_counts[:all],
+              path: membership_applications_path(ma_nav.merge(status: 'all')),
+              active: @current_status == 'all' }
+          ] %>
+    </div>
+  </div>
 
   <div class="card shadow-sm border-0 mb-3">
     <div class="card-body py-2">
@@ -135,8 +119,8 @@
   <% if @application_verifications.any? %>
     <div class="card shadow-sm border-0">
       <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
+        <table class="table table-list mb-0 align-middle">
+          <thead>
             <tr>
               <th>Email</th>
               <th>Status</th>
@@ -159,11 +143,11 @@
                 </td>
                 <td>
                   <% if verification.expired? %>
-                    <span class="badge text-bg-danger">Expired</span>
+                    <span class="badge text-bg-danger-subtle">Expired</span>
                   <% elsif verification.email_verified? %>
-                    <span class="badge text-bg-success">Verified</span>
+                    <span class="badge text-bg-success-subtle">Verified</span>
                   <% else %>
-                    <span class="badge text-bg-secondary">Email sent</span>
+                    <span class="badge text-bg-secondary-subtle">Email sent</span>
                   <% end %>
                 </td>
                 <td class="text-muted small"><%= verification.created_at.strftime('%b %d, %Y') %></td>
@@ -223,21 +207,17 @@
       </div>
     </div>
 
-    <div class="mt-3">
-      <%== @pagy.series_nav(:bootstrap) if @pagy.pages > 1 %>
-    </div>
+    <%= render 'shared/pagination', pagy: @pagy %>
   <% else %>
-    <div class="text-center text-muted py-5">
-      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-      <p><%= params[:q].present? ? 'No initiated applications match your search.' : 'No initiated applications found.' %></p>
-    </div>
+    <%= render 'shared/list_empty', icon: 'envelope-paper',
+               message: params[:q].present? ? 'No initiated applications match your search.' : 'No applications have been initiated.' %>
   <% end %>
 <% elsif @applications.any? %>
   <% show_link_actions = @applications.any?(&:linkable_to_member?) %>
   <div class="card shadow-sm border-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
+      <table class="table table-list mb-0 align-middle">
+        <thead>
           <tr>
             <th>Name</th>
             <th>Status</th>
@@ -261,7 +241,7 @@
                             data: { turbo_frame: '_top' } %>
               </td>
               <td>
-                <span class="badge bg-<%= app.status_badge_color %><%= ' text-dark' if app.in_review? %>"><%= app.status_display %></span>
+                <span class="badge text-bg-<%= app.status_badge_color %>-subtle"><%= app.status_display %></span>
                 <% if membership_application_applicant_status_path(app) %>
                   <div class="mt-1">
                     <%= render 'applicant_status_link',
@@ -274,12 +254,12 @@
               <td><%= app.submitted_at&.strftime('%b %d, %Y') || '—' %></td>
               <td class="text-nowrap">
                 <% if app.ai_feedback_processed? %>
-                  <span class="badge bg-dark"><%= app.ai_feedback_score.nil? ? '—' : app.ai_feedback_score %></span>
+                  <span class="badge text-bg-dark-subtle"><%= app.ai_feedback_score.nil? ? '—' : app.ai_feedback_score %></span>
                   <% if app.ai_feedback_recommendation.present? %>
-                    <span class="badge bg-<%= app.ai_feedback_recommendation_badge_color %>"><%= app.ai_feedback_recommendation.to_s.truncate(14) %></span>
+                    <span class="badge text-bg-<%= app.ai_feedback_recommendation_badge_color %>-subtle"><%= app.ai_feedback_recommendation.to_s.truncate(14) %></span>
                   <% end %>
                 <% elsif app.ai_feedback_last_error.present? %>
-                  <span class="badge bg-danger" title="<%= h app.ai_feedback_last_error %>">AI error</span>
+                  <span class="badge text-bg-danger-subtle" title="<%= h app.ai_feedback_last_error %>">AI error</span>
                 <% else %>
                   <span class="text-muted small">Pending</span>
                 <% end %>
@@ -290,9 +270,9 @@
                 <% if av_accept.zero? && av_reject.zero? %>
                   <span class="text-muted">—</span>
                 <% else %>
-                  <span class="badge bg-success"><%= av_accept %></span>
+                  <span class="badge text-bg-success-subtle"><%= av_accept %></span>
                   <span class="text-muted">/</span>
-                  <span class="badge bg-danger"><%= av_reject %></span>
+                  <span class="badge text-bg-danger-subtle"><%= av_reject %></span>
                 <% end %>
               </td>
               <td><%= app.reviewed_by&.display_name || '—' %></td>
@@ -308,7 +288,7 @@
               <% if show_link_actions %>
                 <td class="text-end text-nowrap">
                   <% if app.linkable_to_member? %>
-                    <button type="button" class="btn btn-sm btn-primary"
+                    <button type="button" class="btn btn-sm btn-outline-warning"
                             data-bs-toggle="modal" data-bs-target="#maLinkMemberModal"
                             data-ma-link-action="<%= link_user_membership_application_path(app) %>"
                             <%# Withheld without applications.view_pii — this attribute put the
@@ -328,14 +308,10 @@
     </div>
   </div>
 
-  <div class="mt-3">
-    <%== @pagy.series_nav(:bootstrap) if @pagy.pages > 1 %>
-  </div>
+  <%= render 'shared/pagination', pagy: @pagy %>
 <% else %>
-  <div class="text-center text-muted py-5">
-    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-    <p><%= params[:q].present? ? 'No applications match your search.' : 'No applications found.' %></p>
-  </div>
+  <%= render 'shared/list_empty', icon: 'envelope-paper',
+             message: params[:q].present? ? 'No applications match your search.' : 'No applications in this bucket.' %>
 <% end %>
 <% end %><%# turbo_frame_tag membership_applications_table %>
 

@@ -1,4 +1,4 @@
-<%= render layout: 'shared/payment_index_header',
+<%= render layout: 'shared/list_page_header',
            locals: { title: 'PayPal payments', count: @payment_count, total_amount: @total_amount } do %>
   <% if can?(:'payments.sync') %>
     <%= button_to 'Sync now', sync_paypal_payments_path, method: :post,
@@ -29,13 +29,13 @@
 <% if @filter_active || @show_unmatched %>
   <% filter_labels = [(@show_unmatched ? 'Unmatched subjects' : nil),
                       { 'yes' => 'Linked', 'no' => 'Unlinked', 'dont_link' => "Don't link" }[params[:linked]]].compact %>
-  <%= render 'shared/payment_filter_banner',
+  <%= render 'shared/list_filter_banner',
              label: "#{filter_labels.presence&.join(' / ') || 'Searched'} payments",
              shown: @payment_count, total: PaypalPayment.count, clear_path: paypal_payments_path %>
 <% end %>
 
 <% unmatched_param = @show_unmatched ? { show_unmatched: 'true' } : {} %>
-<%= render 'shared/payment_filter_tiles', tiles: [
+<%= render 'shared/list_filter_tiles', tiles: [
       { label: 'All', count: @total_count, path: paypal_payments_path(unmatched_param),
         active: params[:linked].blank? },
       { label: 'Linked', count: @linked_count, path: paypal_payments_path(unmatched_param.merge(linked: 'yes')),
@@ -81,12 +81,12 @@
   </div>
 </div>
 
-<%= render 'shared/payment_search', url: paypal_payments_path, frame: 'paypal_payments_results',
+<%= render 'shared/list_search', url: paypal_payments_path, frame: 'paypal_payments_results',
            placeholder: 'Search by transaction ID, payer name, full email, or status…' %>
 
 <%= turbo_frame_tag 'paypal_payments_results' do %>
   <% if @payments.any? %>
-    <%= render layout: 'shared/payment_table',
+    <%= render layout: 'shared/list_table',
                locals: { body_id: 'paypal_payments_table_body',
                          headers: ['Transaction', 'Status', ['Amount', 'num'], 'Payer', 'Time'] } do %>
       <% @payments.each do |payment| %>
@@ -105,18 +105,18 @@
             <%= link_to payment.paypal_id, paypal_payment_path(payment),
                         class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
           </td>
-          <td><%= payment_status_cell(payment.status) %></td>
-          <td class="num"><%= payment_money_tag(payment.amount, payment.currency) %></td>
+          <td><%= list_status_cell(payment.status) %></td>
+          <td class="num"><%= list_money_tag(payment.amount, payment.currency) %></td>
           <td class="paypal-payment-payer">
             <%= render 'shared/payment_member_cell', payment: payment, name: payment.payer_name,
                        link_path: paypal_payment_path(payment), unlinked: unlinked %>
           </td>
-          <td><%= payment_time_tag(payment.transaction_time) %></td>
+          <td><%= list_time_tag(payment.transaction_time) %></td>
         </tr>
       <% end %>
     <% end %>
   <% elsif @filter_active || @show_unmatched %>
-    <%= render 'shared/payment_empty', icon: 'paypal', message: 'No PayPal payments match these filters.' %>
+    <%= render 'shared/list_empty', icon: 'paypal', message: 'No PayPal payments match these filters.' %>
   <% elsif @unmatched_plan_count.positive? %>
     <%# The default list is the payments matching a plan, so an empty one with unmatched
         payments waiting means the subjects need plans, not that the sync found nothing. %>
@@ -126,10 +126,10 @@
                                   class: 'btn btn-outline-secondary btn-sm',
                                   data: { turbo_frame: '_top' } %>
     <% waiting = pluralize(@unmatched_plan_count, 'payment') %>
-    <%= render 'shared/payment_empty', icon: 'paypal', action: unmatched_action,
+    <%= render 'shared/list_empty', icon: 'paypal', action: unmatched_action,
                message: "No PayPal payment matches a membership plan yet — #{waiting} waiting on a subject no plan claims." %>
   <% else %>
-    <%= render 'shared/payment_empty', icon: 'paypal',
+    <%= render 'shared/list_empty', icon: 'paypal',
                message: 'No PayPal payments have been synced yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>

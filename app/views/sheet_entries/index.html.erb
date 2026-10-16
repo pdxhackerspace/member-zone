@@ -1,150 +1,93 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Sheet Entries</h1>
-    <p class="text-muted mb-0">Entries from the Google Sheet membership roster.</p>
-  </div>
-  <div class="d-flex gap-2">
-    <% if MemberSource.enabled?('sheet') %>
-      <%= button_to "Sync now", sync_sheet_entries_path, method: :post, class: "btn btn-primary", data: { turbo: false } %>
-      <%= button_to "Sync to Members", sync_to_users_sheet_entries_path, method: :post, class: "btn btn-outline-primary", data: { turbo: false } %>
-      <%= link_to "Test", test_sheet_entries_path, class: "btn btn-outline-secondary", data: { turbo: false } %>
-    <% else %>
-      <button class="btn btn-secondary" disabled title="Google Sheet source is disabled">Sync now</button>
-      <button class="btn btn-secondary" disabled title="Google Sheet source is disabled">Sync to Members</button>
-      <button class="btn btn-secondary" disabled title="Google Sheet source is disabled">Test</button>
-    <% end %>
-  </div>
-</div>
-
-<% if @filter_active %>
-  <div class="alert alert-info py-2 mb-3 d-flex justify-content-between align-items-center">
-    <small>
-      <i class="bi bi-funnel me-1"></i> Filtering:
-      <%= case params[:filter]
-          when 'linked' then 'Linked'
-          when 'unlinked' then 'Unlinked'
-          when 'paying' then 'Paying'
-          when 'sponsored' then 'Sponsored'
-          when 'inactive' then 'Inactive'
-          when 'with_email' then 'With Email'
-          end %> entries
-      (<%= @sheet_entries.count %> of <%= @total_count %>)
-    </small>
-    <%= link_to "Clear filter", sheet_entries_path, class: "btn btn-outline-secondary btn-sm" %>
-  </div>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Sheet entries', count: @sheet_entries.size, noun: 'entry' } do %>
+  <% if MemberSource.enabled?('sheet') %>
+    <%= button_to 'Sync now', sync_sheet_entries_path, method: :post,
+                  class: 'btn btn-primary btn-sm', data: { turbo: false } %>
+    <div class="dropdown">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+              aria-expanded="false" aria-label="More actions">&hellip;</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <%= button_to 'Sync to members', sync_to_users_sheet_entries_path, method: :post,
+                        class: 'dropdown-item', data: { turbo: false } %>
+        </li>
+        <li><%= link_to 'Test', test_sheet_entries_path, class: 'dropdown-item', data: { turbo: false } %></li>
+      </ul>
+    </div>
+  <% else %>
+    <button class="btn btn-outline-secondary btn-sm" disabled title="Google Sheet source is disabled">
+      Sync now
+    </button>
+  <% end %>
 <% end %>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <p class="small text-muted mb-3"><i class="bi bi-hand-index me-1"></i> Click any badge to filter the list</p>
-    
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to sheet_entries_path, class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if !@filter_active}" do %>
-        All: <strong><%= @total_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'linked'), class: "badge text-bg-success text-decoration-none #{'border border-dark border-2' if params[:filter] == 'linked'}" do %>
-        Linked: <strong><%= @linked_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'unlinked'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:filter] == 'unlinked'}" do %>
-        Unlinked: <strong><%= @unlinked_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'paying'), class: "badge text-bg-primary text-decoration-none #{'border border-dark border-2' if params[:filter] == 'paying'}" do %>
-        Paying: <strong><%= @paying_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'sponsored'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:filter] == 'sponsored'}" do %>
-        Sponsored: <strong><%= @sponsored_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'inactive'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:filter] == 'inactive'}" do %>
-        Inactive: <strong><%= @inactive_count %></strong>
-      <% end %>
-      <%= link_to sheet_entries_path(filter: 'with_email'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:filter] == 'with_email'}" do %>
-        With Email: <strong><%= @with_email_count %></strong>
-      <% end %>
-    </div>
-    
-    <div class="d-flex gap-2">
-      <input type="text" id="sheet_search" class="form-control" placeholder="Search by name, status, payment, or access…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <button type="button" id="clear_sheet_search" class="btn btn-outline-secondary d-none">Clear</button>
-    </div>
+<% if @filter_active %>
+  <% label = { 'linked' => 'Linked', 'unlinked' => 'Unlinked', 'paying' => 'Paying',
+               'sponsored' => 'Sponsored', 'inactive' => 'Inactive',
+               'with_email' => 'With email' }[params[:filter]] %>
+  <%= render 'shared/list_filter_banner', label: "#{label} entries", shown: @sheet_entries.size,
+             total: @total_count, clear_path: sheet_entries_path %>
+<% end %>
+
+<%# The controller settles on one `filter` param, so these are one axis of seven buckets,
+    not a tile row with a second axis under it — and seven is past what a tile row carries. %>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <%= render 'shared/list_filter_chip_row', label: 'Entries', chips: [
+          { label: 'All', count: @total_count, path: sheet_entries_path, active: params[:filter].blank? },
+          { label: 'Linked', count: @linked_count, path: sheet_entries_path(filter: 'linked'),
+            active: params[:filter] == 'linked' },
+          { label: 'Unlinked', count: @unlinked_count, path: sheet_entries_path(filter: 'unlinked'),
+            active: params[:filter] == 'unlinked', variant: 'warning' },
+          { label: 'Paying', count: @paying_count, path: sheet_entries_path(filter: 'paying'),
+            active: params[:filter] == 'paying' },
+          { label: 'Sponsored', count: @sponsored_count, path: sheet_entries_path(filter: 'sponsored'),
+            active: params[:filter] == 'sponsored' },
+          { label: 'Inactive', count: @inactive_count, path: sheet_entries_path(filter: 'inactive'),
+            active: params[:filter] == 'inactive' },
+          { label: 'With email', count: @with_email_count, path: sheet_entries_path(filter: 'with_email'),
+            active: params[:filter] == 'with_email' }
+        ] %>
   </div>
 </div>
 
-<div class="card shadow-sm border-0">
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="bg-body-tertiary">
-        <tr>
-          <th scope="col">Name</th>
-          <th scope="col">Status</th>
-          <th scope="col">Payment</th>
-          <th scope="col">Access</th>
-          <th scope="col">Last synced</th>
+<%= render layout: 'shared/list_client_filter' do %>
+  <%= render 'shared/list_search', server: false,
+             placeholder: 'Search by name, status, payment, or access…' %>
+
+  <% if @sheet_entries.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'sheet_entries_table_body',
+                         headers: ['Name', 'Status', 'Payment', 'Access', 'Last synced'] } do %>
+      <% @sheet_entries.each do |entry| %>
+        <tr class="sheet-entry-row"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              entry.name,
+              entry.status.presence || 'inactive',
+              entry.payment,
+              entry.access_permissions.join(' ')
+            ].compact.join(' ').downcase %>">
+          <td><%= link_to entry.name, sheet_entry_path(entry), class: 'fw-medium text-decoration-none' %></td>
+          <td>
+            <%= list_status_cell(entry.status.presence || 'Inactive', tone: 'muted',
+                                 success: entry.status.to_s.casecmp('active').zero?) %>
+          </td>
+          <td><span class="text-secondary"><%= entry.payment.presence || '—' %></span></td>
+          <td>
+            <% if entry.access_permissions.any? %>
+              <span class="text-secondary"><%= entry.access_permissions.join(', ') %></span>
+            <% else %>
+              <span class="text-secondary fst-italic">None recorded</span>
+            <% end %>
+          </td>
+          <td><%= list_time_tag(entry.last_synced_at, empty: 'Never') %></td>
         </tr>
-      </thead>
-      <tbody id="sheet_entries_table_body">
-        <% @sheet_entries.each do |entry| %>
-          <tr class="sheet-entry-row" 
-              data-search-text="<%= [
-                entry.name,
-                entry.email,
-                entry.status.presence || "inactive",
-                entry.payment,
-                entry.access_permissions.join(" ")
-              ].compact.join(' ').downcase %>">
-            <td class="fw-semibold"><%= link_to entry.name, sheet_entry_path(entry) %></td>
-            <td><%= entry.status.presence || content_tag(:span, "Inactive", class: "text-muted") %></td>
-            <td><%= entry.payment.presence || content_tag(:span, "—", class: "text-muted") %></td>
-            <td>
-              <% if entry.access_permissions.any? %>
-                <span class="badge text-bg-info text-wrap"><%= entry.access_permissions.join(", ") %></span>
-              <% else %>
-                <span class="text-muted fst-italic">None recorded</span>
-              <% end %>
-            </td>
-            <td><%= entry.last_synced_at ? l(entry.last_synced_at, format: :long) : "Never" %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-  (function() {
-    const searchInput = document.getElementById('sheet_search');
-    const clearButton = document.getElementById('clear_sheet_search');
-    const tableBody = document.getElementById('sheet_entries_table_body');
-    
-    if (!searchInput || !tableBody) return;
-    
-    function filterEntries() {
-      const searchTerm = searchInput.value.toLowerCase().trim();
-      const rows = tableBody.querySelectorAll('.sheet-entry-row');
-      
-      rows.forEach(function(row) {
-        const searchText = row.getAttribute('data-search-text');
-        if (searchText && searchText.includes(searchTerm)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-      
-      // Show/hide clear button
-      if (clearButton) {
-        clearButton.classList.toggle('d-none', searchTerm === '');
-      }
-    }
-    
-    searchInput.addEventListener('input', filterEntries);
-    
-    if (clearButton) {
-      clearButton.addEventListener('click', function() {
-        searchInput.value = '';
-        filterEntries();
-        searchInput.focus();
-      });
-    }
-  })();
-</script>
-
+      <% end %>
+    <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries match these filters.' %>
+  <% else %>
+    <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries have been synced yet.' %>
+  <% end %>
+<% end %>
