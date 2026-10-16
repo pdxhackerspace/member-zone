@@ -1088,6 +1088,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
   flex-wrap: wrap;
   gap: 4px;
 }
+.topic-resource {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.02);
+  border: 0.5px solid rgba(255,255,255,0.06);
+  border-radius: 5px;
+  font-size: 13px;
+}
+.topic-resource summary {
+  list-style: none;
+  cursor: pointer;
+}
+.topic-resource summary::-webkit-details-marker { display: none; }
+.topic-resource .min-w-0 { min-width: 0; }
 .trainee-remove {
   background: none;
   border: none;

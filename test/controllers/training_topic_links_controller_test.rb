@@ -170,4 +170,25 @@ class TrainingTopicLinksControllerTest < ActionDispatch::IntegrationTest
     end
     assert_response :redirect
   end
+
+  # ─── Returning to the topic page ──────────────────────────────────────
+
+  test 'link changes made from the topic page return to the topic page' do
+    sign_in_as_admin
+
+    post training_topic_links_path(@laser_topic), params: {
+      return_to: 'topic_page', training_topic_link: { title: 'Manual', url: 'https://example.com/manual' }
+    }
+    assert_redirected_to training_catalog_topic_path(@laser_topic, anchor: 'topic-resources')
+
+    patch training_topic_link_path(@laser_topic, @laser_link), params: {
+      return_to: 'topic_page', training_topic_link: { title: 'Renamed', url: @laser_link.url }
+    }
+    assert_redirected_to training_catalog_topic_path(@laser_topic, anchor: 'topic-resources')
+    assert_equal 'Renamed', @laser_link.reload.title
+
+    delete training_topic_link_path(@laser_topic, @laser_link, return_to: 'topic_page')
+    assert_redirected_to training_catalog_topic_path(@laser_topic, anchor: 'topic-resources')
+    assert_not TrainingTopicLink.exists?(@laser_link.id)
+  end
 end

@@ -9,25 +9,25 @@ class TrainingTopicLinksController < AuthenticatedController
     @link = @training_topic.links.build(link_params)
 
     if @link.save
-      redirect_to edit_training_topic_path(@training_topic), notice: 'Link added successfully.'
+      redirect_to return_path, notice: 'Link added successfully.'
     else
-      redirect_to edit_training_topic_path(@training_topic),
+      redirect_to return_path,
                   alert: "Failed to add link: #{@link.errors.full_messages.join(', ')}"
     end
   end
 
   def update
     if @link.update(link_params)
-      redirect_to edit_training_topic_path(@training_topic), notice: 'Link updated successfully.'
+      redirect_to return_path, notice: 'Link updated successfully.'
     else
-      redirect_to edit_training_topic_path(@training_topic),
+      redirect_to return_path,
                   alert: "Failed to update link: #{@link.errors.full_messages.join(', ')}"
     end
   end
 
   def destroy
     @link.destroy
-    redirect_to edit_training_topic_path(@training_topic), notice: 'Link removed successfully.'
+    redirect_to return_path, notice: 'Link removed successfully.'
   end
 
   private
@@ -45,6 +45,16 @@ class TrainingTopicLinksController < AuthenticatedController
 
   def set_link
     @link = @training_topic.links.find(params[:id])
+  end
+
+  # Links are edited from the admin topic page and, by curators, from the member-facing
+  # topic page; each form says which one to come back to.
+  def return_path
+    if params[:return_to] == 'topic_page'
+      training_catalog_topic_path(@training_topic, anchor: 'topic-resources')
+    else
+      edit_training_topic_path(@training_topic)
+    end
   end
 
   def link_params

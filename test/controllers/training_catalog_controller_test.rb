@@ -112,7 +112,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_match @laser_topic.name, response.body
     assert_match(/Trainers/i, response.body)
     assert_match(/Trained Members/i, response.body)
-    assert_match(/Training Materials/i, response.body)
+    assert_select '#topic-resources h2', text: /Resources/
   end
 
   test 'member cannot view a topic that is not offered to members' do
@@ -272,24 +272,53 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/Request Training/i, response.body)
   end
 
-  test 'show renders training materials before trainers and trained members' do
+  test 'show renders resources after trainers and trained members' do
     TrainerCapability.find_or_create_by!(user: users(:one), training_topic: @laser_topic)
 
     sign_in_as_admin
     get training_catalog_topic_path(@laser_topic)
 
     assert_response :success
-    materials_index = response.body.index('Training Materials')
+    resources_index = response.body.index('id="topic-resources"')
     trainers_index  = response.body.index('Trainers</h2>')
     trained_index   = response.body.index('Trained Members')
 
-    assert materials_index, 'expected Training Materials section'
-    assert trainers_index,  'expected Trainers section'
-    assert trained_index,   'expected Trained Members section'
-    assert materials_index < trainers_index,
-           'expected Training Materials to appear before Trainers'
-    assert materials_index < trained_index,
-           'expected Training Materials to appear before Trained Members'
+    assert resources_index, 'expected Resources section'
+    assert trainers_index < resources_index, 'expected Resources to appear after Trainers'
+    assert trained_index < resources_index, 'expected Resources to appear after Trained Members'
+  end
+
+  test 'member without the links privilege sees resources but cannot edit them' do
+    sign_in_as_member
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select '#topic-resources'
+    assert_select "#topic-resources form[action='#{training_topic_links_path(@laser_topic)}']", count: 0
+    assert_select '#topic-resources details', count: 0
+    assert_no_match 'Add document', response.body
+  end
+
+  test 'curator with the links privilege for the topic can add, edit, and remove links on the topic page' do
+    sign_in_as_member
+    grant_privileges(signed_in_member, 'training.topics.manage_links', topic: @laser_topic)
+
+    get training_catalog_topic_path(@laser_topic)
+    assert_select "#topic-resources form[action='#{training_topic_links_path(@laser_topic)}']"
+    link = @laser_topic.links.first
+    assert_select "#topic-link-#{link.id} form[action='#{training_topic_link_path(@laser_topic, link)}']"
+
+    get training_catalog_topic_path(@woodworking_topic)
+    assert_select "#topic-resources form[action='#{training_topic_links_path(@woodworking_topic)}']", count: 0
+  end
+
+  test 'member who can manage topic documents is offered add and edit document links' do
+    sign_in_as_member
+    grant_privileges(signed_in_member, 'training.documents.manage', topic: @laser_topic)
+
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_select "#topic-resources a[href^='#{new_document_path}']", text: 'Add document'
   end
 
   test 'show displays edit button for admin' do
@@ -370,5 +399,9 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     post local_login_path, params: {
       session: { email: local_accounts(:regular_member).email, password: 'memberpassword123' }
     }
+  end
+
+  def signed_in_member
+    User.find_by!('authentik_id LIKE ?', "local:#{local_accounts(:regular_member).id}")
   end
 end

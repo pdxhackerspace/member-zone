@@ -57,12 +57,13 @@
 
   <% if params[:return_to_topic].present? %>
     <%= hidden_field_tag :return_to_topic, params[:return_to_topic] %>
+    <%= hidden_field_tag :return_to, params[:return_to] if params[:return_to].present? %>
   <% end %>
 
   <div class="d-flex gap-2">
     <%= f.submit document.persisted? ? "Update Document" : "Create Document", class: "btn btn-primary" %>
     <% if params[:return_to_topic].present? %>
-      <%= link_to "Cancel", edit_training_topic_path(params[:return_to_topic]), class: "btn btn-outline-secondary" %>
+      <%= link_to "Cancel", document_return_path, class: "btn btn-outline-secondary" %>
     <% else %>
       <%= link_to "Cancel", documents_path, class: "btn btn-outline-secondary" %>
     <% end %>

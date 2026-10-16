@@ -123,11 +123,7 @@ class DocumentsController < AuthenticatedController
   end
 
   def return_path
-    if params[:return_to_topic].present?
-      edit_training_topic_path(params[:return_to_topic])
-    else
-      documents_path
-    end
+    helpers.document_return_path
   end
 
   def restrict_trainer_permissions_on(document)
