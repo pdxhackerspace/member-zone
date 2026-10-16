@@ -8,6 +8,8 @@ class MailLogController < AuthenticatedController
     @state = params[:state].presence_in(MailLogEntry::STATE_FILTERS.keys)
     @search = params[:q].to_s.strip
     @filter_counts = MailLogEntry.state_filter_counts(search: @search)
+    # The header describes the whole log; the chips are what the search narrows.
+    @overall_counts = @search.present? ? MailLogEntry.state_filter_counts(search: '') : @filter_counts
     @failed_in_queue_count = QueuedMail.failed.count
     @pagy, @log_entries = pagy(filtered_entries, limit: PER_PAGE)
   end

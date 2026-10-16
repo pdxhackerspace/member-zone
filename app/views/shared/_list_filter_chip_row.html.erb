@@ -1,11 +1,11 @@
 <%# One labelled row of filter chips, for lists whose filters stack across several axes.
-    Locals: label (the axis name) and chips — { label:, count:, path:, active:, variant: }. %>
+    Locals: label (the axis name) and chips — { label:, count:, path:, active:, variant:, data: }. %>
 <div class="d-flex align-items-start gap-3 mb-2">
   <h2 class="h-section-label mb-0 flex-shrink-0 filter-axis-label"><%= label %></h2>
   <div class="d-flex flex-wrap gap-2">
     <% chips.each do |chip| %>
       <%= render 'shared/filter_chip', label: chip[:label], count: chip[:count], path: chip[:path],
-                 active: chip[:active], variant: chip[:variant] %>
+                 active: chip[:active], variant: chip[:variant], data: chip[:data] %>
     <% end %>
   </div>
 </div>

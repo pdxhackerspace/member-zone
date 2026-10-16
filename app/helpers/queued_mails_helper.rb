@@ -39,6 +39,19 @@ module QueuedMailsHelper
     %w[Rejected secondary]
   end
 
+  # An approve button that can actually send. Without SMTP it is a plain grey disabled button
+  # rather than a faded primary one, which on the dark theme still reads as clickable; the SMTP
+  # banner at the top of the page says why.
+  def queued_mail_send_button(label, path, confirm:, primary: false)
+    unless smtp_configured?
+      return tag.button(label, type: 'button', class: 'btn btn-sm btn-outline-secondary', disabled: true,
+                               title: 'Sending is off until SMTP is configured')
+    end
+
+    button_to label, path, method: :post, class: "btn btn-sm #{primary ? 'btn-primary' : 'btn-outline-secondary'}",
+                           data: { turbo_confirm: confirm }
+  end
+
   private
 
   def queued_mail_sent_title(queued_mail)
