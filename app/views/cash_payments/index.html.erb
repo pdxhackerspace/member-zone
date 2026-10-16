@@ -73,7 +73,9 @@
     <%= render 'shared/list_empty', icon: 'cash-coin', message: 'No cash payments match these filters.' %>
   <% else %>
     <% first_payment_action = gate :'payments.manage_cash' do %>
-      <%= link_to 'Record first payment', new_cash_payment_path, class: 'btn btn-primary btn-sm' %>
+      <%# Breaks out of the results frame: the form is a page of its own, not a swap of the table. %>
+      <%= link_to 'Record first payment', new_cash_payment_path, class: 'btn btn-primary btn-sm',
+                  data: { turbo_frame: '_top' } %>
     <% end %>
     <%= render 'shared/list_empty', icon: 'cash-coin', action: first_payment_action,
                message: 'No cash payments have been recorded yet.' %>
