@@ -1,7 +1,7 @@
 <% summary = capture do %>
-  <span class="text-body"><%= number_with_delimiter(@filter_counts['all']) %></span>
-  <%= 'entry'.pluralize(@filter_counts['all']) %> ·
-  <span class="<%= @filter_counts['failed'].zero? ? 'text-secondary' : 'text-danger' %>"><%= @filter_counts['failed'] %></span>
+  <span class="text-body"><%= number_with_delimiter(@overall_counts['all']) %></span>
+  <%= 'entry'.pluralize(@overall_counts['all']) %> ·
+  <span class="<%= @overall_counts['failed'].zero? ? 'text-secondary' : 'text-danger' %>"><%= @overall_counts['failed'] %></span>
   failed
   <% if @failed_in_queue_count > 0 %>
     · <%= link_to "#{@failed_in_queue_count} still waiting in the queue", queued_mails_path(filter: 'failed'),
@@ -18,21 +18,24 @@
 
 <%= render 'shared/smtp_warning' %>
 
-<% if @state.present? || @search.present? %>
-  <% state_label = MailLogHelper::STATE_CHIPS.find { |chip| chip[:state] == @state }&.dig(:label) %>
-  <% banner_label = [state_label, (%("#{@search}") if @search.present?)].compact.join(' matching ') %>
-  <%= render 'shared/list_filter_banner', label: banner_label, shown: @pagy.count,
-             total: @filter_counts['all'], noun: 'entry', clear_path: mail_log_path %>
-<% end %>
+<%= render 'shared/list_search', url: mail_log_path, frame: 'mail_log_results',
+           placeholder: 'Search by recipient or subject…' %>
 
-<%= render 'shared/list_filter_chip_row', label: 'Event', chips: mail_log_filter_chips(@filter_counts) %>
-
-<div class="mt-3">
-  <%= render 'shared/list_search', url: mail_log_path, frame: 'mail_log_results',
-             placeholder: 'Search by recipient or subject…' %>
-</div>
-
+<%# The search reloads only this frame, so the chips and the banner live inside it: their counts
+    and links follow the search as it is typed. %>
 <%= turbo_frame_tag 'mail_log_results' do %>
+  <% if @state.present? || @search.present? %>
+    <% state_label = MailLogHelper::STATE_CHIPS.find { |chip| chip[:state] == @state }&.dig(:label) if @state %>
+    <% banner_label = [state_label, (%("#{@search}") if @search.present?)].compact.join(' matching ') %>
+    <%= render 'shared/list_filter_banner', label: banner_label, shown: @pagy.count,
+               total: @overall_counts['all'], noun: 'entry', clear_path: mail_log_path,
+               clear_data: { turbo_frame: '_top' } %>
+  <% end %>
+
+  <div class="mb-3">
+    <%= render 'shared/list_filter_chip_row', label: 'Event', chips: mail_log_filter_chips(@filter_counts) %>
+  </div>
+
   <% if @log_entries.any? %>
     <%= render layout: 'shared/list_table',
                locals: { body_id: 'mail_log_table_body',

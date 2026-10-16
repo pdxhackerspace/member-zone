@@ -123,6 +123,28 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'ul.pagination', false
   end
 
+  test 'approve buttons send when SMTP is configured' do
+    get queued_mails_path
+
+    assert_select 'form[action=?] button.btn-primary', approve_all_queued_mails_path, text: 'Approve and send all'
+    assert_select 'form[action=?] button', approve_queued_mail_path(@pending), text: 'Approve and send'
+  end
+
+  test 'without SMTP the approve buttons are plain disabled buttons' do
+    Rails.configuration.action_mailer.smtp_settings = {}
+
+    get queued_mails_path
+
+    assert_select 'form[action=?]', approve_all_queued_mails_path, false
+    assert_select 'form[action=?]', approve_queued_mail_path(@pending), false
+    assert_select 'button.btn-outline-secondary[disabled]', text: 'Approve and send all'
+    assert_select 'button.btn-primary', text: /Approve and send/, count: 0
+
+    get queued_mail_path(@pending)
+
+    assert_select 'button.btn-outline-secondary[disabled]', text: 'Approve and send'
+  end
+
   # ─── Show ─────────────────────────────────────────────────────────
 
   test 'shows queued mail' do
@@ -174,6 +196,25 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'form'
     assert_select 'input#queued_mail_sync_body_text[name=?][checked]', 'sync_body_text'
     assert_select 'label[for=?]', 'queued_mail_sync_body_text', text: 'Keep in sync with HTML'
+  end
+
+  test 'edit page regenerates by POST, and only for admins' do
+    template = EmailTemplate.create!(key: 'regenerate_link_test', name: 'Regenerate link test', subject: 'Hi',
+                                     body_html: '<p>Hi</p>', body_text: 'Hi', enabled: true)
+    @pending.update!(email_template: template)
+
+    get edit_queued_mail_path(@pending)
+
+    assert_select 'a[href=?][data-turbo-method=post][data-turbo-confirm]', regenerate_queued_mail_path(@pending)
+
+    editor = sign_in_as_plain_member
+    grant_privileges(editor, 'queued_mail.view', 'queued_mail.edit')
+    sign_in_as_plain_member
+
+    get edit_queued_mail_path(@pending)
+
+    assert_response :success
+    assert_select 'a[href=?]', regenerate_queued_mail_path(@pending), false
   end
 
   test 'redirects edit for non-pending mail' do

@@ -32,11 +32,14 @@ module MailLogHelper
     safe_join([tag.span(nil, class: "status-dot #{dot} me-1"), tag.span(label, class: 'text-secondary text-13')])
   end
 
-  # The state chips with their counts, keeping the search as the chip changes.
+  # The state chips with their counts, keeping the search as the chip changes. They sit inside the
+  # results frame so the search refreshes them, but a click reloads the whole page: the search form
+  # outside the frame carries the state along, and only a full load puts the new one there.
   def mail_log_filter_chips(counts)
     STATE_CHIPS.map do |chip|
       { label: chip[:label], variant: chip[:variant], count: counts.fetch(chip[:state] || 'all', 0),
-        path: mail_log_path(state: chip[:state], q: @search.presence), active: mail_log_chip_active?(chip[:state]) }
+        path: mail_log_path(state: chip[:state], q: @search.presence), active: mail_log_chip_active?(chip[:state]),
+        data: { turbo_frame: '_top' } }
     end
   end
 
