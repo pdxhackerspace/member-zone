@@ -1,5 +1,6 @@
 class TrainingsController < AuthenticatedController
   include TrainerCapabilityActions
+  include BulkTrainingRecording
 
   before_action :require_trainer_or_admin
   before_action :prepare_record_training_form, only: :record
@@ -13,46 +14,6 @@ class TrainingsController < AuthenticatedController
   def index = redirect_to(record_training_path)
 
   def record; end
-
-  def create_bulk
-    training_topic = TrainingTopic.find(params[:training_topic_id])
-    unless can_train_topic?(training_topic)
-      redirect_to record_training_path, alert: "You don't have permission to train #{training_topic.name}."
-      return
-    end
-
-    trainee_ids = Array(params[:trainee_ids]).compact_blank.uniq
-    if trainee_ids.empty?
-      redirect_to record_training_path, alert: 'Add at least one member before recording training.'
-      return
-    end
-
-    trainer = selected_trainer_for_recording
-    trained_at = parsed_trained_at
-    result = TrainingRecorder.new(
-      current_user: true_user,
-      training_topic: training_topic,
-      trainee_ids: trainee_ids,
-      trainer: trainer,
-      trained_at: trained_at,
-      notify_inactive: notify_inactive?
-    ).call
-
-    if result.recorded_count.zero?
-      redirect_to record_training_path,
-                  alert: 'No training events were recorded. Everyone selected was already trained ' \
-                         'or could not be trained.'
-      return
-    end
-
-    skipped_message = result.skipped_count.positive? ? " #{result.skipped_count} skipped." : ''
-    event_label = 'event'.pluralize(result.recorded_count)
-    redirect_to training_catalog_path,
-                notice: "Recorded #{result.recorded_count} training #{event_label} " \
-                        "for #{training_topic.name}.#{skipped_message}#{bulk_inactive_note(result)}"
-  rescue ActiveRecord::RecordNotFound
-    redirect_to record_training_path, alert: 'Training topic not found.'
-  end
 
   def add_training
     unless can_train_topic?(@training_topic)
@@ -150,14 +111,6 @@ class TrainingsController < AuthenticatedController
     ActiveModel::Type::Boolean.new.cast(params[:notify_inactive]) || false
   end
 
-  def bulk_inactive_note(result)
-    return '' unless result.inactive_count.to_i.positive?
-
-    label = 'inactive member'.pluralize(result.inactive_count)
-    state = notify_inactive? ? 'notified' : 'not notified'
-    " #{result.inactive_count} #{label} trained and #{state}."
-  end
-
   def single_inactive_note(result)
     return '' unless result.inactive_count.to_i.positive?
 
@@ -202,21 +155,16 @@ class TrainingsController < AuthenticatedController
   end
 
   def prepare_record_training_form
-    @trainable_topics = trainable_topics_for_actor
+    recordable = trainable_topics_for_actor.to_a
+    appointable = current_user.manageable_trainer_topics
+    @recordable_topic_ids = recordable.map(&:id)
+    @appointable_topic_ids = appointable.map(&:id)
+    @record_topics = (recordable | appointable).sort_by(&:name)
     @trainer_options = trainer_options_for_recording
     @recording_users = recording_user_options
     @initial_trainee_ids = initial_trainee_ids_from_params
-    @initial_topic_id = params[:topic_id].presence
-    prepare_trainer_capabilities_panel
-  end
-
-  # Admins, directors and stewards each see the topics they may appoint trainers for.
-  def prepare_trainer_capabilities_panel
-    @manageable_trainer_topics = current_user.manageable_trainer_topics
-    return if @manageable_trainer_topics.empty?
-
-    @trainer_manage_user = User.find_by(id: params[:trainer_user_id]) if params[:trainer_user_id].present?
-    @users_for_search = User.ordered_by_display_name
+    @initial_topic_ids = Array(params[:topic_ids].presence || params[:topic_id].presence).compact_blank.map(&:to_s)
+    @initial_record_as = params[:record_as] == 'trainer' ? 'trainer' : 'trained'
   end
 
   def initial_trainee_ids_from_params

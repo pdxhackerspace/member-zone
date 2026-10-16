@@ -14,18 +14,16 @@ module TrainerCapabilityActions
       return
     end
 
-    capability = TrainerCapability.new(user: @trainee, training_topic: @training_topic)
-
-    if capability.save
-      ensure_trainee_trained_for_trainer_capability
-      log_trainer_capability_added
-      notify_trainer_capability_granted
+    if @trainee.banned?
       redirect_to trainer_capability_return_path(@trainee),
-                  notice: "#{@trainee.display_name} can now train others in #{@training_topic.name}."
-    else
-      redirect_to trainer_capability_return_path(@trainee),
-                  alert: "Failed to add trainer capability: #{capability.errors.full_messages.join(', ')}"
+                  alert: "#{@trainee.display_name} is banned and cannot be made a trainer."
+      return
     end
+
+    TrainerAppointer.new(current_user: true_user, training_topic: @training_topic, trainee_ids: [@trainee.id],
+                         trainer: true_user, trained_at: Time.current, notify_inactive: true).call
+    redirect_to trainer_capability_return_path(@trainee),
+                notice: "#{@trainee.display_name} can now train others in #{@training_topic.name}."
   end
 
   def remove_trainer_capability
@@ -54,34 +52,6 @@ module TrainerCapabilityActions
     current_user&.may_manage_trainer_capability?(topic) || false
   end
 
-  def ensure_trainee_trained_for_trainer_capability
-    return if Training.exists?(trainee: @trainee, training_topic: @training_topic)
-
-    Training.create!(
-      trainee: @trainee,
-      trainer: true_user,
-      training_topic: @training_topic,
-      trained_at: Time.current
-    )
-  end
-
-  def log_trainer_capability_added
-    Journal.create!(
-      user: @trainee,
-      actor_user: true_user,
-      action: 'trainer_capability_added',
-      changes_json: {
-        'trainer_capability' => {
-          'topic' => @training_topic.name,
-          'granted_by' => true_user.display_name,
-          'granted_at' => Time.current.iso8601
-        }
-      },
-      changed_at: Time.current,
-      highlight: true
-    )
-  end
-
   def log_trainer_capability_removed
     Journal.create!(
       user: @trainee,
@@ -99,21 +69,7 @@ module TrainerCapabilityActions
     )
   end
 
-  def notify_trainer_capability_granted
-    return if @trainee.email.blank?
-
-    QueuedMail.enqueue(:trainer_capability_granted, @trainee,
-                       reason: "Can now train #{@training_topic.name}",
-                       training_topic: @training_topic.name)
-  end
-
   def trainer_capability_return_path(trainee)
-    return user_path(trainee, anchor: 'training-access-section') if params[:return_to] == 'profile'
-
-    record_training_path(
-      trainer_user_id: trainee.id,
-      topic_id: params[:return_topic_id].presence,
-      trainee_ids: params[:return_trainee_ids].presence
-    )
+    user_path(trainee, anchor: 'training-access-section')
   end
 end
