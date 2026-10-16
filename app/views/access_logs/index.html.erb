@@ -1,205 +1,97 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Access Logs</h1>
-    <p class="text-muted mb-0">
-      <strong><%= @display_count %></strong> log entries
-      <% if @filter_active %>(filtered from <%= @total_count %> total)<% end %>
-      <% if @total_pages > 1 %>
-        &mdash; page <%= @page %> of <%= @total_pages %>
-      <% end %>
-    </p>
-  </div>
-  <div class="d-flex gap-2">
-    <%= button_to "Sync Access Logs", import_access_logs_path, method: :post, class: "btn btn-outline-primary", data: { turbo: false } %>
-    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#uploadLogModal">
-      <i class="bi bi-upload me-1"></i>Upload Log File
-    </button>
-  </div>
-</div>
+<% filter_path = ->(value) { access_logs_path(linked: value, q: params[:q].presence) } %>
 
-<% if @filter_active %>
-  <div class="alert alert-info py-2 mb-3">
-    <i class="bi bi-funnel me-1"></i> Filtering:
-    <%= case params[:linked]
-        when 'yes' then 'Linked'
-        when 'no' then 'Unlinked (with name)'
-        when 'no_name' then 'No name'
-        when 'service' then 'Service Accounts'
-        end %> entries
-    &mdash; <%= link_to 'Clear filter', access_logs_path(q: params[:q]), class: 'alert-link' %>
-  </div>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Access logs', count: @display_count, noun: 'entry' } do %>
+  <%= gate :'access.import_logs' do %>
+    <%= button_to 'Sync access logs', import_access_logs_path, method: :post,
+                  class: 'btn btn-primary btn-sm', data: { turbo: false } %>
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            data-bs-toggle="modal" data-bs-target="#uploadLogModal">Upload log file</button>
+  <% end %>
 <% end %>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <p class="small text-muted mb-3"><i class="bi bi-hand-index me-1"></i> Click any badge to filter the list</p>
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to access_logs_path(q: params[:q]), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if !@filter_active}" do %>
-        All: <strong><%= @total_count %></strong>
-      <% end %>
-      <%= link_to access_logs_path(linked: 'yes', q: params[:q]), class: "badge text-bg-success text-decoration-none #{'border border-dark border-2' if params[:linked] == 'yes'}" do %>
-        Linked: <strong><%= @linked_count %></strong>
-      <% end %>
-      <%= link_to access_logs_path(linked: 'no', q: params[:q]), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:linked] == 'no'}" do %>
-        Unlinked: <strong><%= @unlinked_count %></strong>
-      <% end %>
-      <%= link_to access_logs_path(linked: 'no_name', q: params[:q]), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:linked] == 'no_name'}" do %>
-        No name: <strong><%= @no_name_count %></strong>
-      <% end %>
-      <span class="border-start ms-2 ps-2"></span>
-      <%= link_to access_logs_path(linked: 'service', q: params[:q]), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:linked] == 'service'}" do %>
-        <i class="bi bi-gear-fill me-1"></i>Service: <strong><%= @service_account_count %></strong>
-      <% end %>
-    </div>
-    <%= form_with url: access_logs_path, method: :get, local: true, class: "d-flex gap-2" do %>
-      <% if params[:linked].present? %>
-        <input type="hidden" name="linked" value="<%= params[:linked] %>">
-      <% end %>
-      <input type="search" name="q" value="<%= params[:q] %>"
-             class="form-control"
-             placeholder="Search by name, location, or raw text…"
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <button type="submit" class="btn btn-outline-primary">Search</button>
-      <% if params[:q].present? %>
-        <%= link_to "Clear", access_logs_path(linked: params[:linked].presence), class: "btn btn-outline-secondary" %>
+<% if @filter_active %>
+  <% labels = [{ 'yes' => 'Linked', 'no' => 'Unlinked (with name)', 'no_name' => 'No name',
+                 'service' => 'Service accounts' }[params[:linked]],
+               ("Search: #{params[:q]}" if params[:q].present?)].compact %>
+  <%= render 'shared/list_filter_banner', label: "#{labels.join(' + ')} entries",
+             shown: @display_count, total: @total_count, clear_path: access_logs_path %>
+<% end %>
+
+<%= render 'shared/list_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: filter_path.call(nil), active: params[:linked].blank? },
+      { label: 'Linked', count: @linked_count, path: filter_path.call('yes'),
+        active: params[:linked] == 'yes' },
+      { label: 'Unlinked', count: @unlinked_count, path: filter_path.call('no'),
+        active: params[:linked] == 'no', variant: 'warning' },
+      { label: 'No name', count: @no_name_count, path: filter_path.call('no_name'),
+        active: params[:linked] == 'no_name' },
+      { label: 'Service', count: @service_account_count, path: filter_path.call('service'),
+        active: params[:linked] == 'service' }
+    ] %>
+
+<%= render 'shared/list_search', url: access_logs_path, frame: 'access_logs_results',
+           placeholder: 'Search by name, location, or raw text…' %>
+
+<%= turbo_frame_tag 'access_logs_results' do %>
+  <% if @access_logs.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'access_logs_table_body',
+                         headers: ['Time', 'Member', 'Location', 'Action', 'Raw text', ['', 'text-end']] } do %>
+      <% @access_logs.each do |log| %>
+        <% needs_linking = log.user.blank? && log.name.present? %>
+        <tr class="access-log-row <%= 'row-attention' if needs_linking %>">
+          <td><%= list_time_tag(log.logged_at, empty: 'Not set') %></td>
+          <td class="access-log-member">
+            <% if log.user.present? %>
+              <%= link_to log.user.display_name, user_path(log.user),
+                          class: 'text-decoration-none', data: { turbo_frame: '_top' } %>
+              <% if log.user.service_account? %>
+                <i class="bi bi-gear-fill text-secondary ms-1" title="Service account"></i>
+              <% end %>
+            <% elsif log.name.present? %>
+              <div class="mb-1"><%= log.name %></div>
+              <span class="badge text-bg-warning-subtle">Unlinked</span>
+            <% else %>
+              <span class="text-secondary fst-italic">Unknown</span>
+            <% end %>
+          </td>
+          <td><span class="text-secondary"><%= log.location.presence || '—' %></span></td>
+          <td><span class="text-secondary"><%= log.action.presence || '—' %></span></td>
+          <td>
+            <% if log.raw_text.present? %>
+              <code class="text-12 text-secondary cell-truncate" title="<%= log.raw_text %>">
+                <%= truncate(log.raw_text, length: 100) %>
+              </code>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+          <td class="text-end text-nowrap">
+            <% if needs_linking %>
+              <%= gate :'access.link_logs' do %>
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="modal" data-bs-target="#linkUserModal"
+                        data-log-id="<%= log.id %>" data-log-name="<%= log.name %>">Link member…</button>
+              <% end %>
+              <% if current_user_admin? %>
+                <%= button_to 'Create member',
+                              create_member_access_log_path(log, linked: params[:linked], q: params[:q],
+                                                                 page: params[:page]),
+                              method: :post, class: 'btn btn-sm btn-outline-secondary',
+                              data: { turbo: false, turbo_confirm: "Create a new member '#{log.name}'?" } %>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
       <% end %>
     <% end %>
-  </div>
-</div>
-
-<div class="card shadow-sm border-0">
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="bg-body-tertiary">
-        <tr>
-          <th scope="col">Timestamp</th>
-          <th scope="col">Member</th>
-          <th scope="col">Location</th>
-          <th scope="col">Action</th>
-          <th scope="col">Raw Text</th>
-          <th scope="col" class="text-end"></th>
-        </tr>
-      </thead>
-      <tbody id="access_logs_table_body">
-        <% if @access_logs.any? %>
-          <% @access_logs.each do |log| %>
-            <tr>
-              <td>
-                <% if log.logged_at.present? %>
-                  <%= l(log.logged_at, format: :long) %>
-                <% else %>
-                  <span class="text-muted fst-italic">Not set</span>
-                <% end %>
-              </td>
-              <td>
-                <% if log.user.present? %>
-                  <%= link_to log.user.display_name, user_path(log.user), class: "text-decoration-none" %>
-                  <% if log.user.service_account? %>
-                    <span class="badge text-bg-info ms-1"><i class="bi bi-gear-fill"></i></span>
-                  <% end %>
-                <% elsif log.name.present? %>
-                  <span class="text-warning-emphasis"><%= log.name %></span>
-                  <span class="badge text-bg-warning ms-1">unlinked</span>
-                <% else %>
-                  <span class="text-muted fst-italic">Unknown</span>
-                <% end %>
-              </td>
-              <td><%= log.location.presence || content_tag(:span, "—", class: "text-muted") %></td>
-              <td><%= log.action.presence || content_tag(:span, "—", class: "text-muted") %></td>
-              <td>
-                <% if log.raw_text.present? %>
-                  <code class="small"><%= truncate(log.raw_text, length: 100) %></code>
-                <% else %>
-                  <span class="text-muted fst-italic">—</span>
-                <% end %>
-              </td>
-              <td class="text-end text-nowrap">
-                <% if log.user.blank? && log.name.present? %>
-                  <button type="button" class="btn btn-sm btn-outline-primary"
-                          data-bs-toggle="modal" data-bs-target="#linkUserModal"
-                          data-log-id="<%= log.id %>" data-log-name="<%= log.name %>">
-                    Link
-                  </button>
-                  <%= button_to "Create Member", create_member_access_log_path(log, linked: params[:linked], q: params[:q], page: params[:page]),
-                      method: :post, class: "btn btn-sm btn-outline-success", data: { turbo: false,
-                      turbo_confirm: "Create a new member '#{log.name}'?" } %>
-                <% end %>
-              </td>
-            </tr>
-          <% end %>
-        <% else %>
-          <tr>
-            <td colspan="6" class="text-center text-muted py-4">No access logs found.</td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<% if @total_pages > 1 %>
-  <nav aria-label="Access logs pagination" class="mt-4">
-    <ul class="pagination justify-content-center">
-      <% page_params = { q: params[:q], linked: params[:linked] }.compact_blank %>
-      <% if @page > 1 %>
-        <li class="page-item">
-          <%= link_to "Previous", access_logs_path(page_params.merge(page: @page - 1)), class: "page-link" %>
-        </li>
-      <% else %>
-        <li class="page-item disabled">
-          <span class="page-link">Previous</span>
-        </li>
-      <% end %>
-      
-      <% start_page = [@page - 2, 1].max %>
-      <% end_page = [start_page + 4, @total_pages].min %>
-      <% start_page = [end_page - 4, 1].max if end_page - start_page < 4 %>
-      
-      <% if start_page > 1 %>
-        <li class="page-item">
-          <%= link_to "1", access_logs_path(page_params.merge(page: 1)), class: "page-link" %>
-        </li>
-        <% if start_page > 2 %>
-          <li class="page-item disabled">
-            <span class="page-link">...</span>
-          </li>
-        <% end %>
-      <% end %>
-      
-      <% (start_page..end_page).each do |page_num| %>
-        <% if page_num == @page %>
-          <li class="page-item active">
-            <span class="page-link"><%= page_num %></span>
-          </li>
-        <% else %>
-          <li class="page-item">
-            <%= link_to page_num, access_logs_path(page_params.merge(page: page_num)), class: "page-link" %>
-          </li>
-        <% end %>
-      <% end %>
-      
-      <% if end_page < @total_pages %>
-        <% if end_page < @total_pages - 1 %>
-          <li class="page-item disabled">
-            <span class="page-link">...</span>
-          </li>
-        <% end %>
-        <li class="page-item">
-          <%= link_to @total_pages, access_logs_path(page_params.merge(page: @total_pages)), class: "page-link" %>
-        </li>
-      <% end %>
-      
-      <% if @page < @total_pages %>
-        <li class="page-item">
-          <%= link_to "Next", access_logs_path(page_params.merge(page: @page + 1)), class: "page-link" %>
-        </li>
-      <% else %>
-        <li class="page-item disabled">
-          <span class="page-link">Next</span>
-        </li>
-      <% end %>
-    </ul>
-  </nav>
+  <% elsif @filter_active %>
+    <%= render 'shared/list_empty', icon: 'door-open', message: 'No access log entries match these filters.' %>
+  <% else %>
+    <%= render 'shared/list_empty', icon: 'door-open', message: 'No access logs have been imported yet.' %>
+  <% end %>
+  <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>
 
 <!-- Upload Log File Modal -->

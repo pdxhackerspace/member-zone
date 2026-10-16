@@ -141,7 +141,11 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
 
   # ─── Key access paused filtering ───────────────────────────────────
 
-  test 'index shows key paused filter badge' do
+  # A filter chip whose bucket is empty is muted and not a link — it would open nothing — so
+  # this pauses a member first and asserts the chip is offered as a link.
+  test 'index shows key paused filter chip' do
+    users(:one).pause_key_access!
+
     get users_path
     assert_response :success
     assert_match(/Key paused/i, response.body)
@@ -169,7 +173,7 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
   test 'clear all filters link is shown when filter active' do
     get users_path(payment_type: 'paypal')
     assert_response :success
-    assert_match 'Clear all filters', response.body
+    assert_match 'Clear filters', response.body
   end
 
   test 'stacking two filters returns intersection' do

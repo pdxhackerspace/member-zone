@@ -1,107 +1,183 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Slack Users</h1>
-    <p class="text-muted mb-0"><strong><%= @total_count %></strong> total Slack users</p>
-  </div>
-  <div class="d-flex align-items-center gap-2">
-    <% if MemberSource.enabled?('slack') %>
-      <%= form_with url: sync_slack_users_path, method: :post, local: true, class: "d-flex align-items-center gap-3 mb-0" do %>
-        <div class="form-check form-switch mb-0">
-          <%= check_box_tag :update_members, '1', false, class: 'form-check-input', role: 'switch', id: 'slack_sync_update_members' %>
-          <%= label_tag :update_members, 'Update member accounts', class: 'form-check-label text-13 text-nowrap', for: 'slack_sync_update_members' %>
-        </div>
-        <%= submit_tag 'Sync Slack users', class: 'btn btn-primary btn-sm', data: { turbo: false } %>
-      <% end %>
-      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importSlackMembersModal">Import Members</button>
-      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importSlackAnalyticsModal">Import Analytics</button>
-    <% else %>
-      <button class="btn btn-secondary btn-sm" disabled title="Slack source is disabled">Sync Slack users</button>
-      <button class="btn btn-secondary btn-sm" disabled title="Slack source is disabled">Import Members</button>
-      <button class="btn btn-secondary btn-sm" disabled title="Slack source is disabled">Import Analytics</button>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Slack users', count: @filtered_count || @total_count, noun: 'account' } do %>
+  <% if MemberSource.enabled?('slack') %>
+    <%= form_with url: sync_slack_users_path, method: :post, local: true,
+                  class: 'd-flex align-items-center gap-3 mb-0' do %>
+      <div class="form-check form-switch mb-0">
+        <%= check_box_tag :update_members, '1', false, class: 'form-check-input', role: 'switch',
+                          id: 'slack_sync_update_members' %>
+        <%= label_tag :update_members, 'Update member accounts', class: 'form-check-label text-13 text-nowrap',
+                      for: 'slack_sync_update_members' %>
+      </div>
+      <%= submit_tag 'Sync Slack users', class: 'btn btn-primary btn-sm', data: { turbo: false } %>
     <% end %>
-  </div>
-</div>
-
-<% if @filter_active %>
-  <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <i class="bi bi-funnel me-2"></i>
-      Showing <strong><%= @filtered_count %></strong> of <%= @total_count %> Slack users
-      <% if params[:linked].present? %>
-        — <%= case params[:linked]
-              when 'yes' then 'Linked'
-              when 'no' then 'Unlinked'
-              when 'dont_link' then "Don't Link"
-              end %>
-      <% end %>
-      <% if params[:is_admin].present? %>
-        — <%= params[:is_admin] == 'yes' ? 'Admins' : 'Non-admins' %>
-      <% end %>
-      <% if params[:is_owner].present? %>
-        — <%= params[:is_owner] == 'yes' ? 'Owners' : 'Non-owners' %>
-      <% end %>
-      <% if params[:is_bot].present? %>
-        — <%= params[:is_bot] == 'yes' ? 'Bots' : 'Humans' %>
-      <% end %>
-      <% if params[:status].present? %>
-        — <%= params[:status].humanize %>
-      <% end %>
+    <div class="dropdown">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+              aria-expanded="false" aria-label="More actions">&hellip;</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <button type="button" class="dropdown-item" data-bs-toggle="modal"
+                  data-bs-target="#importSlackMembersModal">Import members</button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item" data-bs-toggle="modal"
+                  data-bs-target="#importSlackAnalyticsModal">Import analytics</button>
+        </li>
+      </ul>
     </div>
-    <%= link_to "Clear filters", slack_users_path(sort: @sort_column, direction: @sort_direction), class: "btn btn-outline-secondary btn-sm" %>
-  </div>
+  <% else %>
+    <button class="btn btn-outline-secondary btn-sm" disabled title="Slack source is disabled">
+      Sync Slack users
+    </button>
+  <% end %>
 <% end %>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <p class="small text-muted mb-3"><i class="bi bi-hand-index me-1"></i> Click any badge to filter the list</p>
-    
-    <h2 class="h6 mb-3">Linked to Member</h2>
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to slack_users_path(linked: 'yes'), class: "badge text-bg-success text-decoration-none #{'border border-dark border-2' if params[:linked] == 'yes'}" do %>
-        Linked: <strong><%= @linked_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(linked: 'no'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:linked] == 'no'}" do %>
-        Unlinked: <strong><%= @unlinked_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(linked: 'dont_link'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:linked] == 'dont_link'}" do %>
-        Don't Link: <strong><%= @dont_link_count %></strong>
-      <% end %>
-    </div>
-    
-    <h2 class="h6 mb-3">Role</h2>
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to slack_users_path(is_admin: 'yes'), class: "badge text-bg-primary text-decoration-none #{'border border-dark border-2' if params[:is_admin] == 'yes'}" do %>
-        Admin: <strong><%= @admin_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(is_owner: 'yes'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:is_owner] == 'yes'}" do %>
-        Owner: <strong><%= @owner_count %></strong>
-      <% end %>
-    </div>
-    
-    <h2 class="h6 mb-3">Type</h2>
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to slack_users_path(is_bot: 'no'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:is_bot] == 'no'}" do %>
-        Human: <strong><%= @human_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(is_bot: 'yes'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:is_bot] == 'yes'}" do %>
-        Bot: <strong><%= @bot_count %></strong>
-      <% end %>
-    </div>
-    
-    <h2 class="h6 mb-3">Status</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <%= link_to slack_users_path(status: 'active'), class: "badge text-bg-success-subtle text-decoration-none #{'border border-dark border-2' if params[:status] == 'active'}" do %>
-        Active: <strong><%= @active_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(status: 'inactive'), class: "badge text-bg-warning-subtle text-decoration-none #{'border border-dark border-2' if params[:status] == 'inactive'}" do %>
-        Inactive: <strong><%= @inactive_count %></strong>
-      <% end %>
-      <%= link_to slack_users_path(status: 'deactivated'), class: "badge text-bg-danger-subtle text-decoration-none #{'border border-dark border-2' if params[:status] == 'deactivated'}" do %>
-        Deactivated: <strong><%= @deactivated_count %></strong>
-      <% end %>
-    </div>
+<% if @filter_active %>
+  <% labels = [{ 'yes' => 'Linked', 'no' => 'Unlinked', 'dont_link' => "Don't link" }[params[:linked]],
+               ('Admins' if params[:is_admin] == 'yes'),
+               ('Owners' if params[:is_owner] == 'yes'),
+               ({ 'yes' => 'Bots', 'no' => 'Humans' }[params[:is_bot]]),
+               params[:status]&.humanize].compact %>
+  <%= render 'shared/list_filter_banner', label: "#{labels.join(' + ')} accounts",
+             shown: @filtered_count, total: @total_count,
+             clear_path: slack_users_path(sort: @sort_column, direction: @sort_direction) %>
+<% end %>
+
+<%= render 'shared/list_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: list_filter_path(:slack_users_path, :linked, nil),
+        active: params[:linked].blank? },
+      { label: 'Linked', count: @linked_count, path: list_filter_path(:slack_users_path, :linked, 'yes'),
+        active: params[:linked] == 'yes' },
+      { label: 'Unlinked', count: @unlinked_count, path: list_filter_path(:slack_users_path, :linked, 'no'),
+        active: params[:linked] == 'no', variant: 'warning' },
+      { label: "Don't link", count: @dont_link_count,
+        path: list_filter_path(:slack_users_path, :linked, 'dont_link'),
+        active: params[:linked] == 'dont_link' }
+    ] %>
+
+<%# Role, type and status are separate axes: each chip toggles its own and leaves the rest. %>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <%= render 'shared/list_filter_chip_row', label: 'Role', chips: [
+          { label: 'Admin', count: @admin_count, path: list_filter_path(:slack_users_path, :is_admin, 'yes'),
+            active: params[:is_admin] == 'yes' },
+          { label: 'Owner', count: @owner_count, path: list_filter_path(:slack_users_path, :is_owner, 'yes'),
+            active: params[:is_owner] == 'yes' }
+        ] %>
+    <%= render 'shared/list_filter_chip_row', label: 'Type', chips: [
+          { label: 'Human', count: @human_count, path: list_filter_path(:slack_users_path, :is_bot, 'no'),
+            active: params[:is_bot] == 'no' },
+          { label: 'Bot', count: @bot_count, path: list_filter_path(:slack_users_path, :is_bot, 'yes'),
+            active: params[:is_bot] == 'yes' }
+        ] %>
+    <%= render 'shared/list_filter_chip_row', label: 'Status', chips: [
+          { label: 'Active', count: @active_count, path: list_filter_path(:slack_users_path, :status, 'active'),
+            active: params[:status] == 'active' },
+          { label: 'Inactive', count: @inactive_count,
+            path: list_filter_path(:slack_users_path, :status, 'inactive'),
+            active: params[:status] == 'inactive', variant: 'warning' },
+          { label: 'Deactivated', count: @deactivated_count,
+            path: list_filter_path(:slack_users_path, :status, 'deactivated'),
+            active: params[:status] == 'deactivated', variant: 'danger' }
+        ] %>
   </div>
 </div>
+
+<%= render 'shared/list_search', server: false, placeholder: 'Search by name or linked member…' %>
+
+<% if @slack_users.any? %>
+  <%= render layout: 'shared/list_table',
+             locals: { body_id: 'slack_users_table_body',
+                       headers: [['', 'avatar-col'],
+                                 sortable_column('display_name', 'Name', @sort_column, @sort_direction),
+                                 'Linked member',
+                                 sortable_column('is_admin', 'Admin', @sort_column, @sort_direction),
+                                 sortable_column('is_owner', 'Owner', @sort_column, @sort_direction),
+                                 sortable_column('is_bot', 'Bot', @sort_column, @sort_direction),
+                                 sortable_column('deleted', 'Status', @sort_column, @sort_direction),
+                                 ['', 'text-end']] } do %>
+    <% @slack_users.each do |slack_user| %>
+      <% needs_linking = slack_user.user.blank? && !slack_user.is_bot? && !slack_user.dont_link? %>
+      <tr class="slack-user-row <%= 'row-attention' if needs_linking %>"
+          data-live-filter-target="item"
+          data-search-text="<%= [
+            slack_user.display_name,
+            slack_user.user&.display_name,
+            slack_user.is_admin? ? 'admin' : nil,
+            slack_user.is_owner? ? 'owner' : nil,
+            slack_user.is_bot? ? 'bot' : 'human',
+            slack_user.deleted? ? 'deactivated' : (slack_user.inactive? ? 'inactive' : 'active'),
+            slack_user.dont_link? ? 'dont link' : nil
+          ].compact.join(' ').downcase %>">
+        <td>
+          <% image_url = slack_user.raw_attributes.dig('profile', 'image_32') %>
+          <% if image_url.present? %>
+            <%= link_to slack_user_path(slack_user, @list_params) do %>
+              <img src="<%= image_url %>" alt="" class="list-avatar">
+            <% end %>
+          <% end %>
+        </td>
+        <td>
+          <%= link_to slack_user.display_name, slack_user_path(slack_user, @list_params),
+                      class: 'fw-medium text-decoration-none' %>
+        </td>
+        <td>
+          <% if slack_user.user.present? %>
+            <%= link_to slack_user.user.display_name, user_path(slack_user.user), class: 'text-decoration-none' %>
+          <% elsif slack_user.dont_link? %>
+            <span class="text-secondary">Don't link</span>
+          <% else %>
+            <span class="text-secondary fst-italic">Not linked</span>
+          <% end %>
+        </td>
+        <td><%= slack_user.is_admin? ? tag.span('Admin', class: 'badge text-bg-info-subtle') : tag.span('—', class: 'text-secondary') %></td>
+        <td><%= slack_user.is_owner? ? tag.span('Owner', class: 'badge text-bg-warning-subtle') : tag.span('—', class: 'text-secondary') %></td>
+        <td><%= slack_user.is_bot? ? tag.span('Bot', class: 'badge text-bg-secondary-subtle') : tag.span('—', class: 'text-secondary') %></td>
+        <td>
+          <% if slack_user.deleted? %>
+            <%= list_status_cell('Deactivated', tone: 'danger', success: false) %>
+          <% elsif slack_user.inactive? %>
+            <%= list_status_cell('Inactive', tone: 'warning', success: false) %>
+          <% else %>
+            <%= list_status_cell('Active', success: true) %>
+          <% end %>
+        </td>
+        <td class="text-end text-nowrap">
+          <% if needs_linking %>
+            <div class="d-flex gap-1 justify-content-end">
+              <button type="button" class="btn btn-sm btn-outline-warning"
+                      data-bs-toggle="modal" data-bs-target="#slackLinkUserModal"
+                      data-slack-user-id="<%= slack_user.id %>"
+                      data-slack-user-name="<%= slack_user.display_name %>">Link member…</button>
+              <div class="dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                        aria-expanded="false" aria-label="More actions">&hellip;</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <%= button_to "Don't link", toggle_dont_link_slack_user_path(slack_user, from_index: 'true',
+                                                                                 **@list_params),
+                                  method: :post, class: 'dropdown-item', data: { turbo: false } %>
+                  </li>
+                  <li>
+                    <%= button_to 'Create member', create_member_slack_user_path(slack_user, from_index: 'true',
+                                                                                 **@list_params),
+                                  method: :post, class: 'dropdown-item',
+                                  data: { turbo: false,
+                                          turbo_confirm: "Create a new member from '#{slack_user.display_name}'?" } %>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  <% end %>
+<% elsif @filter_active %>
+  <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts match these filters.' %>
+<% else %>
+  <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts have been synced yet.' %>
+<% end %>
 
 <!-- Import Members Modal -->
 <div class="modal fade" id="importSlackMembersModal" tabindex="-1" aria-labelledby="importSlackMembersModalLabel" aria-hidden="true">
@@ -329,41 +405,6 @@
 
 <script>
   (function() {
-    // Table search functionality
-    const searchInput = document.getElementById('slack_search');
-    const clearButton = document.getElementById('clear_slack_search');
-    const tableBody = document.getElementById('slack_users_table_body');
-    
-    if (searchInput && tableBody) {
-      function filterUsers() {
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        const rows = tableBody.querySelectorAll('.slack-user-row');
-        
-        rows.forEach(function(row) {
-          const searchText = row.getAttribute('data-search-text');
-          if (searchText && searchText.includes(searchTerm)) {
-            row.style.display = '';
-          } else {
-            row.style.display = 'none';
-          }
-        });
-        
-        if (clearButton) {
-          clearButton.classList.toggle('d-none', searchTerm === '');
-        }
-      }
-      
-      searchInput.addEventListener('input', filterUsers);
-      
-      if (clearButton) {
-        clearButton.addEventListener('click', function() {
-          searchInput.value = '';
-          filterUsers();
-          searchInput.focus();
-        });
-      }
-    }
-
     // Link User Modal functionality
     const linkModal = document.getElementById('slackLinkUserModal');
     if (linkModal) {

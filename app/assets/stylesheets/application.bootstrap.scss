@@ -154,6 +154,11 @@
   cursor: default;
 }
 .filter-chip.muted:hover { background: transparent; border-color: rgba(255,255,255,0.06); }
+/* The axis name beside a row of chips, in a fixed column so the rows line up. */
+.filter-axis-label { width: 110px; padding-top: 4px; }
+/* The avatar column in a list: fixed width so the names line up. */
+.avatar-col { width: 48px; }
+.list-avatar { width: 32px; height: 32px; border-radius: 4px; }
 
 /* === KPI tile ===
    For dashboard summary numbers and clickable filter tiles.

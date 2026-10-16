@@ -1,5 +1,5 @@
-<%# The bucket row across the top of a payment index. Each tile is a count that filters the
-    list. Locals: tiles — an array of { label:, count:, path:, active:, variant: } hashes. %>
+<%# The bucket row across the top of an index page, for 2-5 buckets you pick between.
+    Filters that stack across several axes want shared/_list_filter_chip_row instead. Locals: tiles — an array of { label:, count:, path:, active:, variant: } hashes. %>
 <div class="row g-2 mb-3">
   <% tiles.each do |tile| %>
     <div class="col-6 col-lg">

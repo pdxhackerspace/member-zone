@@ -1,0 +1,21 @@
+<%# Page header shared by the index pages: title, a summary line, and the page's actions,
+    which the caller supplies as the block body.
+    Locals: title. Then either summary (any markup for the line under the title), or count
+    with an optional noun ('member', 'record') and an optional total_amount in USD. %>
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0"><%= title %></h1>
+    <div class="text-13 text-secondary mt-1">
+      <% if local_assigns[:summary].present? %>
+        <%= summary %>
+      <% else %>
+        <span class="text-body"><%= number_with_delimiter(count) %></span>
+        <%= (local_assigns[:noun] || 'record').pluralize(count) %>
+        <% if local_assigns.key?(:total_amount) %>
+          · Total <span class="text-body">$<%= number_to_currency(total_amount || 0, unit: '') %> USD</span>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2 align-items-center"><%= yield %></div>
+</div>

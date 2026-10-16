@@ -1,121 +1,96 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0">Parking Notices</h1>
-  <div class="d-flex gap-2">
-    <%= link_to new_parking_notice_path(type: 'permit'), class: "btn btn-primary btn-sm" do %>
-      <i class="bi bi-plus-circle me-1"></i> New Permit
-    <% end %>
-    <%= link_to new_parking_notice_path(type: 'ticket'), class: "btn btn-outline-secondary btn-sm" do %>
-      <i class="bi bi-plus-circle me-1"></i> New Ticket
-    <% end %>
+<% status_path = ->(value) { parking_notices_path(status: value, type: params[:type]) } %>
+<% type_path = ->(value) { parking_notices_path(status: params[:status], type: value) } %>
+
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Parking notices', count: @notice_count, noun: 'notice' } do %>
+  <%= link_to 'New permit', new_parking_notice_path(type: 'permit'), class: 'btn btn-primary btn-sm' %>
+  <%= link_to 'New ticket', new_parking_notice_path(type: 'ticket'), class: 'btn btn-outline-secondary btn-sm' %>
+<% end %>
+
+<% if @filter_active %>
+  <% labels = [params[:status]&.capitalize, params[:type]&.pluralize&.capitalize].compact %>
+  <%= render 'shared/list_filter_banner', label: "#{labels.join(' + ')} notices",
+             shown: @notice_count, total: @status_counts[:all], clear_path: parking_notices_path %>
+<% end %>
+
+<%= render 'shared/list_filter_tiles', tiles: [
+      { label: 'All', count: @status_counts[:all], path: status_path.call(nil),
+        active: params[:status].blank? },
+      { label: 'Active', count: @status_counts[:active], path: status_path.call('active'),
+        active: params[:status] == 'active' },
+      { label: 'Expired', count: @status_counts[:expired], path: status_path.call('expired'),
+        active: params[:status] == 'expired', variant: 'warning' },
+      { label: 'Cleared', count: @status_counts[:cleared], path: status_path.call('cleared'),
+        active: params[:status] == 'cleared' }
+    ] %>
+
+<%# Permit or ticket is its own axis, so it stacks with the status filter above. %>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <%= render 'shared/list_filter_chip_row', label: 'Type', chips: [
+          { label: 'Permits', count: @type_counts.fetch('permit', 0), path: type_path.call('permit'),
+            active: params[:type] == 'permit' },
+          { label: 'Tickets', count: @type_counts.fetch('ticket', 0), path: type_path.call('ticket'),
+            active: params[:type] == 'ticket' }
+        ] %>
   </div>
-</div>
-
-<%# Status filter tabs %>
-<ul class="nav nav-tabs mb-3">
-  <li class="nav-item">
-    <%= link_to parking_notices_path(type: params[:type]),
-        class: "nav-link #{params[:status].blank? ? 'active' : ''}" do %>
-      All <span class="badge bg-secondary"><%= @status_counts[:all] %></span>
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to parking_notices_path(status: 'active', type: params[:type]),
-        class: "nav-link #{params[:status] == 'active' ? 'active' : ''}" do %>
-      Active <span class="badge bg-primary"><%= @status_counts[:active] %></span>
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to parking_notices_path(status: 'expired', type: params[:type]),
-        class: "nav-link #{params[:status] == 'expired' ? 'active' : ''}" do %>
-      Expired <span class="badge bg-danger"><%= @status_counts[:expired] %></span>
-    <% end %>
-  </li>
-  <li class="nav-item">
-    <%= link_to parking_notices_path(status: 'cleared', type: params[:type]),
-        class: "nav-link #{params[:status] == 'cleared' ? 'active' : ''}" do %>
-      Cleared <span class="badge bg-secondary"><%= @status_counts[:cleared] %></span>
-    <% end %>
-  </li>
-</ul>
-
-<%# Type sub-filter %>
-<div class="mb-3 d-flex gap-2">
-  <%= link_to "All Types", parking_notices_path(status: params[:status]),
-      class: "btn btn-sm #{params[:type].blank? ? 'btn-primary' : 'btn-outline-secondary'}" %>
-  <%= link_to "Permits", parking_notices_path(status: params[:status], type: 'permit'),
-      class: "btn btn-sm #{params[:type] == 'permit' ? 'btn-primary' : 'btn-outline-secondary'}" %>
-  <%= link_to "Tickets", parking_notices_path(status: params[:status], type: 'ticket'),
-      class: "btn btn-sm #{params[:type] == 'ticket' ? 'btn-primary' : 'btn-outline-secondary'}" %>
 </div>
 
 <% if @parking_notices.any? %>
-  <div class="card shadow-sm border-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Type</th>
-            <th>Members</th>
-            <th>Location</th>
-            <th>Description</th>
-            <th>Expires</th>
-            <th>Status</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @parking_notices.each do |notice| %>
-            <tr>
-              <td>
-                <span class="badge text-bg-secondary-subtle">
-                  <%= notice.notice_type_display %>
-                </span>
-              </td>
-              <td>
-                <% if notice.members.any? %>
-                  <%= parking_notice_members_display(notice, link: true) %>
-                <% else %>
-                  <span class="text-muted">Unknown</span>
-                <% end %>
-              </td>
-              <td><%= notice.location_display.presence || '—' %></td>
-              <td><%= truncate(notice.description.to_s, length: 50) %></td>
-              <td>
-                <% if notice.active? && notice.expires_at <= 2.days.from_now %>
-                  <span class="text-danger fw-semibold"><%= notice.expires_at.strftime('%b %d, %Y %l:%M %p') %></span>
-                <% else %>
-                  <%= notice.expires_at.strftime('%b %d, %Y %l:%M %p') %>
-                <% end %>
-              </td>
-              <td>
-                <span class="badge text-bg-<%= notice.status_badge_color %>-subtle"><%= notice.status_display %></span>
-              </td>
-              <td class="text-end">
-                <div class="d-flex gap-1 justify-content-end align-items-center">
-                  <%= link_to "View", parking_notice_path(notice), class: "btn btn-sm btn-outline-secondary" %>
-                  <% if notice.active? %>
-                    <%= render 'shared/printer_print_button',
-                        notice: notice,
-                        printers: @printers,
-                        print_route: :print_notice_parking_notice_path,
-                        btn_size: :sm,
-                        dropdown_suffix: notice.id %>
-                  <% end %>
-                </div>
-              </td>
-            </tr>
+  <%= render layout: 'shared/list_table',
+             locals: { body_id: 'parking_notices_table_body',
+                       headers: ['Type', 'Members', 'Location', 'Description', 'Expires', 'Status',
+                                 ['', 'text-end']] } do %>
+    <% @parking_notices.each do |notice| %>
+      <% expiring_soon = notice.active? && notice.expires_at <= 2.days.from_now %>
+      <tr class="parking-notice-row <%= 'row-attention' if expiring_soon %>">
+        <td><span class="text-secondary"><%= notice.notice_type_display %></span></td>
+        <td>
+          <% if notice.members.any? %>
+            <%= parking_notice_members_display(notice, link: true) %>
+          <% else %>
+            <span class="text-secondary fst-italic">Unknown</span>
           <% end %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="mt-3">
-    <%== @pagy.series_nav(:bootstrap) %>
-  </div>
+        </td>
+        <td><span class="text-secondary"><%= notice.location_display.presence || '—' %></span></td>
+        <td>
+          <% if notice.description.present? %>
+            <span class="text-secondary cell-truncate" title="<%= notice.description %>">
+              <%= truncate(notice.description.to_s, length: 50) %>
+            </span>
+          <% else %>
+            <span class="text-secondary">—</span>
+          <% end %>
+        </td>
+        <td>
+          <% if expiring_soon %>
+            <span class="text-warning fw-medium"
+                  title="<%= l(notice.expires_at, format: :long) %>"><%= list_time_label(notice.expires_at) %></span>
+          <% else %>
+            <%= list_time_tag(notice.expires_at) %>
+          <% end %>
+        </td>
+        <td>
+          <span class="badge text-bg-<%= notice.status_badge_color %>-subtle"><%= notice.status_display %></span>
+        </td>
+        <td class="text-end">
+          <div class="d-flex gap-1 justify-content-end align-items-center">
+            <%= link_to 'View', parking_notice_path(notice), class: 'btn btn-sm btn-outline-secondary' %>
+            <% if notice.active? %>
+              <%= render 'shared/printer_print_button',
+                         notice: notice, printers: @printers,
+                         print_route: :print_notice_parking_notice_path,
+                         btn_size: :sm, dropdown_suffix: notice.id %>
+            <% end %>
+          </div>
+        </td>
+      </tr>
+    <% end %>
+  <% end %>
+<% elsif @filter_active %>
+  <%= render 'shared/list_empty', icon: 'car-front', message: 'No parking notices match these filters.' %>
 <% else %>
-  <div class="text-center text-muted py-5">
-    <i class="bi bi-car-front fs-1 d-block mb-2"></i>
-    <p>No parking notices found.</p>
-  </div>
+  <%= render 'shared/list_empty', icon: 'car-front', message: 'No parking notices have been issued yet.' %>
 <% end %>
+
+<%= render 'shared/pagination', pagy: @pagy %>

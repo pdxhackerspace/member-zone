@@ -181,6 +181,16 @@ The device gets back JSON with the member's name and, for a blank permit, its id
 
 Permits issued this way show up on the member's profile like any other, and record which device issued them.
 
+## List pages
+
+The pages that list things — members, Authentik and Slack accounts, membership applications, incident reports, access logs, parking notices and each of the payment sources — are all built the same way, so learning one teaches the rest.
+
+Under the page title is a line saying how much you are looking at. Below that are the filters, in one of two shapes. A **row of counted tiles** is a set you pick between: clicking **Unlinked** shows only those, clicking **All** goes back. **Rows of chips**, each with a label on the left, are filters that stack: pick a membership state and a payment plan and you get members who are both, and clicking a chip you already have on turns just that one off. A strip appears above the list naming everything it is narrowed to, with **Clear filters** to drop the lot.
+
+The search box narrows the list as you type. On the longer lists it searches on the server, so it reaches every record rather than only the page in front of you; on short ones it filters the rows already on screen. Email addresses are encrypted, so a search matches only a **whole** address, never part of one.
+
+Rows that still need someone to do something — a payment nobody has linked to a member, a badge scan with a name but no account — are tinted and carry the button that deals with them. When a list comes back empty it says whether nothing matched your filters or there is nothing there yet.
+
 ## Payment lists
 
 **Payments** in the navbar lists each source separately — PayPal, Recharge, Ko-fi and cash — and the four pages work the same way.

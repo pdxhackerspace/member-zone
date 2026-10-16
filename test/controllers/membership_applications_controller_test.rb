@@ -231,7 +231,7 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     get membership_applications_path
 
     assert_response :success
-    assert_select 'a.nav-link.active', text: /Open/
+    assert_select 'a.filter-chip.active', text: /Open/
     assert_select 'a[href=?]', membership_application_path(open_app)
     assert_select 'a[href=?]', membership_application_path(closed_app), count: 0
   end
@@ -266,7 +266,7 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     get membership_applications_path(status: 'unlinked')
 
     assert_response :success
-    assert_select 'a.nav-link.active', text: /Unlinked/
+    assert_select 'a.filter-chip.active', text: /Unlinked/
     assert_select 'a[href=?]', membership_application_path(keep)
     assert_select 'a[href=?]', membership_application_path(filtered_open), count: 0
     assert_select 'a[href=?]', membership_application_path(filtered_rejected), count: 0
@@ -296,7 +296,7 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     expected_count = MembershipApplication.where(status: 'approved').where(user_id: nil).count
-    assert_select "a[href='#{membership_applications_path(status: 'unlinked')}'] span.badge",
+    assert_select "a[href='#{membership_applications_path(status: 'unlinked')}'] span.count",
                   text: expected_count.to_s
   end
 
@@ -960,7 +960,7 @@ class MembershipApplicationsControllerTest < ActionDispatch::IntegrationTest
     get membership_applications_path(status: 'initiated')
 
     assert_response :success
-    assert_select 'a.nav-link.active', text: /Initiated/
+    assert_select 'a.filter-chip.active', text: /Initiated/
     assert_match verification.email, response.body
     assert_select 'a[href=?]', membership_application_path(received)
     assert_select 'a[href=?]', mail_log_entry_path(mail_log)

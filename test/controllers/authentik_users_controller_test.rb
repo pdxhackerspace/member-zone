@@ -31,6 +31,37 @@ class AuthentikUsersControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'Authentik source is disabled.', flash[:alert]
   end
 
+  # Whether an account is linked and whether it is active used to share one param, so you
+  # could not ask for both at once. They are separate axes now, and the old links still work.
+  test 'index filters on the link and account axes at the same time' do
+    linked_active = AuthentikUser.create!(authentik_id: 'axes-linked-active', username: 'axes-linked-active',
+                                          full_name: 'Axes Linked Active', is_active: true,
+                                          user: users(:member_with_local_account), raw_attributes: {})
+    unlinked_inactive = AuthentikUser.create!(authentik_id: 'axes-unlinked-inactive',
+                                              username: 'axes-unlinked-inactive',
+                                              full_name: 'Axes Unlinked Inactive', is_active: false,
+                                              raw_attributes: {})
+
+    get authentik_users_path(filter: 'unlinked', status: 'inactive')
+
+    assert_response :success
+    assert_select 'a[href=?]', authentik_user_path(unlinked_inactive)
+    assert_select 'a[href=?]', authentik_user_path(linked_active), count: 0
+  end
+
+  test 'index still honours the old single filter param for account status' do
+    inactive = AuthentikUser.create!(authentik_id: 'legacy-inactive', username: 'legacy-inactive',
+                                     full_name: 'Legacy Inactive', is_active: false, raw_attributes: {})
+    active = AuthentikUser.create!(authentik_id: 'legacy-active', username: 'legacy-active',
+                                   full_name: 'Legacy Active', is_active: true, raw_attributes: {})
+
+    get authentik_users_path(filter: 'inactive')
+
+    assert_response :success
+    assert_select 'a[href=?]', authentik_user_path(inactive)
+    assert_select 'a[href=?]', authentik_user_path(active), count: 0
+  end
+
   test 'index does not show the email column' do
     AuthentikUser.create!(
       authentik_id: 'authentik-index-privacy',

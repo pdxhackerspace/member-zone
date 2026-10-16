@@ -1,4 +1,4 @@
-<%= render layout: 'shared/payment_index_header',
+<%= render layout: 'shared/list_page_header',
            locals: { title: 'Recharge payments', count: @payment_count, total_amount: @total_amount } do %>
   <% if can?(:'payments.sync') %>
     <%= button_to 'Sync now', sync_recharge_payments_path, method: :post,
@@ -27,11 +27,11 @@
 
 <% if @filter_active %>
   <% filter_label = { 'yes' => 'Linked', 'no' => 'Unlinked', 'dont_link' => "Don't link" }[params[:linked]] %>
-  <%= render 'shared/payment_filter_banner', label: "#{filter_label || 'Searched'} payments",
+  <%= render 'shared/list_filter_banner', label: "#{filter_label || 'Searched'} payments",
              shown: @payment_count, total: @total_count, clear_path: recharge_payments_path %>
 <% end %>
 
-<%= render 'shared/payment_filter_tiles', tiles: [
+<%= render 'shared/list_filter_tiles', tiles: [
       { label: 'All', count: @total_count, path: recharge_payments_path, active: params[:linked].blank? },
       { label: 'Linked', count: @linked_count, path: recharge_payments_path(linked: 'yes'),
         active: params[:linked] == 'yes' },
@@ -68,12 +68,12 @@
   </div>
 </div>
 
-<%= render 'shared/payment_search', url: recharge_payments_path, frame: 'recharge_payments_results',
+<%= render 'shared/list_search', url: recharge_payments_path, frame: 'recharge_payments_results',
            placeholder: 'Search by charge ID, customer name, full email, or status…' %>
 
 <%= turbo_frame_tag 'recharge_payments_results' do %>
   <% if @payments.any? %>
-    <%= render layout: 'shared/payment_table',
+    <%= render layout: 'shared/list_table',
                locals: { body_id: 'recharge_payments_table_body',
                          headers: ['Charge', 'Status', ['Amount', 'num'], 'Member', 'Processed'] } do %>
       <% @payments.each do |payment| %>
@@ -92,21 +92,21 @@
             <%= link_to payment.recharge_id, recharge_payment_path(payment),
                         class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
           </td>
-          <td><%= payment_status_cell(payment.status) %></td>
-          <td class="num"><%= payment_money_tag(payment.amount, payment.currency) %></td>
+          <td><%= list_status_cell(payment.status) %></td>
+          <td class="num"><%= list_money_tag(payment.amount, payment.currency) %></td>
           <td class="recharge-payment-member">
             <%= render 'shared/payment_member_cell', payment: payment, name: payment.customer_name,
                        link_path: recharge_payment_path(payment), unlinked: unlinked,
                        empty_label: 'Unnamed customer' %>
           </td>
-          <td><%= payment_time_tag(payment.processed_at) %></td>
+          <td><%= list_time_tag(payment.processed_at) %></td>
         </tr>
       <% end %>
     <% end %>
   <% elsif @filter_active %>
-    <%= render 'shared/payment_empty', icon: 'arrow-repeat', message: 'No Recharge payments match these filters.' %>
+    <%= render 'shared/list_empty', icon: 'arrow-repeat', message: 'No Recharge payments match these filters.' %>
   <% else %>
-    <%= render 'shared/payment_empty', icon: 'arrow-repeat',
+    <%= render 'shared/list_empty', icon: 'arrow-repeat',
                message: 'No Recharge payments have been synced yet.' %>
   <% end %>
   <%= render 'shared/pagination', pagy: @pagy %>

@@ -1,168 +1,94 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Authentik Users</h1>
-    <p class="text-muted mb-0">Users from Authentik identity provider.</p>
-  </div>
-  <div class="d-flex gap-2">
-    <% if MemberSource.enabled?('authentik') %>
-      <%= button_to "Sync from Authentik", sync_authentik_users_path, method: :post, class: "btn btn-primary", data: { turbo: false } %>
-    <% else %>
-      <button class="btn btn-secondary" disabled title="Authentik source is disabled">Sync from Authentik</button>
-    <% end %>
-  </div>
-</div>
+<% link_path = ->(value) { authentik_users_path(filter: value, status: @status_filter) } %>
+<% status_path = ->(value) { authentik_users_path(filter: @link_filter, status: value) } %>
 
-<% if params[:filter].present? %>
-  <div class="alert alert-info py-2 mb-3 d-flex justify-content-between align-items-center">
-    <small>
-      <i class="bi bi-funnel me-1"></i> Filtering:
-      <%= case params[:filter]
-          when 'linked' then 'Linked'
-          when 'unlinked' then 'Unlinked'
-          when 'discrepancies' then 'With Discrepancies'
-          when 'active' then 'Active'
-          when 'inactive' then 'Inactive'
-          end %> users
-      (<%= @authentik_users.count %> of <%= @total_count %>)
-    </small>
-    <%= link_to "Clear filter", authentik_users_path, class: "btn btn-outline-secondary btn-sm" %>
-  </div>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Authentik users', count: @shown_count, noun: 'account' } do %>
+  <% if MemberSource.enabled?('authentik') %>
+    <%= button_to 'Sync from Authentik', sync_authentik_users_path, method: :post,
+                  class: 'btn btn-primary btn-sm', data: { turbo: false } %>
+  <% else %>
+    <button class="btn btn-outline-secondary btn-sm" disabled title="Authentik source is disabled">
+      Sync from Authentik
+    </button>
+  <% end %>
 <% end %>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <p class="small text-muted mb-3"><i class="bi bi-hand-index me-1"></i> Click any badge to filter the list</p>
-    
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <%= link_to authentik_users_path, class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:filter].blank?}" do %>
-        All: <strong><%= @total_count %></strong>
-      <% end %>
-      <%= link_to authentik_users_path(filter: 'linked'), class: "badge text-bg-success text-decoration-none #{'border border-dark border-2' if params[:filter] == 'linked'}" do %>
-        Linked: <strong><%= @linked_count %></strong>
-      <% end %>
-      <%= link_to authentik_users_path(filter: 'unlinked'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:filter] == 'unlinked'}" do %>
-        Unlinked: <strong><%= @unlinked_count %></strong>
-      <% end %>
-      <% if @discrepancy_count > 0 %>
-        <%= link_to authentik_users_path(filter: 'discrepancies'), class: "badge text-bg-danger text-decoration-none #{'border border-dark border-2' if params[:filter] == 'discrepancies'}" do %>
-          Discrepancies: <strong><%= @discrepancy_count %></strong>
-        <% end %>
-      <% end %>
-      <%= link_to authentik_users_path(filter: 'active'), class: "badge text-bg-primary text-decoration-none #{'border border-dark border-2' if params[:filter] == 'active'}" do %>
-        Active: <strong><%= @active_count %></strong>
-      <% end %>
-      <%= link_to authentik_users_path(filter: 'inactive'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:filter] == 'inactive'}" do %>
-        Inactive: <strong><%= @inactive_count %></strong>
-      <% end %>
-    </div>
-    
-    <div class="d-flex gap-2">
-      <input type="text" id="authentik_search" class="form-control" placeholder="Search by name or username…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <button type="button" id="clear_authentik_search" class="btn btn-outline-secondary d-none">Clear</button>
-    </div>
+<% if @filter_active %>
+  <% labels = [{ 'linked' => 'Linked', 'unlinked' => 'Unlinked',
+                 'discrepancies' => 'With discrepancies' }[@link_filter],
+               @status_filter&.capitalize].compact %>
+  <%= render 'shared/list_filter_banner', label: "#{labels.join(' + ')} accounts",
+             shown: @shown_count, total: @total_count, clear_path: authentik_users_path %>
+<% end %>
+
+<%= render 'shared/list_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: link_path.call(nil), active: @link_filter.blank? },
+      { label: 'Linked', count: @linked_count, path: link_path.call('linked'),
+        active: @link_filter == 'linked' },
+      { label: 'Unlinked', count: @unlinked_count, path: link_path.call('unlinked'),
+        active: @link_filter == 'unlinked', variant: 'warning' },
+      { label: 'Discrepancies', count: @discrepancy_count, path: link_path.call('discrepancies'),
+        active: @link_filter == 'discrepancies', variant: ('warning' if @discrepancy_count.positive?) }
+    ] %>
+
+<%# Whether the account is active is its own axis, so it stacks with the link filter above. %>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <%= render 'shared/list_filter_chip_row', label: 'Account', chips: [
+          { label: 'Active', count: @active_count, path: status_path.call('active'),
+            active: @status_filter == 'active' },
+          { label: 'Inactive', count: @inactive_count, path: status_path.call('inactive'),
+            active: @status_filter == 'inactive' }
+        ] %>
   </div>
 </div>
 
-<div class="card shadow-sm border-0">
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="bg-body-tertiary">
-        <tr>
-          <th scope="col">Name</th>
-          <th scope="col">Username</th>
-          <th scope="col">Linked Member</th>
-          <th scope="col">Status</th>
-          <th scope="col">Last Synced</th>
-        </tr>
-      </thead>
-      <tbody id="authentik_users_table_body">
-        <% @authentik_users.each do |authentik_user| %>
-          <tr class="authentik-user-row <%= authentik_user.has_discrepancies? ? 'table-warning' : '' %>"
-              data-search-text="<%= [
-                authentik_user.full_name,
-                authentik_user.email,
-                authentik_user.username,
-                authentik_user.user&.display_name
-              ].compact.join(' ').downcase %>">
-            <td class="fw-semibold">
-              <%= link_to authentik_user.display_name, authentik_user_path(authentik_user), class: "text-decoration-none" %>
-              <% if authentik_user.has_discrepancies? %>
-                <span class="badge text-bg-warning ms-1" title="Has discrepancies with linked user">
-                  <i class="bi bi-exclamation-triangle"></i>
-                </span>
-              <% end %>
-            </td>
-            <td>
-              <%= authentik_user.username.presence || "—" %>
-            </td>
-            <td>
-              <% if authentik_user.user.present? %>
-                <%= link_to authentik_user.user.display_name, user_path(authentik_user.user), class: "text-decoration-none" %>
-              <% else %>
-                <span class="text-muted fst-italic">Not linked</span>
-              <% end %>
-            </td>
-            <td>
-              <% if authentik_user.is_active? %>
-                <span class="badge text-bg-success">Active</span>
-              <% else %>
-                <span class="badge text-bg-secondary">Inactive</span>
-              <% end %>
-              <% if authentik_user.is_superuser? %>
-                <span class="badge text-bg-info">Superuser</span>
-              <% end %>
-            </td>
-            <td>
-              <% if authentik_user.last_synced_at %>
-                <span title="<%= authentik_user.last_synced_at.strftime('%Y-%m-%d %H:%M:%S %Z') %>">
-                  <%= time_ago_in_words(authentik_user.last_synced_at) %> ago
-                </span>
-              <% else %>
-                <span class="text-muted fst-italic">Never</span>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-</div>
+<%= render 'shared/list_search', server: false,
+           placeholder: 'Search by name, username, or linked member…' %>
 
-<script>
-  (function() {
-    const searchInput = document.getElementById('authentik_search');
-    const clearButton = document.getElementById('clear_authentik_search');
-    const tableBody = document.getElementById('authentik_users_table_body');
-    
-    if (!searchInput || !tableBody) return;
-    
-    function filterUsers() {
-      const searchTerm = searchInput.value.toLowerCase().trim();
-      const rows = tableBody.querySelectorAll('.authentik-user-row');
-      
-      rows.forEach(function(row) {
-        const searchText = row.getAttribute('data-search-text');
-        if (searchText && searchText.includes(searchTerm)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-      
-      // Show/hide clear button
-      if (clearButton) {
-        clearButton.classList.toggle('d-none', searchTerm === '');
-      }
-    }
-    
-    searchInput.addEventListener('input', filterUsers);
-    
-    if (clearButton) {
-      clearButton.addEventListener('click', function() {
-        searchInput.value = '';
-        filterUsers();
-        searchInput.focus();
-      });
-    }
-  })();
-</script>
+<% if @authentik_users.any? %>
+  <%= render layout: 'shared/list_table',
+             locals: { body_id: 'authentik_users_table_body',
+                       headers: ['Name', 'Username', 'Linked member', 'Status', 'Last synced'] } do %>
+    <% @authentik_users.each do |authentik_user| %>
+      <tr class="authentik-user-row <%= 'row-attention' if authentik_user.has_discrepancies? %>"
+          data-live-filter-target="item"
+          data-search-text="<%= [
+            authentik_user.full_name,
+            authentik_user.username,
+            authentik_user.user&.display_name
+          ].compact.join(' ').downcase %>">
+        <td>
+          <%= link_to authentik_user.display_name, authentik_user_path(authentik_user),
+                      class: 'fw-medium text-decoration-none' %>
+          <% if authentik_user.has_discrepancies? %>
+            <i class="bi bi-exclamation-triangle text-warning ms-1"
+               title="Has discrepancies with the linked member"></i>
+          <% end %>
+        </td>
+        <td><span class="text-secondary"><%= authentik_user.username.presence || '—' %></span></td>
+        <td>
+          <% if authentik_user.user.present? %>
+            <%= link_to authentik_user.user.display_name, user_path(authentik_user.user),
+                        class: 'text-decoration-none' %>
+          <% else %>
+            <span class="text-secondary fst-italic">Not linked</span>
+          <% end %>
+        </td>
+        <td>
+          <%= list_status_cell(authentik_user.is_active? ? 'Active' : 'Inactive',
+                               tone: 'muted', success: authentik_user.is_active?) %>
+          <% if authentik_user.is_superuser? %>
+            <span class="badge text-bg-info-subtle ms-1">Superuser</span>
+          <% end %>
+        </td>
+        <td><%= list_time_tag(authentik_user.last_synced_at, empty: 'Never') %></td>
+      </tr>
+    <% end %>
+  <% end %>
+<% elsif @filter_active %>
+  <%= render 'shared/list_empty', icon: 'person-badge', message: 'No Authentik accounts match these filters.' %>
+<% else %>
+  <%= render 'shared/list_empty', icon: 'person-badge',
+             message: 'No Authentik accounts have been synced yet.' %>
+<% end %>

@@ -1,0 +1,13 @@
+<%# Says what the list is narrowed to and offers the way back out. Locals: label, shown,
+    clear_path; optional total (the unfiltered count) and noun. %>
+<div class="alert alert-info py-2 mb-3 d-flex justify-content-between align-items-center text-13">
+  <div>
+    <i class="bi bi-funnel me-1"></i> Filtering: <%= label %>
+    <% if local_assigns[:total] %>
+      (<%= number_with_delimiter(shown) %> of <%= number_with_delimiter(total) %><%= " #{local_assigns[:noun].to_s.pluralize}" if local_assigns[:noun] %>)
+    <% else %>
+      (<%= number_with_delimiter(shown) %><%= " #{local_assigns[:noun].to_s.pluralize(shown)}" if local_assigns[:noun] %>)
+    <% end %>
+  </div>
+  <%= link_to 'Clear filters', clear_path, class: 'btn btn-outline-secondary btn-sm' %>
+</div>

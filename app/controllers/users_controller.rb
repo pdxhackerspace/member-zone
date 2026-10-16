@@ -136,11 +136,8 @@ class UsersController < AuthenticatedController
 
     @membership_state_counts = filtered_members.group(:membership_state).count
 
-    @payment_type_unknown = filtered_members.where(payment_type: 'unknown').count
-    @payment_type_sponsored = filtered_members.where(payment_type: 'sponsored').count
-    @payment_type_paypal = filtered_members.where(payment_type: 'paypal').count
-    @payment_type_recharge = filtered_members.where(payment_type: 'recharge').count
-    @payment_type_cash = filtered_members.where(payment_type: 'cash').count
+    # One grouped count rather than five scans; the chip row reads it by key.
+    @payment_type_counts = filtered_members.group(:payment_type).count
 
     @membership_plans = MembershipPlan.ordered.to_a
     @plan_counts = @membership_plans.map { |plan| [plan, filtered_members.where(membership_plan_id: plan.id).count] }
