@@ -21,59 +21,61 @@
         active: params[:status] == 'resolved' }
     ] %>
 
-<%= render 'shared/list_search', server: false,
-           placeholder: 'Search by subject, type, reporter, or involved members…' %>
+<%= render layout: 'shared/list_client_filter' do %>
+  <%= render 'shared/list_search', server: false,
+             placeholder: 'Search by subject, type, reporter, or involved members…' %>
 
-<% if @incident_reports.any? %>
-  <%= render layout: 'shared/list_table',
-             locals: { body_id: 'incident_reports_table_body',
-                       headers: ['Date', 'Subject', 'Status', 'Type', 'Reporter', 'Involved members'] } do %>
-    <% @incident_reports.each do |report| %>
-      <tr class="incident-report-row <%= 'row-attention' if report.status == 'in_progress' %>"
-          data-live-filter-target="item"
-          data-search-text="<%= [
-            report.subject,
-            report.incident_type_display,
-            report.status_display,
-            report.reporter&.display_name,
-            report.involved_members.map(&:display_name).join(' ')
-          ].compact.join(' ').downcase %>">
-        <td><%= list_time_tag(report.incident_date) %></td>
-        <td>
-          <%= link_to report.subject, incident_report_path(report), class: 'fw-medium text-decoration-none' %>
-        </td>
-        <td>
-          <%= list_status_cell(report.status_display, success: report.status == 'resolved',
-                               tone: report.status == 'in_progress' ? 'warning' : 'muted') %>
-        </td>
-        <td>
-          <span class="badge text-bg-<%= incident_type_badge_class(report.incident_type) %>-subtle">
-            <%= report.incident_type_display %>
-          </span>
-        </td>
-        <td>
-          <% if report.reporter %>
-            <%= link_to report.reporter.display_name, user_path(report.reporter), class: 'text-decoration-none' %>
-          <% else %>
-            <span class="text-secondary fst-italic">Unknown</span>
-          <% end %>
-        </td>
-        <td>
-          <% if report.involved_members.any? %>
-            <%= safe_join(report.involved_members.map do |member|
-                  link_to member.display_name, user_path(member), class: 'text-decoration-none'
-                end, ', ') %>
-          <% else %>
-            <span class="text-secondary">—</span>
-          <% end %>
-        </td>
-      </tr>
+  <% if @incident_reports.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'incident_reports_table_body',
+                         headers: ['Date', 'Subject', 'Status', 'Type', 'Reporter', 'Involved members'] } do %>
+      <% @incident_reports.each do |report| %>
+        <tr class="incident-report-row <%= 'row-attention' if report.status == 'in_progress' %>"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              report.subject,
+              report.incident_type_display,
+              report.status_display,
+              report.reporter&.display_name,
+              report.involved_members.map(&:display_name).join(' ')
+            ].compact.join(' ').downcase %>">
+          <td><%= list_time_tag(report.incident_date) %></td>
+          <td>
+            <%= link_to report.subject, incident_report_path(report), class: 'fw-medium text-decoration-none' %>
+          </td>
+          <td>
+            <%= list_status_cell(report.status_display, success: report.status == 'resolved',
+                                 tone: report.status == 'in_progress' ? 'warning' : 'muted') %>
+          </td>
+          <td>
+            <span class="badge text-bg-<%= incident_type_badge_class(report.incident_type) %>-subtle">
+              <%= report.incident_type_display %>
+            </span>
+          </td>
+          <td>
+            <% if report.reporter %>
+              <%= link_to report.reporter.display_name, user_path(report.reporter), class: 'text-decoration-none' %>
+            <% else %>
+              <span class="text-secondary fst-italic">Unknown</span>
+            <% end %>
+          </td>
+          <td>
+            <% if report.involved_members.any? %>
+              <%= safe_join(report.involved_members.map do |member|
+                    link_to member.display_name, user_path(member), class: 'text-decoration-none'
+                  end, ', ') %>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
     <% end %>
+  <% elsif params[:status].present? %>
+    <%= render 'shared/list_empty', icon: 'exclamation-octagon',
+               message: 'No incident reports match this filter.' %>
+  <% else %>
+    <%= render 'shared/list_empty', icon: 'exclamation-octagon',
+               message: 'No incident reports have been filed yet.' %>
   <% end %>
-<% elsif params[:status].present? %>
-  <%= render 'shared/list_empty', icon: 'exclamation-octagon',
-             message: 'No incident reports match this filter.' %>
-<% else %>
-  <%= render 'shared/list_empty', icon: 'exclamation-octagon',
-             message: 'No incident reports have been filed yet.' %>
 <% end %>

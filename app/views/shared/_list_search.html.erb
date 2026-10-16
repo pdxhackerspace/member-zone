@@ -3,7 +3,9 @@
     With server: true (the default) it submits to the server inside a turbo frame, so the
     search reaches every record rather than the page in front of you; the page number is
     deliberately dropped from the carried-over params, since a new search starts at page one.
-    With server: false it filters the rows already on the page, for lists that render whole.
+    With server: false it filters the rows already on the page, for lists that render whole; the
+    caller wraps that page's search and table in shared/_list_client_filter, because the input
+    and the rows it hides have to share one controller element.
 
     Locals: placeholder; url and frame when server; rows already carry
     data-live-filter-target="item" and data-search-text either way. %>
@@ -30,7 +32,7 @@
     </div>
   <% end %>
 <% else %>
-  <div class="card shadow-sm border-0 mb-3" data-controller="live-filter">
+  <div class="card shadow-sm border-0 mb-3">
     <div class="card-body"><%= field %></div>
   </div>
 <% end %>

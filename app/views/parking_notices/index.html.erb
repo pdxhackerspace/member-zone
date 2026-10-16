@@ -1,5 +1,9 @@
+<%# The type row has no All chip, so picking the type already showing clears that axis and
+    leaves the status tiles alone. %>
 <% status_path = ->(value) { parking_notices_path(status: value, type: params[:type]) } %>
-<% type_path = ->(value) { parking_notices_path(status: params[:status], type: value) } %>
+<% type_path = lambda { |value|
+     parking_notices_path(status: params[:status], type: (value unless params[:type] == value))
+   } %>
 
 <%= render layout: 'shared/list_page_header',
            locals: { title: 'Parking notices', count: @notice_count, noun: 'notice' } do %>

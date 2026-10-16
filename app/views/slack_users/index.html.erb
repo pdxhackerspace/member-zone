@@ -83,100 +83,102 @@
   </div>
 </div>
 
-<%= render 'shared/list_search', server: false, placeholder: 'Search by name or linked member…' %>
+<%= render layout: 'shared/list_client_filter' do %>
+  <%= render 'shared/list_search', server: false, placeholder: 'Search by name or linked member…' %>
 
-<% if @slack_users.any? %>
-  <%= render layout: 'shared/list_table',
-             locals: { body_id: 'slack_users_table_body',
-                       headers: [['', 'avatar-col'],
-                                 sortable_column('display_name', 'Name', @sort_column, @sort_direction),
-                                 'Linked member',
-                                 sortable_column('is_admin', 'Admin', @sort_column, @sort_direction),
-                                 sortable_column('is_owner', 'Owner', @sort_column, @sort_direction),
-                                 sortable_column('is_bot', 'Bot', @sort_column, @sort_direction),
-                                 sortable_column('deleted', 'Status', @sort_column, @sort_direction),
-                                 ['', 'text-end']] } do %>
-    <% @slack_users.each do |slack_user| %>
-      <% needs_linking = slack_user.user.blank? && !slack_user.is_bot? && !slack_user.dont_link? %>
-      <tr class="slack-user-row <%= 'row-attention' if needs_linking %>"
-          data-live-filter-target="item"
-          data-search-text="<%= [
-            slack_user.display_name,
-            slack_user.user&.display_name,
-            slack_user.is_admin? ? 'admin' : nil,
-            slack_user.is_owner? ? 'owner' : nil,
-            slack_user.is_bot? ? 'bot' : 'human',
-            slack_user.deleted? ? 'deactivated' : (slack_user.inactive? ? 'inactive' : 'active'),
-            slack_user.dont_link? ? 'dont link' : nil
-          ].compact.join(' ').downcase %>">
-        <td>
-          <% image_url = slack_user.raw_attributes.dig('profile', 'image_32') %>
-          <% if image_url.present? %>
-            <%= link_to slack_user_path(slack_user, @list_params) do %>
-              <img src="<%= image_url %>" alt="" class="list-avatar">
+  <% if @slack_users.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'slack_users_table_body',
+                         headers: [['', 'avatar-col'],
+                                   sortable_column('display_name', 'Name', @sort_column, @sort_direction),
+                                   'Linked member',
+                                   sortable_column('is_admin', 'Admin', @sort_column, @sort_direction),
+                                   sortable_column('is_owner', 'Owner', @sort_column, @sort_direction),
+                                   sortable_column('is_bot', 'Bot', @sort_column, @sort_direction),
+                                   sortable_column('deleted', 'Status', @sort_column, @sort_direction),
+                                   ['', 'text-end']] } do %>
+      <% @slack_users.each do |slack_user| %>
+        <% needs_linking = slack_user.user.blank? && !slack_user.is_bot? && !slack_user.dont_link? %>
+        <tr class="slack-user-row <%= 'row-attention' if needs_linking %>"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              slack_user.display_name,
+              slack_user.user&.display_name,
+              slack_user.is_admin? ? 'admin' : nil,
+              slack_user.is_owner? ? 'owner' : nil,
+              slack_user.is_bot? ? 'bot' : 'human',
+              slack_user.deleted? ? 'deactivated' : (slack_user.inactive? ? 'inactive' : 'active'),
+              slack_user.dont_link? ? 'dont link' : nil
+            ].compact.join(' ').downcase %>">
+          <td>
+            <% image_url = slack_user.raw_attributes.dig('profile', 'image_32') %>
+            <% if image_url.present? %>
+              <%= link_to slack_user_path(slack_user, @list_params) do %>
+                <img src="<%= image_url %>" alt="" class="list-avatar">
+              <% end %>
             <% end %>
-          <% end %>
-        </td>
-        <td>
-          <%= link_to slack_user.display_name, slack_user_path(slack_user, @list_params),
-                      class: 'fw-medium text-decoration-none' %>
-        </td>
-        <td>
-          <% if slack_user.user.present? %>
-            <%= link_to slack_user.user.display_name, user_path(slack_user.user), class: 'text-decoration-none' %>
-          <% elsif slack_user.dont_link? %>
-            <span class="text-secondary">Don't link</span>
-          <% else %>
-            <span class="text-secondary fst-italic">Not linked</span>
-          <% end %>
-        </td>
-        <td><%= slack_user.is_admin? ? tag.span('Admin', class: 'badge text-bg-info-subtle') : tag.span('—', class: 'text-secondary') %></td>
-        <td><%= slack_user.is_owner? ? tag.span('Owner', class: 'badge text-bg-warning-subtle') : tag.span('—', class: 'text-secondary') %></td>
-        <td><%= slack_user.is_bot? ? tag.span('Bot', class: 'badge text-bg-secondary-subtle') : tag.span('—', class: 'text-secondary') %></td>
-        <td>
-          <% if slack_user.deleted? %>
-            <%= list_status_cell('Deactivated', tone: 'danger', success: false) %>
-          <% elsif slack_user.inactive? %>
-            <%= list_status_cell('Inactive', tone: 'warning', success: false) %>
-          <% else %>
-            <%= list_status_cell('Active', success: true) %>
-          <% end %>
-        </td>
-        <td class="text-end text-nowrap">
-          <% if needs_linking %>
-            <div class="d-flex gap-1 justify-content-end">
-              <button type="button" class="btn btn-sm btn-outline-warning"
-                      data-bs-toggle="modal" data-bs-target="#slackLinkUserModal"
-                      data-slack-user-id="<%= slack_user.id %>"
-                      data-slack-user-name="<%= slack_user.display_name %>">Link member…</button>
-              <div class="dropdown">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
-                        aria-expanded="false" aria-label="More actions">&hellip;</button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li>
-                    <%= button_to "Don't link", toggle_dont_link_slack_user_path(slack_user, from_index: 'true',
-                                                                                 **@list_params),
-                                  method: :post, class: 'dropdown-item', data: { turbo: false } %>
-                  </li>
-                  <li>
-                    <%= button_to 'Create member', create_member_slack_user_path(slack_user, from_index: 'true',
-                                                                                 **@list_params),
-                                  method: :post, class: 'dropdown-item',
-                                  data: { turbo: false,
-                                          turbo_confirm: "Create a new member from '#{slack_user.display_name}'?" } %>
-                  </li>
-                </ul>
+          </td>
+          <td>
+            <%= link_to slack_user.display_name, slack_user_path(slack_user, @list_params),
+                        class: 'fw-medium text-decoration-none' %>
+          </td>
+          <td>
+            <% if slack_user.user.present? %>
+              <%= link_to slack_user.user.display_name, user_path(slack_user.user), class: 'text-decoration-none' %>
+            <% elsif slack_user.dont_link? %>
+              <span class="text-secondary">Don't link</span>
+            <% else %>
+              <span class="text-secondary fst-italic">Not linked</span>
+            <% end %>
+          </td>
+          <td><%= slack_user.is_admin? ? tag.span('Admin', class: 'badge text-bg-info-subtle') : tag.span('—', class: 'text-secondary') %></td>
+          <td><%= slack_user.is_owner? ? tag.span('Owner', class: 'badge text-bg-warning-subtle') : tag.span('—', class: 'text-secondary') %></td>
+          <td><%= slack_user.is_bot? ? tag.span('Bot', class: 'badge text-bg-secondary-subtle') : tag.span('—', class: 'text-secondary') %></td>
+          <td>
+            <% if slack_user.deleted? %>
+              <%= list_status_cell('Deactivated', tone: 'danger', success: false) %>
+            <% elsif slack_user.inactive? %>
+              <%= list_status_cell('Inactive', tone: 'warning', success: false) %>
+            <% else %>
+              <%= list_status_cell('Active', success: true) %>
+            <% end %>
+          </td>
+          <td class="text-end text-nowrap">
+            <% if needs_linking %>
+              <div class="d-flex gap-1 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="modal" data-bs-target="#slackLinkUserModal"
+                        data-slack-user-id="<%= slack_user.id %>"
+                        data-slack-user-name="<%= slack_user.display_name %>">Link member…</button>
+                <div class="dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                          aria-expanded="false" aria-label="More actions">&hellip;</button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <%= button_to "Don't link", toggle_dont_link_slack_user_path(slack_user, from_index: 'true',
+                                                                                   **@list_params),
+                                    method: :post, class: 'dropdown-item', data: { turbo: false } %>
+                    </li>
+                    <li>
+                      <%= button_to 'Create member', create_member_slack_user_path(slack_user, from_index: 'true',
+                                                                                   **@list_params),
+                                    method: :post, class: 'dropdown-item',
+                                    data: { turbo: false,
+                                            turbo_confirm: "Create a new member from '#{slack_user.display_name}'?" } %>
+                    </li>
+                  </ul>
+                </div>
               </div>
-            </div>
-          <% end %>
-        </td>
-      </tr>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
     <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts match these filters.' %>
+  <% else %>
+    <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts have been synced yet.' %>
   <% end %>
-<% elsif @filter_active %>
-  <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts match these filters.' %>
-<% else %>
-  <%= render 'shared/list_empty', icon: 'slack', message: 'No Slack accounts have been synced yet.' %>
 <% end %>
 
 <!-- Import Members Modal -->
@@ -232,118 +234,6 @@
         </div>
       <% end %>
     </div>
-  </div>
-</div>
-
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <div class="d-flex gap-2">
-      <input type="text" id="slack_search" class="form-control" placeholder="Search by name or linked user…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <button type="button" id="clear_slack_search" class="btn btn-outline-secondary d-none">Clear</button>
-    </div>
-  </div>
-</div>
-
-<div class="card shadow-sm border-0">
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="bg-body-tertiary">
-        <tr>
-          <th scope="col" style="width: 48px;"></th>
-          <th scope="col"><%= sortable_column('display_name', 'Name', @sort_column, @sort_direction) %></th>
-          <th scope="col">Linked Member</th>
-          <th scope="col"><%= sortable_column('is_admin', 'Admin', @sort_column, @sort_direction) %></th>
-          <th scope="col"><%= sortable_column('is_owner', 'Owner', @sort_column, @sort_direction) %></th>
-          <th scope="col"><%= sortable_column('is_bot', 'Bot', @sort_column, @sort_direction) %></th>
-          <th scope="col"><%= sortable_column('deleted', 'Status', @sort_column, @sort_direction) %></th>
-          <th scope="col" class="text-end"></th>
-        </tr>
-      </thead>
-      <tbody id="slack_users_table_body">
-        <% @slack_users.each do |slack_user| %>
-          <tr class="slack-user-row" 
-              data-search-text="<%= [
-                slack_user.display_name,
-                slack_user.email,
-                slack_user.user&.display_name,
-                slack_user.is_admin? ? "admin yes" : "admin no",
-                slack_user.is_owner? ? "owner yes" : "owner no",
-                slack_user.is_bot? ? "bot" : "human",
-                slack_user.deleted? ? "disabled deactivated" : (slack_user.inactive? ? "inactive" : "active"),
-                slack_user.dont_link? ? "dont link" : nil
-              ].compact.join(' ').downcase %>">
-            <td>
-              <% image_url = slack_user.raw_attributes.dig("profile", "image_32") %>
-              <% if image_url.present? %>
-                <%= link_to slack_user_path(slack_user, @list_params) do %>
-                  <img src="<%= image_url %>" alt="<%= slack_user.display_name %>" style="width: 32px; height: 32px; border-radius: 4px;">
-                <% end %>
-              <% end %>
-            </td>
-            <td class="fw-semibold">
-              <%= link_to slack_user.display_name, slack_user_path(slack_user, @list_params), class: "text-decoration-none" %>
-            </td>
-            <td>
-              <% if slack_user.user.present? %>
-                <%= link_to slack_user.user.display_name, user_path(slack_user.user), class: "text-decoration-none" %>
-              <% elsif slack_user.dont_link? %>
-                <span class="badge text-bg-secondary">Don't Link</span>
-              <% else %>
-                <span class="text-muted fst-italic">Not linked</span>
-              <% end %>
-            </td>
-            <td>
-              <span class="badge text-bg-<%= slack_user.is_admin? ? 'primary' : 'secondary' %>">
-                <%= slack_user.is_admin? ? "Yes" : "No" %>
-              </span>
-            </td>
-            <td>
-              <span class="badge text-bg-<%= slack_user.is_owner? ? 'warning' : 'secondary' %>">
-                <%= slack_user.is_owner? ? "Yes" : "No" %>
-              </span>
-            </td>
-            <td>
-              <span class="badge text-bg-<%= slack_user.is_bot? ? 'info' : 'secondary' %>">
-                <%= slack_user.is_bot? ? "Bot" : "Human" %>
-              </span>
-            </td>
-            <td>
-              <% status_label = if slack_user.deleted?
-                                  "Deactivated"
-                                elsif slack_user.inactive?
-                                  "Inactive"
-                                else
-                                  "Active"
-                                end %>
-              <% status_class = if slack_user.deleted?
-                                  "danger-subtle"
-                                elsif slack_user.inactive?
-                                  "warning-subtle"
-                                else
-                                  "success-subtle"
-                                end %>
-              <span class="badge text-bg-<%= status_class %>">
-                <%= status_label %>
-              </span>
-            </td>
-            <td class="text-end text-nowrap">
-              <% if slack_user.user.blank? && !slack_user.is_bot? && !slack_user.dont_link? %>
-                <button type="button" class="btn btn-sm btn-outline-primary"
-                        data-bs-toggle="modal" data-bs-target="#slackLinkUserModal"
-                        data-slack-user-id="<%= slack_user.id %>" data-slack-user-name="<%= slack_user.display_name %>">
-                  Link
-                </button>
-                <%= button_to "Don't Link", toggle_dont_link_slack_user_path(slack_user, from_index: 'true', **@list_params),
-                    method: :post, class: "btn btn-sm btn-outline-secondary", data: { turbo: false } %>
-                <%= button_to "Create Member", create_member_slack_user_path(slack_user, from_index: 'true', **@list_params),
-                    method: :post, class: "btn btn-sm btn-outline-success", data: { turbo: false,
-                    turbo_confirm: "Create a new member from '#{slack_user.display_name}'?" } %>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
   </div>
 </div>
 

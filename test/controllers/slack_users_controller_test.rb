@@ -18,6 +18,26 @@ class SlackUsersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  # A rewrite of this page once left the old table in place below the import modals, so every
+  # account rendered twice and the stale rows carried email addresses in their search text.
+  test 'index renders each account exactly once' do
+    get slack_users_path
+
+    assert_response :success
+    assert_select 'table', 1
+    assert_select 'tr.slack-user-row', SlackUser.count
+  end
+
+  # The search input and the rows it hides have to share one live-filter element, or typing
+  # filters nothing.
+  test 'index search and rows sit under one live-filter controller' do
+    get slack_users_path
+
+    assert_response :success
+    assert_select '[data-controller=?] input[data-live-filter-target=?]', 'live-filter', 'input'
+    assert_select '[data-controller=?] tr[data-live-filter-target=?]', 'live-filter', 'item'
+  end
+
   test 'index shows linked and unlinked counts' do
     get slack_users_path
     assert_response :success

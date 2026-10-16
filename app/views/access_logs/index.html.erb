@@ -134,7 +134,7 @@
         <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
         <input type="hidden" name="linked" value="<%= params[:linked] %>">
         <input type="hidden" name="q" value="<%= params[:q] %>">
-        <input type="hidden" name="page" value="<%= @page %>">
+        <input type="hidden" name="page" value="<%= params[:page] %>">
         <div class="modal-body">
           <p class="mb-3">Linking access log entry for <strong id="linkLogName"></strong>. Other entries with the same name will also be linked, and the name will be added as an alias if it differs.</p>
           <div class="mb-3">

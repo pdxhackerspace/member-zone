@@ -29,19 +29,16 @@
              total: @total_count, clear_path: sheet_entries_path %>
 <% end %>
 
-<%= render 'shared/list_filter_tiles', tiles: [
-      { label: 'All', count: @total_count, path: sheet_entries_path, active: params[:filter].blank? },
-      { label: 'Linked', count: @linked_count, path: sheet_entries_path(filter: 'linked'),
-        active: params[:filter] == 'linked' },
-      { label: 'Unlinked', count: @unlinked_count, path: sheet_entries_path(filter: 'unlinked'),
-        active: params[:filter] == 'unlinked', variant: 'warning' }
-    ] %>
-
-<%# Paying, sponsored, inactive and having an email are facts about the roster row rather than
-    the one bucket question above, so they read as chips. %>
+<%# The controller settles on one `filter` param, so these are one axis of seven buckets,
+    not a tile row with a second axis under it — and seven is past what a tile row carries. %>
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body py-2">
-    <%= render 'shared/list_filter_chip_row', label: 'Roster', chips: [
+    <%= render 'shared/list_filter_chip_row', label: 'Entries', chips: [
+          { label: 'All', count: @total_count, path: sheet_entries_path, active: params[:filter].blank? },
+          { label: 'Linked', count: @linked_count, path: sheet_entries_path(filter: 'linked'),
+            active: params[:filter] == 'linked' },
+          { label: 'Unlinked', count: @unlinked_count, path: sheet_entries_path(filter: 'unlinked'),
+            active: params[:filter] == 'unlinked', variant: 'warning' },
           { label: 'Paying', count: @paying_count, path: sheet_entries_path(filter: 'paying'),
             active: params[:filter] == 'paying' },
           { label: 'Sponsored', count: @sponsored_count, path: sheet_entries_path(filter: 'sponsored'),
@@ -54,41 +51,43 @@
   </div>
 </div>
 
-<%= render 'shared/list_search', server: false,
-           placeholder: 'Search by name, status, payment, or access…' %>
+<%= render layout: 'shared/list_client_filter' do %>
+  <%= render 'shared/list_search', server: false,
+             placeholder: 'Search by name, status, payment, or access…' %>
 
-<% if @sheet_entries.any? %>
-  <%= render layout: 'shared/list_table',
-             locals: { body_id: 'sheet_entries_table_body',
-                       headers: ['Name', 'Status', 'Payment', 'Access', 'Last synced'] } do %>
-    <% @sheet_entries.each do |entry| %>
-      <tr class="sheet-entry-row"
-          data-live-filter-target="item"
-          data-search-text="<%= [
-            entry.name,
-            entry.status.presence || 'inactive',
-            entry.payment,
-            entry.access_permissions.join(' ')
-          ].compact.join(' ').downcase %>">
-        <td><%= link_to entry.name, sheet_entry_path(entry), class: 'fw-medium text-decoration-none' %></td>
-        <td>
-          <%= list_status_cell(entry.status.presence || 'Inactive', tone: 'muted',
-                               success: entry.status.to_s.casecmp('active').zero?) %>
-        </td>
-        <td><span class="text-secondary"><%= entry.payment.presence || '—' %></span></td>
-        <td>
-          <% if entry.access_permissions.any? %>
-            <span class="text-secondary"><%= entry.access_permissions.join(', ') %></span>
-          <% else %>
-            <span class="text-secondary fst-italic">None recorded</span>
-          <% end %>
-        </td>
-        <td><%= list_time_tag(entry.last_synced_at, empty: 'Never') %></td>
-      </tr>
+  <% if @sheet_entries.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'sheet_entries_table_body',
+                         headers: ['Name', 'Status', 'Payment', 'Access', 'Last synced'] } do %>
+      <% @sheet_entries.each do |entry| %>
+        <tr class="sheet-entry-row"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              entry.name,
+              entry.status.presence || 'inactive',
+              entry.payment,
+              entry.access_permissions.join(' ')
+            ].compact.join(' ').downcase %>">
+          <td><%= link_to entry.name, sheet_entry_path(entry), class: 'fw-medium text-decoration-none' %></td>
+          <td>
+            <%= list_status_cell(entry.status.presence || 'Inactive', tone: 'muted',
+                                 success: entry.status.to_s.casecmp('active').zero?) %>
+          </td>
+          <td><span class="text-secondary"><%= entry.payment.presence || '—' %></span></td>
+          <td>
+            <% if entry.access_permissions.any? %>
+              <span class="text-secondary"><%= entry.access_permissions.join(', ') %></span>
+            <% else %>
+              <span class="text-secondary fst-italic">None recorded</span>
+            <% end %>
+          </td>
+          <td><%= list_time_tag(entry.last_synced_at, empty: 'Never') %></td>
+        </tr>
+      <% end %>
     <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries match these filters.' %>
+  <% else %>
+    <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries have been synced yet.' %>
   <% end %>
-<% elsif @filter_active %>
-  <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries match these filters.' %>
-<% else %>
-  <%= render 'shared/list_empty', icon: 'table', message: 'No sheet entries have been synced yet.' %>
 <% end %>
