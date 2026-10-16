@@ -455,9 +455,11 @@ paths:
     get:
       operationId: listPrinters
       summary: List printers
-      description: The printers a notice can be sent to. Either parking scope will do.
-      tags: [Parking (staff), Parking (your own)]
-      x-required-scope: parking.manage_notices or parking.own_permits
+      description: |
+        The printers a notice can be sent to. Any parking scope will do: `parking.manage_notices`,
+        `parking.own_permits`, or `parking.issue_for_members` (kiosks choosing a `printer_id`).
+      tags: [Parking (staff), Parking (your own), Parking (kiosks)]
+      x-required-scope: parking.manage_notices, parking.own_permits, or parking.issue_for_members
       responses:
         '200':
           description: Printers, in their configured order.
@@ -497,6 +499,12 @@ paths:
         - `blank` issues a permit at once, valid for two weeks, for the member to hand-write. They
           are emailed a link to record the details online and reminded until they do.
 
+        A blank permit can be printed in the same request: send `"print": true` for the default
+        printer, or `printer_id` (from `GET /parking/printers`) for a particular one. The printer is
+        checked first — an unknown `printer_id` is `404`, no printer at all is `409`, and asking to
+        print in `link` mode is `400` — so nothing is issued if it cannot be printed. If the printer
+        then refuses the job, the permit still stands and `print.error` says what went wrong.
+
         The response never contains the form link; it goes only to the member's inbox. Banned
         members and members with no email address (for `link`) get `422 ineligible_member`.
       tags: [Parking (kiosks)]
@@ -521,9 +529,20 @@ paths:
                 email:
                   type: string
                   description: The member's full email address.
+                print:
+                  type: boolean
+                  description: Print the blank permit on the default printer.
+                printer_id:
+                  type: integer
+                  description: Print the blank permit on this printer. Implies `print`.
+                layout:
+                  type: string
+                  enum: [letter]
+                  description: Force a full page on a thermal receipt printer.
             example:
               rfid: '0012345678'
               mode: blank
+              print: true
       responses:
         '201':
           description: The link was emailed, or the blank permit issued.
@@ -536,7 +555,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [mode, member, email_sent, link_expires_at, permit]
+                    required: [mode, member, email_sent, link_expires_at, permit, print]
                     additionalProperties: false
                     properties:
                       mode:
@@ -555,6 +574,24 @@ paths:
                         type: [string, 'null']
                         format: date-time
                         description: When the emailed form link stops working (link mode).
+                      print:
+                        description: What happened to the print job, or null when printing was not asked for.
+                        oneOf:
+                          - type: 'null'
+                          - type: object
+                            required: [printer_id, printer_name, job_id, error]
+                            additionalProperties: false
+                            properties:
+                              printer_id:
+                                type: integer
+                              printer_name:
+                                type: string
+                              job_id:
+                                type: [string, 'null']
+                                description: The CUPS job, when the printer accepted it.
+                              error:
+                                type: [string, 'null']
+                                description: Why it did not print. The permit was still issued.
                       permit:
                         description: The permit issued (blank mode).
                         oneOf:
@@ -578,6 +615,11 @@ paths:
                   permit:
                     id: 512
                     expires_at: '2026-10-28T17:00:00Z'
+                  print:
+                    printer_id: 3
+                    printer_name: Front desk
+                    job_id: front_desk-118
+                    error: null
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -587,7 +629,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: More than one member matches.
+          description: More than one member matches, or printing was asked for and no printer is configured.
           content:
             application/json:
               schema:

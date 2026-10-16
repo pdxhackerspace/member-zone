@@ -177,6 +177,8 @@ The device calls `POST /api/v1/parking/permit_requests` with `Authorization: Bea
 - **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
 - **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.
 
+A blank permit can also be printed on one of Member Zone's printers in the same request — the default printer, or one the device names.
+
 The device gets back JSON with the member's name and, for a blank permit, its id and expiry — enough to print a blank permit with the name on it. The form link itself only ever goes to the member's inbox. Banned and deceased members are refused, as are members with no email address when the mode is `link`.
 
 Permits issued this way show up on the member's profile like any other, and record which device issued them.
