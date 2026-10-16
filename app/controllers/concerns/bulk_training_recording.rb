@@ -17,7 +17,7 @@ module BulkTrainingRecording
     end
 
     totals = topics.map { |topic| bulk_record_topic(topic, trainee_ids) }
-    finish_bulk(topics, totals, trainee_ids)
+    finish_bulk(topics, totals)
   end
 
   private
@@ -50,14 +50,15 @@ module BulkTrainingRecording
     if recording_trainers?
       result = TrainerAppointer.new(**options).call
       { done: result.appointed_count, trained: result.trained_count, skipped: result.skipped_count,
-        inactive: result.inactive_count }
+        inactive: result.inactive_trainee_ids }
     else
       result = TrainingRecorder.new(**options).call
-      { done: result.recorded_count, trained: 0, skipped: result.skipped_count, inactive: result.inactive_count }
+      { done: result.recorded_count, trained: 0, skipped: result.skipped_count,
+        inactive: result.inactive_trainee_ids }
     end
   end
 
-  def finish_bulk(topics, totals, trainee_ids)
+  def finish_bulk(topics, totals)
     sum = ->(key) { totals.sum { |total| total[key] } }
     if sum.call(:done).zero?
       return redirect_to(record_training_path, alert: 'Nothing was recorded. Everyone selected was already ' \
@@ -65,10 +66,10 @@ module BulkTrainingRecording
                                                       'or could not be.')
     end
 
-    redirect_to training_catalog_path, notice: bulk_notice(topics, sum, trainee_ids)
+    redirect_to training_catalog_path, notice: bulk_notice(topics, totals, sum)
   end
 
-  def bulk_notice(topics, sum, trainee_ids)
+  def bulk_notice(topics, totals, sum)
     done = sum.call(:done)
     headline = if recording_trainers?
                  "Made #{done} #{'trainer'.pluralize(done)} in #{topics.map(&:name).to_sentence}."
@@ -78,13 +79,9 @@ module BulkTrainingRecording
     trained = sum.call(:trained)
     headline += " Also recorded #{trained} #{'training'.pluralize(trained)}." if trained.positive?
     headline += " #{sum.call(:skipped)} skipped." if sum.call(:skipped).positive?
-    headline + bulk_inactive_note(sum.call(:inactive).positive? ? inactive_member_count(trainee_ids) : 0)
-  end
-
-  # The services count events, so a member in three topics would count three times; the
-  # note is about people.
-  def inactive_member_count(trainee_ids)
-    User.where(id: trainee_ids).count { |user| !user.active? && !user.banned? }
+    # The services report events; the note is about people, so a member acted on in three
+    # topics counts once, and one who was skipped everywhere doesn't count at all.
+    headline + bulk_inactive_note(totals.flat_map { |total| total[:inactive] }.uniq.size)
   end
 
   def bulk_inactive_note(count)

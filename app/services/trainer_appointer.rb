@@ -1,5 +1,5 @@
 class TrainerAppointer
-  Result = Struct.new(:appointed_count, :trained_count, :skipped_count, :inactive_count)
+  Result = Struct.new(:appointed_count, :trained_count, :skipped_count, :inactive_trainee_ids)
 
   # A trainer has to hold the topic themselves, so appointing someone who was never
   # recorded as trained records that training too, dated and attributed like any other.
@@ -17,7 +17,7 @@ class TrainerAppointer
 
   def call
     trainees = User.where(id: trainee_ids).index_by { |user| user.id.to_s }
-    result = Result.new(0, 0, trainee_ids.count { |id| trainees[id].nil? }, 0)
+    result = Result.new(0, 0, trainee_ids.count { |id| trainees[id].nil? }, [])
 
     trainee_ids.each do |trainee_id|
       trainee = trainees[trainee_id]
@@ -45,7 +45,7 @@ class TrainerAppointer
     end
     notify(trainee)
     result.appointed_count += 1
-    result.inactive_count += 1 unless trainee.active?
+    result.inactive_trainee_ids << trainee.id unless trainee.active?
   end
 
   def record_missing_training(trainee)

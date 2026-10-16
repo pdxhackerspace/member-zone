@@ -1,5 +1,5 @@
 class TrainingRecorder
-  Result = Struct.new(:recorded_count, :skipped_count, :permitted, :inactive_count)
+  Result = Struct.new(:recorded_count, :skipped_count, :permitted, :inactive_count, :inactive_trainee_ids)
 
   # rubocop:disable Metrics/ParameterLists -- keyword arguments, one per recorded field
   def initialize(current_user:, training_topic:, trainee_ids:, trainer:, trained_at:, notify_inactive: false)
@@ -22,11 +22,11 @@ class TrainingRecorder
   end
 
   def call
-    return Result.new(0, trainee_ids.size, false, 0) unless permitted?
+    return Result.new(0, trainee_ids.size, false, 0, []) unless permitted?
 
     trainees = User.where(id: trainee_ids).index_by { |user| user.id.to_s }
     @recorded_count = 0
-    @inactive_count = 0
+    @inactive_trainee_ids = []
     @skipped_count = trainee_ids.count { |id| trainees[id].nil? }
 
     trainee_ids.each do |trainee_id|
@@ -36,7 +36,7 @@ class TrainingRecorder
       training_skip_reason(trainee) ? @skipped_count += 1 : record_for(trainee)
     end
 
-    Result.new(@recorded_count, @skipped_count, true, @inactive_count)
+    Result.new(@recorded_count, @skipped_count, true, @inactive_trainee_ids.size, @inactive_trainee_ids)
   end
 
   private
@@ -53,7 +53,7 @@ class TrainingRecorder
     record_training_journal(trainee, training.trained_at)
     enqueue_training_completed_mail(trainee)
     @recorded_count += 1
-    @inactive_count += 1 unless trainee.active?
+    @inactive_trainee_ids << trainee.id unless trainee.active?
   end
 
   # Inactive members are still trainable — a lapsed membership says nothing about whether

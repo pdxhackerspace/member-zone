@@ -301,6 +301,29 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert_match '1 inactive member trained and notified.', flash[:notice]
   end
 
+  test 'bulk record leaves skipped inactive members out of the notice' do
+    sign_in_as_admin
+    inactive = make_inactive(users(:three))
+    Training.create!(trainee: inactive, training_topic: @laser_topic, trained_at: 1.week.ago)
+
+    post record_training_path, params: {
+      training_topic_ids: [@laser_topic.id, @woodworking_topic.id],
+      trainee_ids: [inactive.id, users(:no_email).id],
+      notify_inactive: '1'
+    }
+
+    assert_match 'Recorded 3 trainings', flash[:notice]
+    assert_match '1 inactive member trained and notified.', flash[:notice]
+
+    post record_training_path, params: {
+      training_topic_ids: [@laser_topic.id],
+      trainee_ids: [inactive.id, users(:two).id]
+    }
+
+    assert_match 'Recorded 1 training', flash[:notice]
+    assert_no_match 'inactive', flash[:notice]
+  end
+
   test 'remove_training with return_to profile redirects to the member profile training section' do
     sign_in_as_admin
     trainee = users(:no_email)
