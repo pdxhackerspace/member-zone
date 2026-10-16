@@ -31,9 +31,12 @@ class TrainingCatalogController < AuthenticatedController
     @trainees = User.where(id: @training_topic.trainings.select(:trainee_id).distinct)
                     .order(:full_name, :id)
     @topic_links = @training_topic.links.order(:title)
-    @topic_documents = visible_documents_for(@training_topic)
     @requestable = @training_topic.offered_to_members? &&
                    @training_topic.trainers.active.exists?
+    @can_manage_links = can?(:'training.topics.manage') ||
+                        can?(:'training.topics.manage_links', topic: @training_topic)
+    @can_manage_documents = can_manage_topic_documents?(@training_topic)
+    @topic_documents = visible_documents_for(@training_topic)
   end
 
   private
@@ -109,11 +112,19 @@ class TrainingCatalogController < AuthenticatedController
     TrainingTopic.offered_for_members
   end
 
-  # Non-admins may only see documents they are allowed to download
-  # (trained in the topic, a trainer for it, or marked `show_on_all_profiles`).
+  # Mirrors DocumentsController#manageable_topic_ids, which decides what the links lead to.
+  def can_manage_topic_documents?(topic)
+    return true if current_user_admin?
+
+    current_user.training_topics.exists?(topic.id) ||
+      current_user.topics_with_privilege(:'training.documents.manage').exists?(topic.id)
+  end
+
+  # Non-admins may only see documents they are allowed to download (trained in the topic,
+  # a trainer for it, able to manage its documents, or marked `show_on_all_profiles`).
   def visible_documents_for(topic)
     documents = topic.documents.ordered
-    return documents if current_user_admin? || can?(:'training.documents.view_all')
+    return documents if @can_manage_documents || can?(:'training.documents.view_all')
 
     trained = Training.exists?(trainee: current_user, training_topic: topic)
     trainer = TrainerCapability.exists?(user: current_user, training_topic: topic)
