@@ -1,74 +1,85 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Cash Payments</h1>
-    <p class="text-muted mb-0">Manually recorded cash payments tied to personal membership plans.</p>
-  </div>
-  <div class="d-flex gap-2">
-    <%= link_to "Record Payment", new_cash_payment_path, class: "btn btn-primary" %>
-  </div>
-</div>
-
-<% if @cash_payments.any? %>
-  <div class="card shadow-sm border-0">
-    <div class="table-responsive">
-      <table class="table mb-0 align-middle">
-        <thead class="bg-body-tertiary">
-          <tr>
-            <th scope="col">Member</th>
-            <th scope="col">Plan</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Date</th>
-            <th scope="col">Notes</th>
-            <th scope="col">Recorded By</th>
-            <th scope="col" class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @cash_payments.each do |payment| %>
-            <tr>
-              <td>
-                <%= link_to payment.user.display_name, user_path(payment.user), class: "fw-semibold text-decoration-none" %>
-              </td>
-              <td>
-                <span class="badge text-bg-info"><%= payment.membership_plan.name %></span>
-              </td>
-              <td><strong><%= number_to_currency(payment.amount) %></strong></td>
-              <td><%= payment.paid_on.strftime('%b %d, %Y') %></td>
-              <td>
-                <% if payment.notes.present? %>
-                  <span class="text-muted small"><%= truncate(payment.notes, length: 60) %></span>
-                <% else %>
-                  <span class="text-muted fst-italic">—</span>
-                <% end %>
-              </td>
-              <td>
-                <% if payment.recorded_by.present? %>
-                  <span class="text-muted small"><%= payment.recorded_by.display_name %></span>
-                <% else %>
-                  <span class="text-muted fst-italic">—</span>
-                <% end %>
-              </td>
-              <td class="text-end">
-                <%= link_to "View", cash_payment_path(payment), class: "btn btn-outline-primary btn-sm" %>
-                <%= link_to "Edit", edit_cash_payment_path(payment), class: "btn btn-outline-secondary btn-sm" %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <% if @pagy.pages > 1 %>
-    <div class="mt-3">
-      <%== @pagy.series_nav(:bootstrap) %>
-    </div>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Cash payments', count: @payment_count, total_amount: @total_amount } do %>
+  <%= gate :'payments.manage_cash' do %>
+    <%= link_to 'Record payment', new_cash_payment_path, class: 'btn btn-primary btn-sm' %>
   <% end %>
-<% else %>
-  <div class="card shadow-sm border-0">
-    <div class="card-body text-center py-5">
-      <i class="bi bi-cash-coin display-4 text-muted mb-3 d-block"></i>
-      <p class="text-muted mb-3">No cash payments have been recorded yet.</p>
-      <%= link_to "Record First Payment", new_cash_payment_path, class: "btn btn-primary" %>
-    </div>
-  </div>
+<% end %>
+
+<% if @filter_active %>
+  <% filter_label = { 'month' => 'This month', 'year' => 'This year' }[params[:period]] %>
+  <%= render 'shared/list_filter_banner', label: "#{filter_label || 'Searched'} payments",
+             shown: @payment_count, total: @total_count, clear_path: cash_payments_path %>
+<% end %>
+
+<% tile_path = ->(value) { cash_payments_path({ period: value, q: params[:q].presence }.compact) } %>
+<%= render 'shared/list_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: tile_path.call(nil), active: params[:period].blank? },
+      { label: 'This month', count: @month_count, path: tile_path.call('month'),
+        active: params[:period] == 'month' },
+      { label: 'This year', count: @year_count, path: tile_path.call('year'),
+        active: params[:period] == 'year' }
+    ] %>
+
+<%= render 'shared/list_search', url: cash_payments_path, frame: 'cash_payments_results',
+           placeholder: 'Search by member name, full email, plan, or notes…' %>
+
+<%= turbo_frame_tag 'cash_payments_results' do %>
+  <% if @cash_payments.any? %>
+    <%= render layout: 'shared/list_table',
+               locals: { body_id: 'cash_payments_table_body',
+                         headers: ['Member', 'Plan', ['Amount', 'num'], 'Date', 'Notes', 'Recorded by',
+                                   ['', 'text-end']] } do %>
+      <% @cash_payments.each do |payment| %>
+        <tr class="cash-payment-row"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              payment.user.display_name,
+              payment.membership_plan&.name,
+              payment.notes,
+              payment.recorded_by&.display_name
+            ].compact.join(' ').downcase %>">
+          <td class="cash-payment-member">
+            <%= link_to payment.user.display_name, cash_payment_path(payment),
+                        class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
+          </td>
+          <td><span class="text-secondary"><%= payment.membership_plan&.name %></span></td>
+          <td class="num"><%= list_money_tag(payment.amount, 'USD') %></td>
+          <td><%= list_time_tag(payment.paid_on) %></td>
+          <td>
+            <% if payment.notes.present? %>
+              <span class="text-secondary cell-truncate" title="<%= payment.notes %>">
+                <%= truncate(payment.notes, length: 60) %>
+              </span>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+          <td>
+            <% if payment.recorded_by.present? %>
+              <span class="text-secondary"><%= payment.recorded_by.display_name %></span>
+            <% else %>
+              <span class="text-secondary">—</span>
+            <% end %>
+          </td>
+          <td class="text-end">
+            <%= gate :'payments.manage_cash' do %>
+              <%= link_to 'Edit', edit_cash_payment_path(payment), class: 'btn btn-sm btn-outline-secondary',
+                          data: { turbo_frame: '_top' } %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/list_empty', icon: 'cash-coin', message: 'No cash payments match these filters.' %>
+  <% else %>
+    <% first_payment_action = gate :'payments.manage_cash' do %>
+      <%# Breaks out of the results frame: the form is a page of its own, not a swap of the table. %>
+      <%= link_to 'Record first payment', new_cash_payment_path, class: 'btn btn-primary btn-sm',
+                  data: { turbo_frame: '_top' } %>
+    <% end %>
+    <%= render 'shared/list_empty', icon: 'cash-coin', action: first_payment_action,
+               message: 'No cash payments have been recorded yet.' %>
+  <% end %>
+  <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>

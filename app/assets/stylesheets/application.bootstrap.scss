@@ -154,6 +154,11 @@
   cursor: default;
 }
 .filter-chip.muted:hover { background: transparent; border-color: rgba(255,255,255,0.06); }
+/* The axis name beside a row of chips, in a fixed column so the rows line up. */
+.filter-axis-label { width: 110px; padding-top: 4px; }
+/* The avatar column in a list: fixed width so the names line up. */
+.avatar-col { width: 48px; }
+.list-avatar { width: 32px; height: 32px; border-radius: 4px; }
 
 /* === KPI tile ===
    For dashboard summary numbers and clickable filter tiles.
@@ -212,6 +217,38 @@
 .table-compact tbody tr:hover td { background: rgba(255,255,255,0.02); }
 .table-compact .num { font-variant-numeric: tabular-nums; text-align: right; }
 .table-compact .muted-num { color: var(--bs-secondary-color); }
+
+/* === List table styling ===
+   The roomier sibling of .table-compact, for index pages where the table is the whole
+   page and 13px reads as cramped. Same header and border treatment, bigger type.
+   Apply with: <table class="table table-list"> */
+.table-list { font-size: 15px; }
+.table-list thead th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bs-secondary-color);
+  font-weight: 400;
+  border-bottom: 0.5px solid var(--bs-border-color);
+  padding: 10px 14px;
+}
+.table-list tbody td {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.04);
+  vertical-align: middle;
+}
+.table-list tbody tr:last-child td { border-bottom: none; }
+.table-list tbody tr:hover td { background: rgba(255,255,255,0.02); }
+.table-list .num { font-variant-numeric: tabular-nums; text-align: right; }
+.table-list .muted-num { color: var(--bs-secondary-color); }
+/* A free-text cell (a note, a supporter's message) clipped to one line, full text on hover. */
+.table-compact .cell-truncate,
+.table-list .cell-truncate { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+/* A row the admin still has to deal with (an unlinked payment, say). */
+.table-compact tbody tr.row-attention td,
+.table-list tbody tr.row-attention td { background: rgba(255, 193, 7, 0.04); }
+.table-compact tbody tr.row-attention:hover td,
+.table-list tbody tr.row-attention:hover td { background: rgba(255, 193, 7, 0.07); }
 
 /* Dim repeated currency parts: "$40.00" -> bright "40", muted "$" and ".00" */
 .money .currency, .money .cents { color: var(--bs-secondary-color); }

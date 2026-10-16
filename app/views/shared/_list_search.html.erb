@@ -1,0 +1,38 @@
+<%# The search box above a list.
+
+    With server: true (the default) it submits to the server inside a turbo frame, so the
+    search reaches every record rather than the page in front of you; the page number is
+    deliberately dropped from the carried-over params, since a new search starts at page one.
+    With server: false it filters the rows already on the page, for lists that render whole; the
+    caller wraps that page's search and table in shared/_list_client_filter, because the input
+    and the rows it hides have to share one controller element.
+
+    Locals: placeholder; url and frame when server; rows already carry
+    data-live-filter-target="item" and data-search-text either way. %>
+<% server = local_assigns.fetch(:server, true) %>
+<% field = capture do %>
+  <div class="d-flex gap-2">
+    <input type="search" name="q" value="<%= params[:q] %>" class="form-control"
+           placeholder="<%= placeholder %>"
+           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+           data-live-filter-target="input" data-action="input->live-filter#filter">
+    <button type="button" class="btn btn-outline-secondary <%= 'd-none' unless params[:q].present? %>"
+            data-live-filter-target="clearButton" data-action="click->live-filter#clear">Clear</button>
+  </div>
+<% end %>
+
+<% if server %>
+  <%= form_with url: url, method: :get, local: true,
+                data: { controller: 'live-filter', live_filter_server_value: true, turbo_frame: frame } do %>
+    <% request.query_parameters.except('q', 'page').each do |key, value| %>
+      <%= hidden_field_tag key, value %>
+    <% end %>
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body"><%= field %></div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body"><%= field %></div>
+  </div>
+<% end %>

@@ -177,9 +177,31 @@ The device calls `POST /api/v1/parking/permit_requests` with `Authorization: Bea
 - **`link`** — the member is emailed a link to a form where they describe the permit, pick an expiry of up to 2 weeks, and print it. The link works for **12 hours** and does **not** sign them in to Member Zone; it reaches only that one permit. Nothing is created until they submit.
 - **`blank`** — a permit is issued straight away, valid for 2 weeks (the self-service maximum), for the member to hand-write. They are emailed a 12-hour link to record the details online, and the [blank parking permit reminder](#blank-parking-permit-reminder) follows up until they do.
 
+A blank permit can also be printed on one of Member Zone's printers in the same request — the default printer, or one the device names.
+
 The device gets back JSON with the member's name and, for a blank permit, its id and expiry — enough to print a blank permit with the name on it. The form link itself only ever goes to the member's inbox. Banned and deceased members are refused, as are members with no email address when the mode is `link`.
 
 Permits issued this way show up on the member's profile like any other, and record which device issued them.
+
+## List pages
+
+The pages that list things — members, Authentik and Slack accounts, membership applications, incident reports, access logs, parking notices and each of the payment sources — are all built the same way, so learning one teaches the rest.
+
+Under the page title is a line saying how much you are looking at. Below that are the filters, in one of two shapes. A **row of counted tiles** is a set you pick between: clicking **Unlinked** shows only those, clicking **All** goes back. **Rows of chips**, each with a label on the left, are filters that stack: pick a membership state and a payment plan and you get members who are both, and clicking a chip you already have on turns just that one off. A strip appears above the list naming everything it is narrowed to, with **Clear filters** to drop the lot.
+
+The search box narrows the list as you type. On the longer lists it searches on the server, so it reaches every record rather than only the page in front of you; on short ones it filters the rows already on screen. Email addresses are encrypted, so a search matches only a **whole** address, never part of one.
+
+Rows that still need someone to do something — a payment nobody has linked to a member, a badge scan with a name but no account — are tinted and carry the button that deals with them. When a list comes back empty it says whether nothing matched your filters or there is nothing there yet.
+
+## Payment lists
+
+**Payments** in the navbar lists each source separately — PayPal, Recharge, Ko-fi and cash — and the four pages work the same way.
+
+The counts across the top are the filters: click **Unlinked** to see only the payments nobody has tied to a member yet, **All** to go back. An unlinked row is tinted and carries a **Link member…** button straight to the payment, so the page lists the work rather than just the history. PayPal adds a second row of filters for the plan-matching side of things: payments **matching a plan**, and the **unmatched subjects** that need a plan before they count as dues. Cash has no processor to reconcile against, so its filters are periods instead: **This month** and **This year**.
+
+The search box takes a transaction or charge ID, a payer or member name, a plan, a note, or a status, and narrows the list on the server as you type — so it searches every payment, not just the page in front of you. Email addresses are encrypted, so a search matches only a **whole** address, never part of one. The count line under the page title always describes what you are looking at: the number of payments shown and what they add up to.
+
+Payment lists never show a payer's email address. Open a payment to reveal the contact details behind it.
 
 ## Member notification preferences
 

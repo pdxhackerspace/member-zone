@@ -25,8 +25,10 @@ class PaypalPaymentsController < AuthenticatedController
     @unlinked_count = base_payments.where(user_id: nil, dont_link: false).count
     @dont_link_count = base_payments.where(dont_link: true).count
 
-    # Count of unmatched payments (always calculated for the button)
+    # Counts for the two halves of the plan-matching axis, which the filter chips offer
+    # alongside the linked/unlinked tiles.
     @unmatched_plan_count = PaypalPayment.not_matching_plan.count
+    @matched_plan_count = PaypalPayment.matching_plan.count
 
     # Build filtered query
     @payments = base_payments

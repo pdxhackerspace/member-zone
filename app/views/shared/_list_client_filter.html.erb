@@ -1,0 +1,9 @@
+<%# Mounts the live-filter controller over a whole list region. The search input and the row
+    targets it hides have to sit under one controller element, so the caller renders its search
+    card and its table inside this block.
+
+    Lists that search on the server do not need it — shared/_list_search mounts its own
+    controller on the form there. %>
+<div data-controller="live-filter">
+  <%= yield %>
+</div>

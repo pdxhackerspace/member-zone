@@ -26,19 +26,12 @@ class AuthentikUsersController < AuthenticatedController
     discrepancy_ids = AuthentikUser.discrepancy_ids
     @discrepancy_count = discrepancy_ids.size
 
-    # Filter options
-    case params[:filter]
-    when 'unlinked'
-      @authentik_users = @authentik_users.unlinked
-    when 'linked'
-      @authentik_users = @authentik_users.linked
-    when 'discrepancies'
-      @authentik_users = @authentik_users.where(id: discrepancy_ids)
-    when 'active'
-      @authentik_users = @authentik_users.active
-    when 'inactive'
-      @authentik_users = @authentik_users.inactive
-    end
+    @link_filter, @status_filter = resolved_filters
+    @authentik_users = filtered_by_link(@authentik_users, discrepancy_ids)
+    @authentik_users = @authentik_users.public_send(@status_filter) if @status_filter
+
+    @filter_active = @link_filter.present? || @status_filter.present?
+    @shown_count = @authentik_users.count
   end
 
   def show
@@ -150,6 +143,28 @@ class AuthentikUsersController < AuthenticatedController
   end
 
   private
+
+  # Whether an account is active used to share the one `filter` param with whether it is
+  # linked, so you could not ask for an unlinked account that is also inactive. The two are
+  # separate axes now; a link written against the old single param still lands sensibly.
+  def resolved_filters
+    link = params[:filter].presence
+    status = params[:status].presence
+    if %w[active inactive].include?(link)
+      status ||= link
+      link = nil
+    end
+    [link, (status if %w[active inactive].include?(status))]
+  end
+
+  def filtered_by_link(scope, discrepancy_ids)
+    case @link_filter
+    when 'linked' then scope.linked
+    when 'unlinked' then scope.unlinked
+    when 'discrepancies' then scope.where(id: discrepancy_ids)
+    else scope
+    end
+  end
 
   def set_authentik_user
     @authentik_user = AuthentikUser.find(params[:id])

@@ -19,7 +19,7 @@ class SheetEntriesControllerTest < ActionDispatch::IntegrationTest
   test 'shows index' do
     get sheet_entries_path
     assert_response :success
-    assert_select 'h1', text: 'Sheet Entries'
+    assert_select 'h1', text: 'Sheet entries'
     assert_match @sheet_entry.name, response.body
   end
 

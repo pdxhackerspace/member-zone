@@ -1,23 +1,20 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h-page-title mb-0">Members</h1>
-    <p class="text-13 text-secondary mb-0 mt-1">
-      <span class="text-body"><%= @user_count %></span> members<%= " (including #{@legacy_count} legacy)" if @include_legacy && @legacy_count.positive? %> ·
-      <%= link_to stacking_filter_path(:active, 'true'), class: "text-decoration-none" do %>
-        <span class="text-success"><%= @active_count %></span> active
-      <% end %>,
-      <%= link_to stacking_filter_path(:active, 'false'), class: "text-decoration-none" do %>
-        <span class="text-secondary"><%= @inactive_count %></span> inactive
-      <% end %>
-      <% if @filter_active || @include_legacy %>
-        <span class="text-muted fst-italic">(filtered counts)</span>
-      <% end %>
-    </p>
-  </div>
+<% members_summary = capture do %>
+  <span class="text-body"><%= number_with_delimiter(@user_count) %></span> members<%= " (including #{@legacy_count} legacy)" if @include_legacy && @legacy_count.positive? %> ·
+  <%= link_to stacking_filter_path(:active, 'true'), class: 'text-decoration-none' do %>
+    <span class="text-success"><%= @active_count %></span> active
+  <% end %>,
+  <%= link_to stacking_filter_path(:active, 'false'), class: 'text-decoration-none' do %>
+    <span class="text-secondary"><%= @inactive_count %></span> inactive
+  <% end %>
+  <% if @filter_active || @include_legacy %>
+    <span class="fst-italic">(filtered counts)</span>
+  <% end %>
+<% end %>
+
+<%= render layout: 'shared/list_page_header', locals: { title: 'Members', summary: members_summary } do %>
   <%# Bulk Authentik operations have no privilege of their own, so the directory is
       readable without them. %>
-  <div class="d-flex gap-2 align-items-center">
-    <% if current_user_admin? %>
+  <% if current_user_admin? %>
     <% settings = DefaultSetting.instance %>
     <% sync_inactive_as_active = settings.authentik_sync_inactive_as_active? %>
     <%= button_to toggle_authentik_sync_inactive_as_active_users_path, method: :post,
@@ -28,13 +25,16 @@
       Inactive synced as active: <span class="fw-medium"><%= sync_inactive_as_active ? 'On' : 'Off' %></span>
     <% end %>
     <% if MemberSource.enabled?('member_zone') %>
-      <%= button_to "Sync to Authentik", sync_all_to_authentik_users_path, method: :post, class: "btn btn-outline-secondary btn-sm", data: { turbo: false, turbo_confirm: "This will sync all members, groups, and the active members group to Authentik. Continue?" } %>
+      <%= button_to 'Sync to Authentik', sync_all_to_authentik_users_path, method: :post,
+                    class: 'btn btn-outline-secondary btn-sm',
+                    data: { turbo: false, turbo_confirm: 'This will sync all members, groups, and the active members group to Authentik. Continue?' } %>
     <% else %>
-      <button class="btn btn-outline-secondary btn-sm" disabled title="Member Zone source is disabled">Sync to Authentik</button>
+      <button class="btn btn-outline-secondary btn-sm" disabled title="Member Zone source is disabled">
+        Sync to Authentik
+      </button>
     <% end %>
-    <% end %>
-  </div>
-</div>
+  <% end %>
+<% end %>
 
 <% if @filter_active || @include_legacy %>
   <%
@@ -57,26 +57,20 @@
       filter_labels << (params[:account_type] == 'service' ? 'Service Accounts' : 'Members Only')
     end
   %>
-  <div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3 text-13">
-    <div>
-      <i class="bi bi-funnel me-2"></i>
-      Showing <strong><%= @filtered_count || @users.count %></strong> of <%= @user_count %> members
-      <% if filter_labels.any? %>
-        — <%= filter_labels.map { |l| "<strong>#{ERB::Util.html_escape(l)}</strong>" }.join(" + ").html_safe %>
-      <% end %>
-    </div>
-    <%= link_to "Clear all filters", users_path, class: "btn btn-outline-secondary btn-sm" %>
-  </div>
+  <%= render 'shared/list_filter_banner', label: filter_labels.to_sentence(two_words_connector: ' + ',
+                                                                           last_word_connector: ' + '),
+             shown: @filtered_count || @users.count, total: @user_count, noun: 'member',
+             clear_path: users_path %>
 <% end %>
 
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <p class="small text-muted mb-0">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <p class="text-13 text-secondary mb-0">
         <% active_filter_count = @filter_params.except(:sort, :direction, :include_legacy).size + (@include_legacy ? 1 : 0) %>
-        <%= active_filter_count %> filters active
+        <%= active_filter_count %> <%= 'filter'.pluralize(active_filter_count) %> active
         <% if active_filter_count.positive? %>
-          · <%= link_to "Clear", users_path, class: "link-secondary" %>
+          · <%= link_to 'Clear', users_path, class: 'link-secondary' %>
         <% end %>
       </p>
       <% if @legacy_count.positive? %>
@@ -84,94 +78,62 @@
           <input class="form-check-input" type="checkbox" id="include_legacy_checkbox"
                  <%= 'checked' if @include_legacy %>
                  onchange="window.location.href='<%= stacking_filter_path(:include_legacy, @include_legacy ? nil : '1') %>'">
-          <label class="form-check-label small" for="include_legacy_checkbox">
+          <label class="form-check-label text-13" for="include_legacy_checkbox">
             <i class="bi bi-archive me-1"></i>Include legacy (<%= @legacy_count %>)
           </label>
         </div>
       <% end %>
     </div>
-    
-    <div class="d-flex align-items-start gap-3 mb-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Membership</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <% User::MEMBERSHIP_STATE_FILTER_ORDER.each do |state| %>
-        <% count = @membership_state_counts.fetch(state, 0) %>
-        <% next if count.zero? && params[:membership_state] != state %>
-        <% selected = params[:membership_state] == state %>
-        <%= link_to stacking_filter_path(:membership_state, state), class: "filter-chip text-decoration-none #{membership_state_filter_chip_class(state)} #{'active' if selected} #{'muted' if count.zero?}" do %>
-          <%= '✓ ' if selected %><%= membership_state_label(state) %> <span class="count"><%= count %></span>
-        <% end %>
-      <% end %>
-    </div>
-    </div>
-    
-    <div class="d-flex align-items-start gap-3 mb-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Payment type</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <%= link_to stacking_filter_path(:payment_type, 'unknown'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:payment_type] == 'unknown'}" do %>
-        Unknown: <strong><%= @payment_type_unknown %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:payment_type, 'sponsored'), class: "badge text-bg-primary text-decoration-none #{'border border-dark border-2' if params[:payment_type] == 'sponsored'}" do %>
-        Sponsored: <strong><%= @payment_type_sponsored %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:payment_type, 'paypal'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:payment_type] == 'paypal'}" do %>
-        PayPal: <strong><%= @payment_type_paypal %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:payment_type, 'recharge'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:payment_type] == 'recharge'}" do %>
-        Recharge: <strong><%= @payment_type_recharge %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:payment_type, 'cash'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:payment_type] == 'cash'}" do %>
-        Cash: <strong><%= @payment_type_cash %></strong>
-      <% end %>
-    </div>
-    </div>
-    
-    <div class="d-flex align-items-start gap-3 mb-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Payment plan</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <% @plan_counts.each do |plan, count| %>
-        <% next if count.zero? %>
-        <%= link_to stacking_filter_path(:membership_plan_id, plan.id.to_s), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:membership_plan_id] == plan.id.to_s}" do %>
-          <%= plan.name %>: <strong><%= count %></strong>
-        <% end %>
-      <% end %>
-      <% if @no_plan_count.positive? %>
-        <%= link_to stacking_filter_path(:membership_plan_id, 'none'), class: "badge text-bg-secondary text-decoration-none #{'border border-dark border-2' if params[:membership_plan_id] == 'none'}" do %>
-          No Plan: <strong><%= @no_plan_count %></strong>
-        <% end %>
-      <% end %>
-    </div>
-    </div>
 
-    <div class="d-flex align-items-start gap-3 mb-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Account type</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <%= link_to stacking_filter_path(:account_type, 'member'), class: "badge text-bg-primary text-decoration-none #{'border border-dark border-2' if params[:account_type] == 'member'}" do %>
-        Members: <strong><%= @member_account_count %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:account_type, 'service'), class: "badge text-bg-info text-decoration-none #{'border border-dark border-2' if params[:account_type] == 'service'}" do %>
-        <i class="bi bi-gear-fill me-1"></i>Service Accounts: <strong><%= @service_account_count %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:emergency_active_override, '1'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:emergency_active_override] == '1'}" do %>
-        <i class="bi bi-lightning-charge me-1"></i>Active override: <strong><%= @emergency_active_override_count %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:key_access, 'paused'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:key_access] == 'paused'}" do %>
-        <i class="bi bi-pause-circle me-1"></i>Key paused: <strong><%= @key_paused_count %></strong>
-      <% end %>
-    </div>
-    </div>
+    <%# Every axis here stacks with the others, so each one is a row of chips rather than a
+        tile row: tiles say "pick one of these", and that is not what these do. %>
+    <% membership_chips = User::MEMBERSHIP_STATE_FILTER_ORDER.filter_map do |state|
+         count = @membership_state_counts.fetch(state, 0)
+         next if count.zero? && params[:membership_state] != state
 
-    <div class="d-flex align-items-start gap-3">
-    <h2 class="h-section-label mb-0 flex-shrink-0" style="width: 110px;">Missing data</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <%= link_to stacking_filter_path(:missing, 'rfid'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:missing] == 'rfid'}" do %>
-        No RFID: <strong><%= @no_rfid_count %></strong>
-      <% end %>
-      <%= link_to stacking_filter_path(:missing, 'email'), class: "badge text-bg-warning text-decoration-none #{'border border-dark border-2' if params[:missing] == 'email'}" do %>
-        No Email: <strong><%= @no_email_count %></strong>
-      <% end %>
-    </div>
-    </div>
+         { label: membership_state_label(state), count: count,
+           path: stacking_filter_path(:membership_state, state),
+           active: params[:membership_state] == state,
+           variant: membership_state_filter_chip_class(state).presence }
+       end %>
+    <%= render 'shared/list_filter_chip_row', label: 'Membership', chips: membership_chips %>
+
+    <%= render 'shared/list_filter_chip_row', label: 'Payment type', chips: %w[unknown sponsored paypal recharge cash].map { |type|
+          { label: type.humanize, count: @payment_type_counts.fetch(type, 0),
+            path: stacking_filter_path(:payment_type, type), active: params[:payment_type] == type }
+        } %>
+
+    <% plan_chips = @plan_counts.filter_map do |plan, count|
+         next if count.zero?
+
+         { label: plan.name, count: count, path: stacking_filter_path(:membership_plan_id, plan.id.to_s),
+           active: params[:membership_plan_id] == plan.id.to_s }
+       end %>
+    <% if @no_plan_count.positive? %>
+      <% plan_chips << { label: 'No plan', count: @no_plan_count,
+                         path: stacking_filter_path(:membership_plan_id, 'none'),
+                         active: params[:membership_plan_id] == 'none' } %>
+    <% end %>
+    <%= render 'shared/list_filter_chip_row', label: 'Payment plan', chips: plan_chips %>
+
+    <%= render 'shared/list_filter_chip_row', label: 'Account', chips: [
+          { label: 'Members', count: @member_account_count, path: stacking_filter_path(:account_type, 'member'),
+            active: params[:account_type] == 'member' },
+          { label: 'Service accounts', count: @service_account_count,
+            path: stacking_filter_path(:account_type, 'service'), active: params[:account_type] == 'service' },
+          { label: 'Active override', count: @emergency_active_override_count,
+            path: stacking_filter_path(:emergency_active_override, '1'),
+            active: params[:emergency_active_override] == '1', variant: 'warning' },
+          { label: 'Key paused', count: @key_paused_count, path: stacking_filter_path(:key_access, 'paused'),
+            active: params[:key_access] == 'paused', variant: 'warning' }
+        ] %>
+
+    <%= render 'shared/list_filter_chip_row', label: 'Missing data', chips: [
+          { label: 'No RFID', count: @no_rfid_count, path: stacking_filter_path(:missing, 'rfid'),
+            active: params[:missing] == 'rfid', variant: 'warning' },
+          { label: 'No email', count: @no_email_count, path: stacking_filter_path(:missing, 'email'),
+            active: params[:missing] == 'email', variant: 'warning' }
+        ] %>
   </div>
 </div>
 
@@ -201,10 +163,10 @@
         <h6 class="mb-0"><i class="bi bi-person-plus me-1"></i>New Members This Week (<%= @recent_members.size %>)</h6>
       </div>
       <div class="table-responsive">
-          <table class="table table-compact mb-0 align-middle">
+          <table class="table table-list mb-0 align-middle">
           <thead>
             <tr>
-              <th scope="col" style="width: 48px;"></th>
+              <th scope="col" class="avatar-col"></th>
               <th scope="col">Username</th>
               <th scope="col">Name</th>
               <th scope="col">Email</th>
@@ -243,10 +205,10 @@
 
   <div class="card shadow-sm border-0">
     <div class="table-responsive">
-      <table class="table table-compact mb-0 align-middle">
+      <table class="table table-list mb-0 align-middle">
       <thead>
         <tr>
-          <th scope="col" style="width: 48px;"></th>
+          <th scope="col" class="avatar-col"></th>
           <th scope="col"><%= sortable_column('username', 'Username', @sort_column, @sort_direction) %></th>
           <th scope="col"><%= sortable_column('full_name', 'Name', @sort_column, @sort_direction) %></th>
           <th scope="col">Email</th>
@@ -319,13 +281,6 @@
     </table>
   </div>
   </div>
-  <% if @pagy.pages > 1 %>
-    <div class="mt-3">
-      <%== @pagy.series_nav(:bootstrap) %>
-      <div class="text-center text-muted small mt-2">
-        Showing <%= @pagy.from %>-<%= @pagy.to %> of <%= @pagy.count %>
-      </div>
-    </div>
-  <% end %>
+  <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>
 

@@ -198,7 +198,9 @@ Identify the member with exactly one of `rfid`, `username`, or full `email`.
 - `"mode": "link"` emails the member a 12-hour link to a form where they fill in and print the permit. Nothing is created until they submit it.
 - `"mode": "blank"` issues a two-week permit at once for them to hand-write, and emails a link to record the details online.
 
-The response gives the member's name and, for a blank permit, its id and expiry — enough to print a slip. It never includes the form link.
+To print a blank permit too, add `"print": true` for the default printer, or `"printer_id": 3` for a particular one (list them with `GET /parking/printers`, which kiosk tokens may call). The printer is checked before anything is issued: an unknown `printer_id` is `404`, no printer configured is `409`, and printing in `link` mode is `400`. If the printer then refuses the job, the permit still stands and the response's `print.error` says why.
+
+The response gives the member's name, for a blank permit its id and expiry, and `print` (the printer and CUPS job id, or `null` when printing wasn't asked for). It never includes the form link.
 
 ## Members (`api.users.search`)
 

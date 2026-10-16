@@ -1,6 +1,7 @@
 class UsersController < AuthenticatedController
   include TrainingHistoryData
   include ParkingStatusFiltering
+  include MemberListFiltering
 
   helper_method :viewing_own_profile?
 
@@ -74,55 +75,7 @@ class UsersController < AuthenticatedController
     @filter_params[:sort] = params[:sort] if params[:sort].present?
     @filter_params[:direction] = params[:direction] if params[:direction].present?
 
-    # Build filtered query by applying all active filters
-    @users = default_users
-
-    if params[:q].present?
-      search_term = "%#{params[:q].downcase}%"
-      # Encrypted email cannot be matched by substring; a whole address still resolves
-      # through the lookup digest.
-      @users = @users.where(
-        "LOWER(COALESCE(full_name, '')) LIKE :p " \
-        'OR LOWER(authentik_id) LIKE :p ' \
-        "OR LOWER(COALESCE(username, '')) LIKE :p",
-        p: search_term
-      ).or(default_users.merge(User.by_any_email(params[:q])))
-    end
-
-    if params[:membership_state].present?
-      @users = @users.non_service_accounts.where(membership_state: params[:membership_state])
-    end
-    if params[:membership_status].present?
-      @users = @users.non_service_accounts.where(membership_status: params[:membership_status])
-    end
-    @users = @users.non_service_accounts.where(payment_type: params[:payment_type]) if params[:payment_type].present?
-    @users = @users.non_service_accounts.where(dues_status: params[:dues_status]) if params[:dues_status].present?
-    if params[:membership_plan_id].present?
-      @users = if params[:membership_plan_id] == 'none'
-                 @users.non_service_accounts.where(membership_plan_id: nil)
-               else
-                 @users.non_service_accounts.where(membership_plan_id: params[:membership_plan_id])
-               end
-    end
-    @users = @users.where(active: params[:active] == 'true') if params[:active].present?
-
-    if params[:account_type] == 'service'
-      @users = @users.service_accounts
-    elsif params[:account_type] == 'member'
-      @users = @users.non_service_accounts
-    end
-
-    if params[:emergency_active_override] == '1'
-      @users = @users.non_service_accounts.where(emergency_active_override: true)
-    end
-
-    if params[:missing] == 'rfid'
-      @users = @users.non_service_accounts.where.missing(:rfids)
-    elsif params[:missing] == 'email'
-      @users = @users.non_service_accounts.where("email IS NULL OR email = ''")
-    end
-
-    @users = @users.non_service_accounts.where(key_access_paused: true) if params[:key_access] == 'paused'
+    @users = apply_member_filters(default_users)
 
     # Total count always from the full (non-legacy-adjusted) set for the "X of Y" message
     @user_count = default_users.count
@@ -131,30 +84,30 @@ class UsersController < AuthenticatedController
     @active_count = @users.where(active: true).count
     @inactive_count = @users.where(active: false).count
 
-    # Badge counts from the filtered set so they reflect stacked filters
-    filtered_members = @users.non_service_accounts
+    # Each chip row counts with its own axis left out, so a sibling of the picked value still
+    # shows what switching to it would find.
+    @membership_state_counts = members_without_filter(default_users, :membership_state)
+                               .group(:membership_state).count
 
-    @membership_state_counts = filtered_members.group(:membership_state).count
-
-    @payment_type_unknown = filtered_members.where(payment_type: 'unknown').count
-    @payment_type_sponsored = filtered_members.where(payment_type: 'sponsored').count
-    @payment_type_paypal = filtered_members.where(payment_type: 'paypal').count
-    @payment_type_recharge = filtered_members.where(payment_type: 'recharge').count
-    @payment_type_cash = filtered_members.where(payment_type: 'cash').count
+    # One grouped count rather than five scans; the chip row reads it by key.
+    @payment_type_counts = members_without_filter(default_users, :payment_type).group(:payment_type).count
 
     @membership_plans = MembershipPlan.ordered.to_a
-    @plan_counts = @membership_plans.map { |plan| [plan, filtered_members.where(membership_plan_id: plan.id).count] }
-    @no_plan_count = filtered_members.where(membership_plan_id: nil)
-                                     .where.not(membership_status: %w[guest sponsored])
-                                     .where(is_sponsored: false)
-                                     .count
+    plan_members = members_without_filter(default_users, :membership_plan_id)
+    @plan_counts = @membership_plans.map { |plan| [plan, plan_members.where(membership_plan_id: plan.id).count] }
+    @no_plan_count = plan_members.where(membership_plan_id: nil)
+                                 .where.not(membership_status: %w[guest sponsored])
+                                 .where(is_sponsored: false)
+                                 .count
 
-    @no_rfid_count = filtered_members.where.missing(:rfids).count
-    @no_email_count = filtered_members.where("email IS NULL OR email = ''").count
-    @key_paused_count = filtered_members.where(key_access_paused: true).count
+    missing_members = members_without_filter(default_users, :missing)
+    @no_rfid_count = missing_members.where.missing(:rfids).count
+    @no_email_count = missing_members.where("email IS NULL OR email = ''").count
+    @key_paused_count = @users.non_service_accounts.where(key_access_paused: true).count
 
-    @service_account_count = @users.service_accounts.count
-    @member_account_count = @users.non_service_accounts.count
+    account_users = apply_member_filters(default_users, except: :account_type)
+    @service_account_count = account_users.service_accounts.count
+    @member_account_count = account_users.non_service_accounts.count
     @emergency_active_override_count = all_users.non_service_accounts.where(emergency_active_override: true).count
 
     # Apply sorting — use Arel nodes to avoid string interpolation (CodeQL SQL injection rule)

@@ -16,6 +16,23 @@ class KofiPayment < ApplicationRecord
   scope :ordered, -> { order(timestamp: :desc, created_at: :desc) }
   scope :for_user, ->(user) { where(user_id: user.id) }
   scope :for_sheet_entry, ->(entry) { where(sheet_entry_id: entry.id) }
+  scope :search, lambda { |term|
+    pattern = "%#{term.to_s.downcase}%"
+    # Encrypted emails match only on a whole address, via their lookup digest.
+    digest = SensitiveData.email_digest(term)
+    left_joins(:user).where(
+      "LOWER(COALESCE(kofi_payments.kofi_transaction_id, '')) LIKE :q " \
+      "OR LOWER(COALESCE(kofi_payments.from_name, '')) LIKE :q " \
+      "OR LOWER(COALESCE(kofi_payments.payment_type, '')) LIKE :q " \
+      "OR LOWER(COALESCE(kofi_payments.tier_name, '')) LIKE :q " \
+      "OR LOWER(COALESCE(kofi_payments.message, '')) LIKE :q " \
+      "OR LOWER(COALESCE(kofi_payments.status, '')) LIKE :q " \
+      "OR LOWER(COALESCE(users.full_name, '')) LIKE :q " \
+      'OR kofi_payments.email_lookup_digest = :d ' \
+      'OR users.email_lookup_digest = :d',
+      q: pattern, d: digest
+    )
+  }
 
   def amount_with_currency
     return nil if amount.blank?

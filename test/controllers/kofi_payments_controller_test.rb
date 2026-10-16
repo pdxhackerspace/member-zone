@@ -27,11 +27,18 @@ class KofiPaymentsControllerTest < ActionDispatch::IntegrationTest
     Rails.application.config.x.local_auth.enabled = @original_local_auth_enabled
   end
 
+  test 'index filter tiles keep the search query' do
+    get kofi_payments_path(q: 'zzz')
+    assert_response :success
+
+    assert_select 'a[href*="linked=no"][href*="q=zzz"]'
+  end
+
   test 'index does not show supporter email addresses' do
     get kofi_payments_path
 
     assert_response :success
-    assert_select 'h1', text: 'Ko-Fi Payments'
+    assert_select 'h1', text: 'Ko-fi payments'
     assert_match @payment.kofi_transaction_id, response.body
     assert_no_match(/kofi-private@example\.com/, response.body)
     assert_select 'a[href^=?]', 'mailto:', count: 0

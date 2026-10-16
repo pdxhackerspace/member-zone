@@ -10,8 +10,24 @@ class CashPaymentsController < AuthenticatedController
   before_action :set_cash_payment, only: %i[show edit update destroy]
 
   def index
-    @cash_payments = CashPayment.includes(:user, :membership_plan, :recorded_by).ordered
-    @pagy, @cash_payments = pagy(@cash_payments, limit: 25)
+    all_payments = CashPayment.all
+
+    # Cash has no processor to reconcile against, so the useful buckets are periods: what
+    # came in this month, and what the year adds up to.
+    @total_count = all_payments.count
+    @month_count = all_payments.paid_between(Date.current.beginning_of_month, Date.current.end_of_month).count
+    @year_count = all_payments.paid_between(Date.current.beginning_of_year, Date.current.end_of_year).count
+
+    @cash_payments = filtered_cash_payments(all_payments)
+    @cash_payments = @cash_payments.search(params[:q]) if params[:q].present?
+
+    @cash_payments = @cash_payments.includes(:user, :membership_plan, :recorded_by).ordered
+    @payment_count = @cash_payments.count
+    @total_amount = @cash_payments.sum(:amount)
+
+    @filter_active = params[:period].present? || params[:q].present?
+
+    @pagy, @cash_payments = pagy(@cash_payments, limit: 100)
   end
 
   def show; end
@@ -69,6 +85,17 @@ class CashPaymentsController < AuthenticatedController
   end
 
   private
+
+  def filtered_cash_payments(scope)
+    case params[:period]
+    when 'month'
+      scope.paid_between(Date.current.beginning_of_month, Date.current.end_of_month)
+    when 'year'
+      scope.paid_between(Date.current.beginning_of_year, Date.current.end_of_year)
+    else
+      scope
+    end
+  end
 
   def set_cash_payment
     @cash_payment = CashPayment.find(params[:id])

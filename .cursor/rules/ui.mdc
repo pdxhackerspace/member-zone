@@ -53,14 +53,41 @@ Apply these rules to any HTML/template/CSS Cursor writes for this project. The s
 
 ## Filters
 
-- Multiple filters in categories → `.filter-chip` components in flex-wrap rows.
-- 2-5 filters that are KPI-like → `.kpi-tile` row.
+Pick the component from the shape of the filters, not from the page:
+
+- **One axis, 2-5 mutually exclusive buckets** → a `.kpi-tile` row (`shared/_list_filter_tiles`). A tile row
+  says "pick one of these", so only use it where picking one is what happens.
+- **Filters that stack across axes, or more than five buckets** → labelled `.filter-chip` rows
+  (`shared/_list_filter_chip_row`, one row per axis). Clicking the value already showing clears
+  that axis and leaves the others alone.
+- A page may use both: the admin-actionable axis as the tile row, the rest as chip rows beneath it.
 - Variants: default (neutral), `.active` (currently applied), `.warning` (count is admin-actionable), `.danger` (serious state), `.muted` (count is 0).
-- Show "X filters active · Clear" indicator when filters are applied.
+- Show "X filters active · Clear" indicator when filters are applied, and the
+  `shared/_list_filter_banner` strip naming what the list is narrowed to.
+
+## Index page skeleton
+
+Every list page is built from the same parts, in this order, so that learning one teaches the rest:
+
+1. `shared/_list_page_header` — title, a summary line, actions (one `btn-primary` at most, the rest
+   in a `⋯` kebab).
+2. `shared/_list_filter_banner` — only while a filter is on.
+3. The filter components above.
+4. `shared/_list_search` — server-backed inside a turbo frame where the list paginates, client-side
+   (`server: false`) where it renders whole.
+5. `shared/_list_table` — the card, the table and its headers; the caller supplies the rows.
+6. `shared/_list_empty` — distinguish "nothing matches these filters" from "nothing here yet".
+7. `shared/_pagination`.
+
+Row-level presentation goes through `ListPresentationHelper`: `list_money_tag`, `list_status_cell`,
+`list_time_tag`. A row the admin still has to deal with carries `.row-attention`.
 
 ## Tables
 
 - Apply `.table-compact` class for 13px text and tight padding.
+- Index pages whose table *is* the page (the payment lists) use `.table-list` instead: same header
+  and border treatment, 15px text and roomier padding, because a wall of 13px rows is what those
+  pages are made of and it reads as cramped.
 - Headers: 11px uppercase muted with letter-spacing.
 - Whole rows clickable when there's a detail view (no separate Details button).
 - One outline action button max per row. Multiple actions → kebab menu.
@@ -135,7 +162,9 @@ Already defined in `refresh.css`:
 - `.status-dot` with `.status-success/.status-danger/.status-warning/.status-muted`
 - `.filter-chip` with `.active/.warning/.danger/.muted`
 - `.kpi-tile` with `.clickable/.active/.warning`
-- `.table-compact`, `.list-compact`
+- `.table-compact`, `.table-list`, `.list-compact`
+- `.row-attention` on a `tr` — tints a row the admin still has to deal with
+- `.cell-truncate` — one-line free-text cell, full text in `title`
 - `.settings-nav`, `.settings-nav-item` with `.active/.attention`
 - `.action-card` for labeled action grids
 - `.status-panel` with `.status-clear/.status-attention`

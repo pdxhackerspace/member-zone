@@ -14,10 +14,17 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
     Rails.application.config.x.local_auth.enabled = @original_local_auth_enabled
   end
 
+  test 'index filter tiles keep the search query' do
+    get cash_payments_path(q: 'zzz')
+    assert_response :success
+
+    assert_select 'a[href*="period=month"][href*="q=zzz"]'
+  end
+
   test 'shows index' do
     get cash_payments_path
     assert_response :success
-    assert_select 'h1', /Cash Payments/
+    assert_select 'h1', /Cash payments/i
   end
 
   test 'shows payment' do

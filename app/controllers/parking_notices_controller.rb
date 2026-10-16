@@ -20,6 +20,10 @@ class ParkingNoticesController < AuthenticatedController
       expired: ParkingNotice.expired_notices.count,
       cleared: ParkingNotice.cleared_notices.count
     }
+    # Type is its own axis, so its counts span every status rather than the current one.
+    @type_counts = ParkingNotice.group(:notice_type).count
+    @filter_active = params[:type].present? || params[:status].present?
+    @notice_count = @parking_notices.count
 
     @pagy, @parking_notices = pagy(@parking_notices, limit: 25)
     @printers = Printer.ordered

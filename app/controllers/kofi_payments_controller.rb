@@ -1,4 +1,6 @@
 class KofiPaymentsController < AuthenticatedController
+  include Pagy::Method
+
   require 'csv'
 
   before_action -> { require_privilege!(:'payments.view') }, only: %i[index show]
@@ -7,9 +9,31 @@ class KofiPaymentsController < AuthenticatedController
   before_action -> { require_privilege!(:'payments.import_export') }, only: %i[import_csv export import]
 
   def index
-    @payments = KofiPayment.ordered
+    all_payments = KofiPayment.all
+
+    # Ko-Fi has no don't-link flag, so a supporter is either tied to a member or still waiting
+    # for someone to tie them.
+    @total_count = all_payments.count
+    @linked_count = all_payments.where.not(user_id: nil).count
+    @unlinked_count = all_payments.where(user_id: nil).count
+
+    @payments = all_payments
+    case params[:linked]
+    when 'yes'
+      @payments = @payments.where.not(user_id: nil)
+    when 'no'
+      @payments = @payments.where(user_id: nil)
+    end
+
+    @payments = @payments.search(params[:q]) if params[:q].present?
+
+    @payments = @payments.includes(:user).ordered
     @payment_count = @payments.count
     @total_amount = @payments.sum(:amount)
+
+    @filter_active = params[:linked].present? || params[:q].present?
+
+    @pagy, @payments = pagy(@payments, limit: 100)
   end
 
   def show

@@ -1,4 +1,6 @@
 class AccessLogsController < AuthenticatedController
+  include Pagy::Method
+
   PER_PAGE = 200
 
   before_action -> { require_privilege!(:'access.view_logs') }, only: :index
@@ -32,7 +34,7 @@ class AccessLogsController < AuthenticatedController
       @access_logs = @access_logs.joins(:user).where(users: { service_account: true })
     end
 
-    @filter_active = params[:linked].present?
+    @filter_active = params[:linked].present? || params[:q].present?
 
     # Apply search filter if provided
     if params[:q].present?
@@ -43,12 +45,8 @@ class AccessLogsController < AuthenticatedController
       )
     end
 
-    # Pagination
-    @page = (params[:page] || 1).to_i
-    @page = 1 if @page < 1
     @display_count = @access_logs.count
-    @total_pages = (@display_count.to_f / PER_PAGE).ceil
-    @access_logs = @access_logs.offset((@page - 1) * PER_PAGE).limit(PER_PAGE)
+    @pagy, @access_logs = pagy(@access_logs, limit: PER_PAGE)
 
     # Load users for the link modal (only if there are unlinked entries)
     @all_users = User.ordered_by_display_name if @unlinked_count.positive?
