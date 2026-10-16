@@ -31,7 +31,10 @@ class PaypalPaymentsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select 'turbo-frame#paypal_payments_results', text: /No PayPal payment matches a membership plan yet/
-    assert_select 'a[href=?]', paypal_payments_path(show_unmatched: 'true'), text: 'View unmatched subjects'
+    # It changes what the whole page is about, so it must leave the results frame rather than
+    # swapping the table under a header that still describes the matched list.
+    assert_select 'a[href=?][data-turbo-frame=?]', paypal_payments_path(show_unmatched: 'true'), '_top',
+                  text: 'View unmatched subjects'
   end
 
   test 'empty list with nothing synced at all says so' do
