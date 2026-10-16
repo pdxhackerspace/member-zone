@@ -1,145 +1,127 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
+<% field = ->(label, &block) { render(layout: 'shared/detail_field_row', locals: { label: label }, &block) } %>
+<% status_label, status_tone = queued_mail_status(@queued_mail) %>
+
+<div class="mb-2 text-13">
+  <%= link_to queued_mails_path, class: 'text-secondary text-decoration-none' do %>
+    <i class="bi bi-arrow-left me-1"></i>Mail queue
+  <% end %>
+</div>
+
+<div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h3 mb-1">Queued Message</h1>
-    <p class="text-muted mb-0">
-      <% if @queued_mail.delivery_failed? %>
-        <span class="badge text-bg-danger-subtle">Send failed</span>
-      <% elsif @queued_mail.delivery_pending? %>
-        <span class="badge text-bg-info-subtle">Sending</span>
-      <% elsif @queued_mail.sent? %>
-        <span class="badge text-bg-success-subtle">Sent</span>
-      <% elsif @queued_mail.pending? %>
-        <span class="badge text-bg-warning-subtle">Pending review</span>
-      <% elsif @queued_mail.rejected? %>
-        <span class="badge text-bg-secondary-subtle">Rejected</span>
-      <% end %>
-    </p>
+    <h1 class="h-page-title mb-0 text-break"><%= @queued_mail.subject.presence || '(no subject)' %></h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="badge text-bg-<%= status_tone || 'success' %>-subtle"><%= status_label %></span>
+      · to <span class="text-body"><%= @queued_mail.to %></span>
+    </div>
   </div>
-  <div class="d-flex gap-2">
-    <% if @queued_mail.delivery_failed? %>
-      <%= button_to "Retry Sending", retry_queued_mail_path(@queued_mail), method: :post,
-          class: "btn btn-warning",
-          data: { turbo_confirm: "Retry sending this email to #{@queued_mail.to}?" } %>
+
+  <% can_approve = @queued_mail.pending? && can?(:'queued_mail.approve') %>
+  <% kebab = can_approve || (@queued_mail.pending? && @queued_mail.can_regenerate? && current_user_admin?) %>
+  <div class="d-flex gap-2 align-items-center flex-shrink-0">
+    <% if @queued_mail.delivery_failed? && current_user_admin? %>
+      <%= button_to 'Retry sending', retry_queued_mail_path(@queued_mail), method: :post,
+                    class: 'btn btn-primary btn-sm',
+                    data: { turbo_confirm: "Retry sending this email to #{@queued_mail.to}?" } %>
     <% end %>
-    <% if @queued_mail.pending? %>
-      <% if can?(:'queued_mail.edit') %>
-      <%= link_to "Edit", edit_queued_mail_path(@queued_mail), class: "btn btn-outline-primary" %>
-      <% end %>
-      <% if @queued_mail.can_regenerate? %>
-        <%= button_to "Regenerate from Template", regenerate_queued_mail_path(@queued_mail), method: :post,
-            class: "btn btn-outline-info",
-            data: { turbo_confirm: "This will overwrite the current message with a fresh render from the template. Continue?" } %>
-      <% end %>
-      <% if smtp_configured? %>
-        <%= button_to "Approve & Send", approve_queued_mail_path(@queued_mail), method: :post,
-            class: "btn btn-success",
-            data: { turbo_confirm: "This will send this email to #{@queued_mail.to}. Continue?" } %>
-      <% else %>
-        <button class="btn btn-success" disabled title="SMTP not configured">Approve & Send</button>
-      <% end %>
-      <%= button_to "Reject", reject_queued_mail_path(@queued_mail), method: :post,
-          class: "btn btn-danger",
-          data: { turbo_confirm: "Reject this email? It will not be sent." } %>
+    <% if can_approve %>
+      <%= queued_mail_send_button 'Approve and send', approve_queued_mail_path(@queued_mail), primary: true,
+                                  confirm: "This will send this email to #{@queued_mail.to}. Continue?" %>
     <% end %>
-    <%= link_to "Back to Queue", queued_mails_path, class: "btn btn-secondary" %>
+    <% if @queued_mail.pending? && can?(:'queued_mail.edit') %>
+      <%= link_to 'Edit', edit_queued_mail_path(@queued_mail), class: 'btn btn-outline-secondary btn-sm' %>
+    <% end %>
+    <% if kebab %>
+      <div class="dropdown">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+                aria-expanded="false" aria-label="More actions">&hellip;</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <% if @queued_mail.can_regenerate? && current_user_admin? %>
+            <li>
+              <%= button_to 'Regenerate from template', regenerate_queued_mail_path(@queued_mail), method: :post,
+                            class: 'dropdown-item',
+                            data: { turbo_confirm: 'This will overwrite the current message with a fresh render from the template. Continue?' } %>
+            </li>
+          <% end %>
+          <% if can_approve %>
+            <li>
+              <%= button_to 'Reject', reject_queued_mail_path(@queued_mail), method: :post,
+                            class: 'dropdown-item text-danger',
+                            data: { turbo_confirm: 'Reject this email? It will not be sent.' } %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
   </div>
 </div>
 
 <%= render 'shared/smtp_warning' %>
 
-<div class="row">
-  <div class="col-lg-4 mb-4">
-    <div class="card shadow-sm border-0">
-      <div class="card-header">
-        <h5 class="mb-0">Details</h5>
+<div class="row g-4">
+  <div class="col-lg-4">
+    <% if @queued_mail.last_error.present? %>
+      <div class="alert alert-danger py-2 mb-4 text-13">
+        <div class="fw-medium mb-1">Last error</div>
+        <code class="text-danger text-break"><%= @queued_mail.last_error %></code>
+        <div class="text-12 text-secondary mt-1">
+          <% if @queued_mail.last_error_at %>
+            <%= list_time_tag(@queued_mail.last_error_at) %> ·
+          <% end %>
+          <%= pluralize(@queued_mail.send_attempts, 'attempt') %>
+        </div>
+        <div class="text-12 text-secondary mt-1">
+          <% if @queued_mail.retries_exhausted? %>
+            Automatic retries stopped. Retry restores the budget.
+          <% elsif (blocked = MailDeliveryReadiness.unavailable_reason) %>
+            Waiting to retry — <%= blocked %>.
+          <% elsif @queued_mail.next_retry_at&.past? %>
+            Retrying automatically within a few minutes.
+          <% elsif @queued_mail.next_retry_at %>
+            Retrying automatically in <%= distance_of_time_in_words_to_now(@queued_mail.next_retry_at) %>.
+          <% end %>
+        </div>
       </div>
-      <div class="card-body">
-        <dl class="row mb-0">
-          <dt class="col-sm-4 text-secondary">To</dt>
-          <dd class="col-sm-8"><code><%= @queued_mail.to %></code></dd>
+    <% end %>
 
-          <dt class="col-sm-4 text-secondary">Subject</dt>
-          <dd class="col-sm-8"><%= @queued_mail.subject %></dd>
+    <div class="profile-section-header"><h2 class="h-section-label mb-0">Message</h2></div>
+    <div class="profile-field-group mb-4">
+      <%= field.call('To') { @queued_mail.to } %>
+      <% if @queued_mail.recipient %>
+        <%= field.call('Member') { link_to(@queued_mail.recipient.display_name, user_path(@queued_mail.recipient), class: 'text-decoration-none') } %>
+      <% end %>
+      <%= field.call('Reason') { @queued_mail.reason } %>
+      <%= field.call('Template') do %>
+        <% if @queued_mail.email_template %>
+          <%= link_to @queued_mail.email_template.name, email_template_path(@queued_mail.email_template), class: 'text-decoration-none' %>
+        <% else %>
+          <span class="text-secondary">View-based, no database template</span>
+        <% end %>
+      <% end %>
+    </div>
 
-          <dt class="col-sm-4 text-secondary">Reason</dt>
-          <dd class="col-sm-8"><%= @queued_mail.reason %></dd>
-
-          <% if @queued_mail.recipient %>
-            <dt class="col-sm-4 text-secondary">Recipient</dt>
-            <dd class="col-sm-8"><%= link_to @queued_mail.recipient.display_name, user_path(@queued_mail.recipient) %></dd>
-          <% end %>
-
-          <dt class="col-sm-4 text-secondary">Template</dt>
-          <dd class="col-sm-8">
-            <% if @queued_mail.email_template %>
-              <%= link_to @queued_mail.email_template.name, email_template_path(@queued_mail.email_template) %>
-            <% else %>
-              <span class="text-muted fst-italic">View-based (no database template)</span>
-            <% end %>
-          </dd>
-
-          <dt class="col-sm-4 text-secondary">Action</dt>
-          <dd class="col-sm-8"><code><%= @queued_mail.mailer_action %></code></dd>
-
-          <dt class="col-sm-4 text-secondary">Queued</dt>
-          <dd class="col-sm-8"><%= @queued_mail.created_at.strftime('%b %d, %Y %l:%M %p') %></dd>
-
-          <% if @queued_mail.reviewed_by %>
-            <dt class="col-sm-4 text-secondary">Reviewed by</dt>
-            <dd class="col-sm-8"><%= link_to @queued_mail.reviewed_by.display_name, user_path(@queued_mail.reviewed_by) %></dd>
-
-            <dt class="col-sm-4 text-secondary">Reviewed at</dt>
-            <dd class="col-sm-8"><%= @queued_mail.reviewed_at&.strftime('%b %d, %Y %l:%M %p') %></dd>
-          <% end %>
-
-          <% if @queued_mail.sent_at %>
-            <dt class="col-sm-4 text-secondary">Sent at</dt>
-            <dd class="col-sm-8"><%= @queued_mail.sent_at.strftime('%b %d, %Y %l:%M %p') %></dd>
-          <% end %>
-
-          <% if @queued_mail.send_attempts > 0 %>
-            <dt class="col-sm-4 text-secondary">Attempts</dt>
-            <dd class="col-sm-8"><%= @queued_mail.send_attempts %></dd>
-          <% end %>
-
-          <% if @queued_mail.last_error.present? %>
-            <dt class="col-sm-4 text-danger">Last Error</dt>
-            <dd class="col-sm-8">
-              <code class="text-danger"><%= @queued_mail.last_error %></code>
-              <% if @queued_mail.last_error_at %>
-                <div class="text-muted small"><%= time_ago_in_words(@queued_mail.last_error_at) %> ago</div>
-              <% end %>
-              <% if @queued_mail.retries_exhausted? %>
-                <div class="text-12 text-secondary">
-                  Automatic retries stopped after <%= @queued_mail.send_attempts %> attempts.
-                  Retry restores the budget.
-                </div>
-              <% elsif (blocked = MailDeliveryReadiness.unavailable_reason) %>
-                <div class="text-12 text-secondary">
-                  Waiting to retry — <%= blocked %>.
-                </div>
-              <% elsif @queued_mail.next_retry_at %>
-                <div class="text-12 text-secondary">
-                  <% if @queued_mail.next_retry_at.past? %>
-                    Retrying automatically within a few minutes.
-                  <% else %>
-                    Retrying automatically in <%= distance_of_time_in_words_to_now(@queued_mail.next_retry_at) %>.
-                  <% end %>
-                </div>
-              <% end %>
-            </dd>
-          <% end %>
-        </dl>
-      </div>
+    <div class="profile-section-header"><h2 class="h-section-label mb-0">System</h2></div>
+    <div class="profile-field-group profile-field-group-compact text-secondary">
+      <%= field.call('Action') { tag.code(@queued_mail.mailer_action) } %>
+      <%= field.call('Queued') { list_time_tag(@queued_mail.created_at) } %>
+      <% if @queued_mail.reviewed_by %>
+        <%= field.call('Reviewed') do %>
+          <%= link_to @queued_mail.reviewed_by.display_name, user_path(@queued_mail.reviewed_by), class: 'text-secondary' %>
+          · <%= list_time_tag(@queued_mail.reviewed_at, empty: '') %>
+        <% end %>
+      <% end %>
+      <% if @queued_mail.sent_at %>
+        <%= field.call('Sent') { list_time_tag(@queued_mail.sent_at) } %>
+      <% end %>
     </div>
   </div>
 
-  <div class="col-lg-8 mb-4">
-    <div class="card shadow-sm border-0">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h5 class="mb-0">Message Preview</h5>
-        <span class="text-11 text-secondary">Banner and opt-out footer shown as sent</span>
-      </div>
+  <div class="col-lg-8">
+    <div class="profile-section-header justify-content-between">
+      <h2 class="h-section-label mb-0">Preview</h2>
+      <span class="profile-section-context">Banner and opt-out footer shown as sent</span>
+    </div>
+    <div class="card shadow-sm border-0 mb-4">
       <div class="card-body p-0">
         <iframe id="mail_preview" srcdoc="<%= ERB::Util.html_escape(@preview.html) %>"
                 style="width: 100%; min-height: 400px; border: none;"
@@ -148,31 +130,14 @@
     </div>
 
     <% if @preview.text.present? %>
-      <div class="card shadow-sm border-0 mt-3">
-        <div class="card-header">
-          <h5 class="mb-0">Plain Text Version</h5>
-        </div>
+      <div class="profile-section-header"><h2 class="h-section-label mb-0">Plain text</h2></div>
+      <div class="card shadow-sm border-0">
         <div class="card-body">
-          <pre class="mb-0 text-body bg-body" style="white-space: pre-wrap;"><%= @preview.text %></pre>
+          <pre class="mb-0 text-body text-13" style="white-space: pre-wrap;"><%= @preview.text %></pre>
         </div>
       </div>
     <% end %>
   </div>
 </div>
 
-<script>
-  (function() {
-    function resizeIframe() {
-      var iframe = document.getElementById('mail_preview');
-      if (!iframe) return;
-      iframe.addEventListener('load', function() {
-        try {
-          var height = iframe.contentDocument.documentElement.scrollHeight;
-          iframe.style.height = Math.max(height + 20, 400) + 'px';
-        } catch(e) {}
-      });
-    }
-    document.addEventListener('DOMContentLoaded', resizeIframe);
-    document.addEventListener('turbo:load', resizeIframe);
-  })();
-</script>
+<%= render 'shared/mail_preview_resize' %>

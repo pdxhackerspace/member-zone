@@ -1,0 +1,6 @@
+<%# One label/value row on a read-only detail page. Render as a layout; the block is the value.
+    Locals: label. %>
+<div class="profile-field-row detail-field-row">
+  <span class="profile-field-label"><%= label %></span>
+  <div class="profile-field-value"><%= yield %></div>
+</div>

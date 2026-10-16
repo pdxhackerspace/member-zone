@@ -217,25 +217,25 @@ class SubtopicPrivilegesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test 'a steward can remove a subtopic trainer and sees the panel listing only their subtopics' do
+  test 'a steward can remove a subtopic trainer and is offered the trainer option' do
     steward = sign_in_as_plain_member
     grant_privileges(steward, 'training.subtopics.grant_trainer', 'training.record', topic: @parent)
     trainee = User.where.not(id: steward.id).first
     TrainerCapability.create!(user: trainee, training_topic: @subtopic)
 
     get record_training_path
-    assert_select '#trainer-capabilities-panel'
+    assert_select '#record-as-trainer'
 
     assert_difference 'TrainerCapability.count', -1 do
       delete remove_trainer_capability_path(user_id: trainee.id, topic_id: @subtopic.id)
     end
   end
 
-  test 'a curator without the grant privilege sees no trainer panel' do
+  test 'a curator without the grant privilege is not offered the trainer option' do
     lead = sign_in_as_plain_member
     grant_privileges(lead, 'training.record', topic: @parent)
 
     get record_training_path
-    assert_select '#trainer-capabilities-panel', count: 0
+    assert_select '#record-as-trainer', count: 0
   end
 end

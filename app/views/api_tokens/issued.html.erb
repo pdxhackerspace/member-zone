@@ -10,6 +10,19 @@
   </div>
 </div>
 
+<% unless @api_token.user.active? %>
+  <div class="alert alert-danger text-13">
+    <strong>This token will be refused for now.</strong>
+    <% if @api_token.service? %>
+      The service account <%= link_to @api_token.user.display_name, user_path(@api_token.user) %> is inactive.
+      Activate it (⋯ → Activate on its profile) and the token starts working — no need to make a new one.
+    <% else %>
+      <%= @api_token.user == current_user ? 'Your membership is' : "#{@api_token.user.display_name}'s membership is" %>
+      not active. The token starts working when it is.
+    <% end %>
+  </div>
+<% end %>
+
 <div class="alert alert-warning text-13">
   <strong>Copy this now.</strong> It is shown only once and cannot be recovered. If you lose it, revoke it and create
   a new one.

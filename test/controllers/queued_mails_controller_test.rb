@@ -22,7 +22,13 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
   test 'shows index with pending filter by default' do
     get queued_mails_path
     assert_response :success
-    assert_select 'h1', /Mail Queue/
+    assert_select 'h1', /Mail queue/
+  end
+
+  test 'index links to the mail log' do
+    get queued_mails_path
+
+    assert_select 'a.btn[href=?]', mail_log_path, text: 'Mail log'
   end
 
   test 'shows index with approved filter' do
@@ -58,24 +64,27 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'a[href=?]', queued_mail_path(@pending)
   end
 
-  test 'every filter chip carries the size of its bucket' do
+  test 'every filter tile carries the size of its bucket' do
     get queued_mails_path
 
     assert_response :success
-    QueuedMailsHelper::FILTER_CHIPS.each do |chip|
-      assert_select '.filter-chip', text: /#{chip[:label]}\s+\d+/, count: 1
+    QueuedMailsHelper::FILTER_TILES.each do |tile|
+      assert_select 'a.kpi-tile[href=?]', queued_mails_path(filter: tile[:filter]), count: 1 do
+        assert_select '.kpi-label', tile[:label]
+        assert_select '.kpi-value', /\d+/
+      end
     end
-    assert_select '.filter-chip.active', text: /Pending\s+\d+/, count: 1
+    assert_select 'a.kpi-tile.active .kpi-label', 'Pending'
   end
 
-  test 'a chip for an empty bucket is not a link' do
-    QueuedMail.where(status: 'rejected').delete_all
+  test 'an empty bucket keeps its tile neutral' do
+    QueuedMail.where.not(last_error: nil).update_all(last_error: nil)
 
     get queued_mails_path
 
     assert_response :success
-    assert_select 'span.filter-chip.muted', text: /Rejected\s+0/
-    assert_select 'a.filter-chip[href=?]', queued_mails_path(filter: 'rejected'), false
+    assert_select 'a.kpi-tile.danger', false
+    assert_select 'a.kpi-tile[href=?]', queued_mails_path(filter: 'failed')
   end
 
   test 'index shows 50 messages a page' do
@@ -112,6 +121,28 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select 'ul.pagination', false
+  end
+
+  test 'approve buttons send when SMTP is configured' do
+    get queued_mails_path
+
+    assert_select 'form[action=?] button.btn-primary', approve_all_queued_mails_path, text: 'Approve and send all'
+    assert_select 'form[action=?] button', approve_queued_mail_path(@pending), text: 'Approve and send'
+  end
+
+  test 'without SMTP the approve buttons are plain disabled buttons' do
+    Rails.configuration.action_mailer.smtp_settings = {}
+
+    get queued_mails_path
+
+    assert_select 'form[action=?]', approve_all_queued_mails_path, false
+    assert_select 'form[action=?]', approve_queued_mail_path(@pending), false
+    assert_select 'button.btn-outline-secondary[disabled]', text: 'Approve and send all'
+    assert_select 'button.btn-primary', text: /Approve and send/, count: 0
+
+    get queued_mail_path(@pending)
+
+    assert_select 'button.btn-outline-secondary[disabled]', text: 'Approve and send'
   end
 
   # ─── Show ─────────────────────────────────────────────────────────
@@ -165,6 +196,25 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'form'
     assert_select 'input#queued_mail_sync_body_text[name=?][checked]', 'sync_body_text'
     assert_select 'label[for=?]', 'queued_mail_sync_body_text', text: 'Keep in sync with HTML'
+  end
+
+  test 'edit page regenerates by POST, and only for admins' do
+    template = EmailTemplate.create!(key: 'regenerate_link_test', name: 'Regenerate link test', subject: 'Hi',
+                                     body_html: '<p>Hi</p>', body_text: 'Hi', enabled: true)
+    @pending.update!(email_template: template)
+
+    get edit_queued_mail_path(@pending)
+
+    assert_select 'a[href=?][data-turbo-method=post][data-turbo-confirm]', regenerate_queued_mail_path(@pending)
+
+    editor = sign_in_as_plain_member
+    grant_privileges(editor, 'queued_mail.view', 'queued_mail.edit')
+    sign_in_as_plain_member
+
+    get edit_queued_mail_path(@pending)
+
+    assert_response :success
+    assert_select 'a[href=?]', regenerate_queued_mail_path(@pending), false
   end
 
   test 'redirects edit for non-pending mail' do

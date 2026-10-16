@@ -97,7 +97,7 @@ Skipping the capture re-raises, which hands the failure to the queue adapter —
 
 ### Where an admin looks
 
-Two pages cover outgoing mail and share their chrome (`shared/_filter_chip`, `FilteredListHelper`) so they read the same way. The **Mail Queue** is present tense — what a message *is* — filtered into Pending, Failed, Approved, Rejected and All. The **Mail Log** is past tense — what happened to it — filtered by event, with recipient and subject search and a column showing where the message stands now, so an old failure line says whether it has since gone out. Every chip carries its own count, which is the point of them: a backlog is visible without clicking into it, and an empty bucket renders unclickable rather than offering an empty page. Both lists page at 50 rows.
+Two pages cover outgoing mail and are built from the shared list parts (`shared/_list_page_header`, `shared/_list_table`, `shared/_pagination`), with a button on each header leading to the other. The **Mail queue** is present tense — what a message *is* — split into Pending, Failed, Approved, Rejected and All as a tile row, since those are one axis of five buckets you pick between; Pending and Failed only take their colour while they hold something. The **Mail log** is past tense — what happened to it — filtered by event on a chip row (eight buckets is too many for tiles), with recipient and subject search and a column showing where the message stands now, so an old failure line says whether it has since gone out. Every tile and chip carries its own count, which is the point of them: a backlog is visible without clicking into it. A log chip for an empty bucket renders unclickable rather than offering an empty page. Both lists page at 50 rows.
 
 ### One retry engine
 

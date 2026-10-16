@@ -6,7 +6,7 @@ class ManagedApiTokensController < AuthenticatedController
   include ApiTokenIssuing
 
   EXPIRING_WINDOW = 30.days
-  FILTERS = %w[active expiring suspended expired revoked no_contact].freeze
+  FILTERS = %w[active expiring holder_inactive suspended expired revoked no_contact].freeze
 
   before_action -> { require_privilege!(:'api.tokens.manage') }
   before_action :refuse_while_impersonating, only: %i[create update lifetime]
@@ -92,6 +92,7 @@ class ManagedApiTokensController < AuthenticatedController
     when 'expired' then tokens.expired(now)
     when 'revoked' then tokens.revoked
     when 'no_contact' then tokens.where(id: tokens_without_contact)
+    when 'holder_inactive' then tokens.where(id: tokens_with_inactive_holder)
     else tokens
     end
   end
@@ -113,8 +114,15 @@ class ManagedApiTokensController < AuthenticatedController
       'suspended' => ApiToken.suspended.count,
       'expired' => ApiToken.expired(now).count,
       'revoked' => ApiToken.revoked.count,
-      'no_contact' => tokens_without_contact.size
+      'no_contact' => tokens_without_contact.size,
+      'holder_inactive' => tokens_with_inactive_holder.size
     }
+  end
+
+  # Tokens that are fine in themselves but refused because their holder is inactive. Asked of
+  # User#active? rather than the cached column, since that is what authentication asks.
+  def tokens_with_inactive_holder
+    @tokens_with_inactive_holder ||= ApiToken.usable.includes(:user).reject { |token| token.user.active? }.map(&:id)
   end
 
   def lifecycle_return_path

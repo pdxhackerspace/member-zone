@@ -13,24 +13,34 @@ module MailLogHelper
     { state: 'edited', label: 'Edited' }
   ].freeze
 
-  EVENT_BADGE_CLASSES = {
-    'send_failed' => 'text-bg-danger-subtle',
-    'suppressed' => 'text-bg-warning-subtle',
-    'rejected' => 'text-bg-warning-subtle',
-    'sent' => 'text-bg-success-subtle',
-    'approved' => 'text-bg-success-subtle',
-    'edited' => 'text-bg-info-subtle',
-    'regenerated' => 'text-bg-info-subtle'
-  }.freeze
+  # Events an admin has to look at. Everything else is the normal course of a message and reads as
+  # a dot and a muted label, so the exceptions stand out down the column.
+  EVENT_ALERT_TONES = { 'send_failed' => 'danger', 'suppressed' => 'warning', 'rejected' => 'warning' }.freeze
 
   EVENT_LABELS = { 'send_failed' => 'Failed', 'created' => 'Queued' }.freeze
 
-  def mail_log_event_badge_class(event)
-    EVENT_BADGE_CLASSES.fetch(event, 'text-bg-secondary-subtle')
-  end
-
   def mail_log_event_label(event)
     EVENT_LABELS.fetch(event, event.humanize)
+  end
+
+  def mail_log_event_cell(event)
+    label = mail_log_event_label(event)
+    tone = EVENT_ALERT_TONES[event]
+    return tag.span(label, class: "badge text-bg-#{tone}-subtle") if tone
+
+    dot = event == 'sent' ? 'status-success' : 'status-muted'
+    safe_join([tag.span(nil, class: "status-dot #{dot} me-1"), tag.span(label, class: 'text-secondary text-13')])
+  end
+
+  # The state chips with their counts, keeping the search as the chip changes. They sit inside the
+  # results frame so the search refreshes them, but a click reloads the whole page: the search form
+  # outside the frame carries the state along, and only a full load puts the new one there.
+  def mail_log_filter_chips(counts)
+    STATE_CHIPS.map do |chip|
+      { label: chip[:label], variant: chip[:variant], count: counts.fetch(chip[:state] || 'all', 0),
+        path: mail_log_path(state: chip[:state], q: @search.presence), active: mail_log_chip_active?(chip[:state]),
+        data: { turbo_frame: '_top' } }
+    end
   end
 
   # The All chip carries no state, so it is the selected one when nothing is filtered.

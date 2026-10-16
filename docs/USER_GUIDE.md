@@ -272,6 +272,24 @@ Each token lasts the maximum lifetime (365 days unless changed) and we email you
 
 Tokens cannot be created or changed while viewing as a member.
 
+## Recording training
+
+**Record training** (from the dashboard or the training catalog) records a class in three steps:
+
+1. **Topics.** Pick one or more. Only topics you may train in, or appoint trainers for, are listed.
+2. **Members.** Search by name, email, or username, or use **Paste list** for a whole class. Each member's row shows what will happen in every selected topic: *train*, *make trainer*, or a greyed-out *already trained* / *already a trainer* that will be skipped.
+3. **Record as.** **Trained** records a training in each topic. **Trainer** lets the members train others in those topics, and records their own training first if it is missing. Trainer is shown only to people who can appoint trainers (admins, directors, and stewards for their subtopics); topics you can't appoint trainers for are greyed out while it is selected. Set the date and, for admins, who ran the session.
+
+The bar at the bottom totals it (for example, *4 members × 2 topics → 6 trainings, 2 skipped*) before you submit. Inactive members can be included; you'll be asked whether to email them. Banned members are always skipped.
+
+To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
+
+## Topic resources
+
+Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open.
+
+People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.

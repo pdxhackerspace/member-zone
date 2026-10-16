@@ -144,6 +144,34 @@ class ManagedApiTokensControllerTest < ActionDispatch::IntegrationTest
     assert_select 'select[name=?]', 'api_token[contact_user_id]', count: 0
   end
 
+  test 'flags tokens refused because their holder is inactive' do
+    manager = sign_in_as_manager
+    ApiToken.create!(user: @kiosk, created_by: manager, contact_user: manager, name: 'Sleeping kiosk token')
+    @kiosk.update_columns(active: false)
+
+    get managed_api_tokens_path(filter: 'holder_inactive')
+
+    assert_includes response.body, 'Sleeping kiosk token'
+    assert_includes response.body, 'Refused: holder inactive'
+    assert_includes response.body, 'refused because the holder is inactive'
+  end
+
+  test 'warns on the new-token page when the service account is inactive' do
+    sign_in_as_manager
+    @kiosk.update_columns(active: false)
+    post managed_api_tokens_path, params: { api_token: { user_id: @kiosk.id, name: 'Kiosk', contact_user_id: '' } }
+
+    assert_response :success
+    assert_includes response.body, 'This token will be refused for now.'
+  end
+
+  test 'no warning when the service account is active' do
+    sign_in_as_manager
+    post managed_api_tokens_path, params: { api_token: { user_id: @kiosk.id, name: 'Kiosk', contact_user_id: '' } }
+
+    assert_not_includes response.body, 'This token will be refused for now.'
+  end
+
   test 'sets the maximum lifetime' do
     sign_in_as_manager
     patch lifetime_managed_api_tokens_path, params: { api_token_max_lifetime_days: 90 }

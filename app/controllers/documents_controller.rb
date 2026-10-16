@@ -74,6 +74,10 @@ class DocumentsController < AuthenticatedController
     # Whoever may list every document may open one; the index already requires this key.
     return true if can?(:'training.documents.view_all')
 
+    # Whoever may manage the document may open it, including a curator who reaches a
+    # subtopic through its parent without being trained in it.
+    return true if trainer_for_document?(document)
+
     # Document is shown on all profiles
     return true if document.show_on_all_profiles?
 
@@ -123,11 +127,7 @@ class DocumentsController < AuthenticatedController
   end
 
   def return_path
-    if params[:return_to_topic].present?
-      edit_training_topic_path(params[:return_to_topic])
-    else
-      documents_path
-    end
+    helpers.document_return_path
   end
 
   def restrict_trainer_permissions_on(document)

@@ -179,6 +179,10 @@
   background: rgba(255, 193, 7, 0.06);
   border-color: rgba(255, 193, 7, 0.3);
 }
+.kpi-tile.danger {
+  background: rgba(220, 53, 69, 0.06);
+  border-color: rgba(220, 53, 69, 0.3);
+}
 .kpi-label {
   font-size: 10px;
   text-transform: uppercase;
@@ -187,6 +191,7 @@
   margin-bottom: 2px;
 }
 .kpi-tile.warning .kpi-label { color: var(--bs-warning); }
+.kpi-tile.danger .kpi-label  { color: var(--bs-danger); }
 .kpi-tile.active .kpi-label  { color: var(--bs-info-text-emphasis); }
 .kpi-value {
   font-size: 20px;
@@ -195,6 +200,7 @@
   font-variant-numeric: tabular-nums;
 }
 .kpi-tile.warning .kpi-value { color: var(--bs-warning); }
+.kpi-tile.danger .kpi-value  { color: var(--bs-danger); }
 
 /* === Compact table styling ===
    Apply with: <table class="table table-compact"> */
@@ -1000,14 +1006,31 @@ svg.leaflet-image-layer.leaflet-interactive path {
   background: rgba(255,255,255,0.06);
   border-color: rgba(255,255,255,0.2);
 }
-.topic-chip-selected {
-  font-size: 14px;
-  font-weight: 500;
+.topic-chip.active {
   color: var(--bs-body-color);
   background: rgba(13,110,253,0.12);
-  border: 0.5px solid rgba(13,110,253,0.4);
-  padding: 5px 12px;
-  border-radius: 5px;
+  border-color: rgba(13,110,253,0.5);
+}
+.topic-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.record-mode .btn-check:checked + .btn {
+  color: var(--bs-body-color);
+  background: rgba(13,110,253,0.12);
+  border-color: rgba(13,110,253,0.5);
+}
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--bs-primary-text-emphasis);
+  background: rgba(13,110,253,0.12);
 }
 .member-search-input {
   display: flex;
@@ -1039,17 +1062,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
 }
 .trainee-row {
   display: grid;
-  grid-template-columns: 28px 1fr auto 24px;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 2fr) 24px;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
   background: rgba(255,255,255,0.02);
   border: 0.5px solid rgba(255,255,255,0.06);
   border-radius: 5px;
-}
-.trainee-row-warning {
-  background: rgba(255,193,7,0.04);
-  border-color: rgba(255,193,7,0.2);
 }
 .trainee-avatar {
   width: 24px;
@@ -1064,19 +1083,24 @@ svg.leaflet-image-layer.leaflet-interactive path {
 }
 .trainee-name { font-size: 13px; color: var(--bs-body-color); }
 .trainee-meta { font-size: 11px; color: var(--bs-secondary-color); }
-.trainee-status {
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 3px;
+.trainee-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
-.trainee-status.status-add {
-  color: var(--bs-success);
-  background: rgba(151,196,89,0.1);
+.topic-resource {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.02);
+  border: 0.5px solid rgba(255,255,255,0.06);
+  border-radius: 5px;
+  font-size: 13px;
 }
-.trainee-status.status-skip {
-  color: var(--bs-warning);
-  background: rgba(255,193,7,0.12);
+.topic-resource summary {
+  list-style: none;
+  cursor: pointer;
 }
+.topic-resource summary::-webkit-details-marker { display: none; }
+.topic-resource .min-w-0 { min-width: 0; }
 .trainee-remove {
   background: none;
   border: none;
@@ -1137,6 +1161,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   text-decoration: none;
 }
 .profile-field-edit:hover { text-decoration: underline; }
+
+/* Read-only detail pages: label and value, no inline Edit column. */
+.profile-field-row.detail-field-row {
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: start;
+}
+.detail-field-row .profile-field-value { min-width: 0; overflow-wrap: anywhere; }
 
 .profile-field-row.membership-setting-field-row {
   grid-template-columns: minmax(180px, 38%) 1fr;

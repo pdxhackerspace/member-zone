@@ -4,6 +4,8 @@ module ApiTokensHelper
   # Active tokens are the common case and get a quiet dot; anything that needs undoing gets a
   # labelled badge.
   def api_token_state(token)
+    return api_token_holder_inactive_badge(token) if token.state == 'active' && !token.user.active?
+
     case token.state
     when 'active' then tag.span(class: 'status-dot status-success', title: 'Active')
     when 'suspended' then tag.span('Suspended', class: 'badge text-bg-warning-subtle')
@@ -25,6 +27,14 @@ module ApiTokensHelper
            end
     warn = !token.revoked? && value < EXPIRY_WARNING.from_now
     tag.span(text, class: ('text-warning' if warn), title: l(value, format: :long))
+  end
+
+  # A token whose holder is inactive is refused even though nothing about the token itself is
+  # wrong, so say so where the token is listed rather than leaving it to a mystery 401.
+  def api_token_holder_inactive_badge(token)
+    what = token.service? ? 'Service account is inactive' : 'Membership is not active'
+    tag.span('Refused: holder inactive', class: 'badge text-bg-warning-subtle',
+                                         title: "#{what}, so this token is refused until it is active again.")
   end
 
   def api_token_last_used(token)

@@ -312,6 +312,19 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test 'curator who manages a parent topic can download a subtopic document without being trained in it' do
+    sign_in_as_regular_member
+    member = User.find_by!('authentik_id LIKE ?', "local:#{local_accounts(:regular_member).id}")
+    parent = TrainingTopic.create!(name: 'Curated area', offered_to_members: true)
+    grant_privileges(member, 'training.documents.manage', topic: parent)
+    subtopic = TrainingTopic.create!(name: 'Curated subtopic', parent: parent, offered_to_members: true)
+    doc = create_document_for_topic(subtopic)
+
+    get download_document_path(doc)
+
+    assert_response :success
+  end
+
   test 'return_to_topic redirects back to topic page after create' do
     sign_in_as_trainer
     post documents_path, params: {

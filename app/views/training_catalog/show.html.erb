@@ -41,45 +41,6 @@
   </div>
 </div>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
-    <h2 class="h5 mb-3"><i class="bi bi-link-45deg me-2"></i>Training Materials</h2>
-
-    <% if @topic_links.any? %>
-      <h3 class="h6 text-muted mb-2">Links</h3>
-      <ul class="list-unstyled mb-4">
-        <% @topic_links.each do |link| %>
-          <li class="mb-2">
-            <i class="bi bi-link-45deg me-1"></i>
-            <%= link_to link.title, link.url, target: '_blank', rel: 'noopener', class: 'text-decoration-none' %>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-
-    <% if @topic_documents.any? %>
-      <h3 class="h6 text-muted mb-2">Documents</h3>
-      <ul class="list-unstyled mb-0">
-        <% @topic_documents.each do |doc| %>
-          <li class="mb-2 d-flex align-items-center gap-2">
-            <i class="bi bi-file-earmark"></i>
-            <% if doc.file.attached? %>
-              <%= link_to doc.title, download_document_path(doc), class: 'text-decoration-none' %>
-              <span class="text-muted small">(<%= number_to_human_size(doc.file.byte_size) %>)</span>
-            <% else %>
-              <span><%= doc.title %></span>
-            <% end %>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-
-    <% if @topic_links.empty? && @topic_documents.empty? %>
-      <p class="text-muted mb-0">No training materials have been added for this topic.</p>
-    <% end %>
-  </div>
-</div>
-
 <div class="row g-4">
   <div class="col-lg-6">
     <div class="card shadow-sm border-0 h-100">
@@ -129,3 +90,5 @@
     </div>
   </div>
 </div>
+
+<%= render 'training_catalog/resources' %>

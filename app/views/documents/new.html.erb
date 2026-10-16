@@ -1,6 +1,6 @@
 <div class="mb-4">
   <% if params[:return_to_topic].present? %>
-    <%= link_to "&larr; Back to Topic".html_safe, edit_training_topic_path(params[:return_to_topic]), class: "text-decoration-none" %>
+    <%= link_to "&larr; Back to Topic".html_safe, document_return_path, class: "text-decoration-none" %>
   <% else %>
     <%= link_to "&larr; Back to Documents".html_safe, documents_path, class: "text-decoration-none" %>
   <% end %>
