@@ -27,11 +27,12 @@
              shown: @payment_count, total: @total_count, clear_path: kofi_payments_path %>
 <% end %>
 
+<% tile_path = ->(value) { kofi_payments_path({ linked: value, q: params[:q].presence }.compact) } %>
 <%= render 'shared/list_filter_tiles', tiles: [
-      { label: 'All', count: @total_count, path: kofi_payments_path, active: params[:linked].blank? },
-      { label: 'Linked', count: @linked_count, path: kofi_payments_path(linked: 'yes'),
+      { label: 'All', count: @total_count, path: tile_path.call(nil), active: params[:linked].blank? },
+      { label: 'Linked', count: @linked_count, path: tile_path.call('yes'),
         active: params[:linked] == 'yes' },
-      { label: 'Unlinked', count: @unlinked_count, path: kofi_payments_path(linked: 'no'),
+      { label: 'Unlinked', count: @unlinked_count, path: tile_path.call('no'),
         active: params[:linked] == 'no', variant: 'warning' }
     ] %>
 

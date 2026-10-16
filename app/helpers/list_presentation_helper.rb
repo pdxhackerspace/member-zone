@@ -18,18 +18,24 @@ module ListPresentationHelper
     public_send(path_helper, carried.compact_blank)
   end
 
-  # Money in a list cell. The dollar figure is the bright part; the symbol and the cents are
+  # Symbols for the currencies the processors actually send. Anything else goes without a
+  # symbol and leans on its code alone rather than borrowing a dollar sign.
+  CURRENCY_SYMBOLS = { 'USD' => '$', 'CAD' => '$', 'AUD' => '$', 'EUR' => '€', 'GBP' => '£' }.freeze
+
+  # Money in a list cell. The whole figure is the bright part; the symbol and the cents are
   # dimmed so a column of identical dues payments stops shouting and an odd amount stands out.
+  # A currency other than US dollars also carries its code, since $ alone would read as USD.
   def list_money_tag(amount, currency = nil)
     return tag.span('—', class: 'text-secondary') if amount.blank?
 
     value = amount.to_d
     whole = value.truncate
     cents = ((value - whole).abs * 100).round
-    code = currency.to_s.strip.presence
-    parts = [tag.span('$', class: 'currency'), number_with_delimiter(whole),
-             tag.span(format('.%02d', cents), class: 'cents')]
-    parts << tag.span(" #{code}", class: 'cents') if code && code.casecmp('USD') != 0
+    code = currency.to_s.strip.upcase.presence || 'USD'
+    symbol = CURRENCY_SYMBOLS[code]
+    parts = [number_with_delimiter(whole), tag.span(format('.%02d', cents), class: 'cents')]
+    parts.unshift(tag.span(symbol, class: 'currency')) if symbol
+    parts << tag.span(" #{code}", class: 'cents') unless code == 'USD'
     tag.span(safe_join(parts), class: 'money')
   end
 
