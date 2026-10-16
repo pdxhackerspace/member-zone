@@ -11,11 +11,12 @@
              shown: @payment_count, total: @total_count, clear_path: cash_payments_path %>
 <% end %>
 
+<% tile_path = ->(value) { cash_payments_path({ period: value, q: params[:q].presence }.compact) } %>
 <%= render 'shared/list_filter_tiles', tiles: [
-      { label: 'All', count: @total_count, path: cash_payments_path, active: params[:period].blank? },
-      { label: 'This month', count: @month_count, path: cash_payments_path(period: 'month'),
+      { label: 'All', count: @total_count, path: tile_path.call(nil), active: params[:period].blank? },
+      { label: 'This month', count: @month_count, path: tile_path.call('month'),
         active: params[:period] == 'month' },
-      { label: 'This year', count: @year_count, path: cash_payments_path(period: 'year'),
+      { label: 'This year', count: @year_count, path: tile_path.call('year'),
         active: params[:period] == 'year' }
     ] %>
 

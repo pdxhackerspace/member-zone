@@ -209,6 +209,16 @@ class UsersIndexFiltersTest < ActionDispatch::IntegrationTest
     assert_select 'a[href*="membership_state=sponsored_member"]', /Sponsored\s+\d+/
   end
 
+  test 'sibling chips on a picked axis stay clickable with their own counts' do
+    users(:one).update_columns(payment_type: 'paypal', service_account: false)
+    users(:two).update_columns(payment_type: 'cash', service_account: false)
+
+    get users_path(payment_type: 'paypal')
+    assert_response :success
+
+    assert_select 'a.filter-chip[href*="payment_type=cash"]', /Cash\s+[1-9]/
+  end
+
   test 'filter summary shows all active filter labels' do
     get users_path(membership_state: 'overdue_member', payment_type: 'paypal')
     assert_response :success
