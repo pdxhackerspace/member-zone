@@ -741,6 +741,7 @@ class User < ApplicationRecord
 
   before_validation :generate_username_if_blank
   before_validation :set_membership_start_date, on: :create
+  before_validation :activate_new_service_account, on: :create
   before_validation :apply_sponsored_guest_duration_months
   before_save :set_extra_email_lookup_digests
   before_save :ensure_greeting_name_mutual_exclusivity
@@ -1124,5 +1125,12 @@ class User < ApplicationRecord
 
     sources << 'all_members'
     Authentik::ApplicationGroupMembershipSyncJob.perform_later(sources.uniq)
+  end
+
+  # A service account's activeness is set by hand rather than projected from a membership, and
+  # the column defaults to inactive — which left a new one, and every API token it held, refused
+  # until someone found the Activate button. One created without saying otherwise starts active.
+  def activate_new_service_account
+    self.active = true if service_account? && !active_came_from_user?
   end
 end

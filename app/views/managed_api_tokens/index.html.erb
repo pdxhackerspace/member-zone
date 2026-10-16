@@ -4,6 +4,7 @@
     <div class="text-13 text-secondary mt-1">
       <span class="text-body"><%= @counts['active'] %></span> active
       <% if @counts['expiring'].positive? %>· <span class="text-warning"><%= @counts['expiring'] %></span> expiring within 30 days<% end %>
+      <% if @counts['holder_inactive'].positive? %>· <span class="text-warning"><%= @counts['holder_inactive'] %></span> refused because the holder is inactive<% end %>
       <% if @counts['no_contact'].positive? %>· <span class="text-warning"><%= @counts['no_contact'] %></span> with nobody to remind<% end %>
     </div>
   </div>
@@ -16,9 +17,10 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
   <%= link_to "All", managed_api_tokens_path(kind: params[:kind]),
               class: "filter-chip text-decoration-none #{'active' if @filter.nil?}" %>
-  <% { 'active' => 'Active', 'expiring' => 'Expiring soon', 'no_contact' => 'Nobody to remind', 'suspended' => 'Suspended',
+  <% { 'active' => 'Active', 'expiring' => 'Expiring soon', 'holder_inactive' => 'Holder inactive',
+       'no_contact' => 'Nobody to remind', 'suspended' => 'Suspended',
        'expired' => 'Expired', 'revoked' => 'Revoked' }.each do |key, label| %>
-    <% variant = 'warning' if %w[expiring no_contact].include?(key) && @counts[key].positive? %>
+    <% variant = 'warning' if %w[expiring holder_inactive no_contact].include?(key) && @counts[key].positive? %>
     <%= link_to managed_api_tokens_path(filter: key, kind: params[:kind]),
                 class: ["filter-chip text-decoration-none", variant, ('active' if @filter == key),
                         ('muted' if @counts[key].zero?)].compact.join(' ') do %>
