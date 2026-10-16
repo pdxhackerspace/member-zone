@@ -17,13 +17,8 @@
 
 <%= render layout: 'shared/list_page_header', locals: { title: 'Mail queue', summary: summary } do %>
   <% if bulk_actions %>
-    <% if smtp_configured? %>
-      <%= button_to 'Approve and send all', approve_all_queued_mails_path, method: :post,
-                    class: 'btn btn-primary btn-sm',
-                    data: { turbo_confirm: "This will approve and send all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" } %>
-    <% else %>
-      <button type="button" class="btn btn-primary btn-sm" disabled title="SMTP not configured">Approve and send all</button>
-    <% end %>
+    <%= queued_mail_send_button 'Approve and send all', approve_all_queued_mails_path, primary: true,
+                                confirm: "This will approve and send all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" %>
   <% end %>
   <% if can?(:'mail_log.view') %>
     <%= link_to 'Mail log', mail_log_path, class: 'btn btn-outline-secondary btn-sm' %>
@@ -86,13 +81,8 @@
                           data: { turbo_confirm: "Retry sending this email to #{qm.to}?" } %>
           <% elsif qm.pending? && can?(:'queued_mail.approve') %>
             <div class="d-inline-flex gap-1">
-              <% if smtp_configured? %>
-                <%= button_to 'Approve and send', approve_queued_mail_path(qm), method: :post,
-                              class: 'btn btn-sm btn-outline-secondary',
-                              data: { turbo_confirm: "This will send this email to #{qm.to}. Continue?" } %>
-              <% else %>
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="SMTP not configured">Approve and send</button>
-              <% end %>
+              <%= queued_mail_send_button 'Approve and send', approve_queued_mail_path(qm),
+                                          confirm: "This will send this email to #{qm.to}. Continue?" %>
               <div class="dropdown">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
                         aria-expanded="false" aria-label="More actions">&hellip;</button>

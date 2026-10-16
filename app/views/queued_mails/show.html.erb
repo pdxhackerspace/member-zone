@@ -25,13 +25,8 @@
                     data: { turbo_confirm: "Retry sending this email to #{@queued_mail.to}?" } %>
     <% end %>
     <% if can_approve %>
-      <% if smtp_configured? %>
-        <%= button_to 'Approve and send', approve_queued_mail_path(@queued_mail), method: :post,
-                      class: 'btn btn-primary btn-sm',
-                      data: { turbo_confirm: "This will send this email to #{@queued_mail.to}. Continue?" } %>
-      <% else %>
-        <button type="button" class="btn btn-primary btn-sm" disabled title="SMTP not configured">Approve and send</button>
-      <% end %>
+      <%= queued_mail_send_button 'Approve and send', approve_queued_mail_path(@queued_mail), primary: true,
+                                  confirm: "This will send this email to #{@queued_mail.to}. Continue?" %>
     <% end %>
     <% if @queued_mail.pending? && can?(:'queued_mail.edit') %>
       <%= link_to 'Edit', edit_queued_mail_path(@queued_mail), class: 'btn btn-outline-secondary btn-sm' %>

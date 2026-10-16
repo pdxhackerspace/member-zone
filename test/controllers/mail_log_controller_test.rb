@@ -144,6 +144,40 @@ class MailLogControllerTest < ActionDispatch::IntegrationTest
     assert_select 'ul.pagination', false
   end
 
+  # The search reloads only the results frame, so whatever depends on the search has to come back
+  # with it, and links from it have to reload the whole page to keep the search form in step.
+  test 'chips and the filter banner come back with a search' do
+    MailLogEntry.log_queued_delivery!(queued_mails(:approved_mail))
+
+    get mail_log_path(q: 'nothing-matches-this')
+
+    assert_select 'turbo-frame#mail_log_results' do
+      assert_select '.alert', text: /Filtering: "nothing-matches-this" \(0 of #{MailLogEntry.count} entries\)/
+      assert_select '.alert a[data-turbo-frame=_top]', 'Clear filters'
+      assert_select '.filter-chip.active', text: /All\s+0/
+    end
+  end
+
+  test 'the header counts the whole log while a search narrows the chips' do
+    MailLogEntry.log_queued_delivery!(queued_mails(:approved_mail))
+    total = MailLogEntry.count
+
+    get mail_log_path(q: 'nothing-matches-this')
+
+    assert_select '.h-page-title + div', text: /#{total}\s+#{'entry'.pluralize(total)}/
+  end
+
+  test 'links in the results leave the frame' do
+    entry = MailLogEntry.log_queued_delivery!(queued_mails(:approved_mail))
+
+    get mail_log_path
+
+    assert_select 'turbo-frame#mail_log_results' do
+      assert_select 'a.filter-chip:not([data-turbo-frame=_top])', false
+      assert_select 'a[href=?][data-turbo-frame=_top]', mail_log_entry_path(entry)
+    end
+  end
+
   test 'index points at failed messages still waiting in the queue' do
     queued_mails(:approved_mail).update!(sent_at: nil, last_error: 'Net::SMTPServerBusy: try later',
                                          last_error_at: Time.current)
