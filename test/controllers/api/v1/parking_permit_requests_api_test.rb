@@ -16,6 +16,17 @@ module Api
         @raw = issue_api_token(@kiosk, created_by: admin, name: 'Front door kiosk',
                                        scopes: ['parking.issue_for_members'])
         @token = ApiToken.find_by(token_digest: ApiToken.digest(@raw))
+        @original_print_data = CupsService.method(:print_data)
+        @printed_to = []
+        printed_to = @printed_to
+        CupsService.define_singleton_method(:print_data) do |_pdf, printer_name, **_kwargs|
+          printed_to << printer_name
+          "#{printer_name}-1"
+        end
+      end
+
+      teardown do
+        CupsService.define_singleton_method(:print_data, @original_print_data)
       end
 
       test 'refuses a request without a token' do
@@ -90,6 +101,81 @@ module Api
         assert_equal 'Blank permit issued by Front door kiosk.', notice.events.find_by(event_type: 'note').note
         assert ParkingPermitLink.exists?(parking_notice: notice, purpose: 'complete_permit', api_token: @token)
         assert_equal notice.id, json_body.dig('data', 'permit', 'id')
+      end
+
+      test 'print: true prints the blank permit on the default printer' do
+        Printer.create!(name: 'Back room', cups_printer_name: 'back_room')
+        default = Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+
+        request_permit(rfid: 'RFID001', mode: 'blank', print: true)
+
+        assert_response :created
+        assert_matches_spec :post, '/parking/permit_requests'
+        assert_equal ['front_desk'], @printed_to
+        assert_equal({ 'printer_id' => default.id, 'printer_name' => 'Front desk', 'job_id' => 'front_desk-1',
+                       'error' => nil }, json_body.dig('data', 'print'))
+      end
+
+      test 'printer_id prints on that printer' do
+        Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+        back = Printer.create!(name: 'Back room', cups_printer_name: 'back_room')
+
+        request_permit(rfid: 'RFID001', mode: 'blank', printer_id: back.id)
+
+        assert_response :created
+        assert_equal ['back_room'], @printed_to
+        assert_equal back.id, json_body.dig('data', 'print', 'printer_id')
+      end
+
+      test 'without print or printer_id nothing is printed' do
+        Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+        request_permit(rfid: 'RFID001', mode: 'blank')
+
+        assert_response :created
+        assert_empty @printed_to
+        assert_nil json_body.dig('data', 'print')
+      end
+
+      test 'an unknown printer or no printer at all refuses before issuing anything' do
+        assert_no_difference 'ParkingNotice.count' do
+          request_permit(rfid: 'RFID001', mode: 'blank', printer_id: 0)
+          assert_api_error :not_found, 'not_found'
+
+          request_permit(rfid: 'RFID001', mode: 'blank', print: true)
+          assert_api_error :conflict, 'conflict'
+          assert_matches_spec :post, '/parking/permit_requests'
+        end
+      end
+
+      test 'link mode cannot print, since there is no permit yet' do
+        Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+
+        assert_no_enqueued_emails do
+          request_permit(rfid: 'RFID001', mode: 'link', print: true)
+        end
+        assert_api_error :bad_request, 'bad_request'
+      end
+
+      test 'a printer that refuses the job leaves the permit issued and says why' do
+        Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+        CupsService.define_singleton_method(:print_data) { |*_args, **_kwargs| raise CupsService::PrintError, 'offline' }
+
+        assert_difference 'ParkingNotice.count', 1 do
+          request_permit(rfid: 'RFID001', mode: 'blank', print: true)
+        end
+
+        assert_response :created
+        assert_matches_spec :post, '/parking/permit_requests'
+        assert_nil json_body.dig('data', 'print', 'job_id')
+        assert_equal 'offline', json_body.dig('data', 'print', 'error')
+      end
+
+      test 'the kiosk can list printers' do
+        Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)
+        get api_v1_parking_printers_path, headers: api_headers(@raw)
+
+        assert_response :success
+        assert_equal ['Front desk'], json_body['data'].pluck('name')
       end
 
       test 'finds the member by username or email' do
