@@ -179,6 +179,10 @@
   background: rgba(255, 193, 7, 0.06);
   border-color: rgba(255, 193, 7, 0.3);
 }
+.kpi-tile.danger {
+  background: rgba(220, 53, 69, 0.06);
+  border-color: rgba(220, 53, 69, 0.3);
+}
 .kpi-label {
   font-size: 10px;
   text-transform: uppercase;
@@ -187,6 +191,7 @@
   margin-bottom: 2px;
 }
 .kpi-tile.warning .kpi-label { color: var(--bs-warning); }
+.kpi-tile.danger .kpi-label  { color: var(--bs-danger); }
 .kpi-tile.active .kpi-label  { color: var(--bs-info-text-emphasis); }
 .kpi-value {
   font-size: 20px;
@@ -195,6 +200,7 @@
   font-variant-numeric: tabular-nums;
 }
 .kpi-tile.warning .kpi-value { color: var(--bs-warning); }
+.kpi-tile.danger .kpi-value  { color: var(--bs-danger); }
 
 /* === Compact table styling ===
    Apply with: <table class="table table-compact"> */
@@ -1137,6 +1143,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   text-decoration: none;
 }
 .profile-field-edit:hover { text-decoration: underline; }
+
+/* Read-only detail pages: label and value, no inline Edit column. */
+.profile-field-row.detail-field-row {
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: start;
+}
+.detail-field-row .profile-field-value { min-width: 0; overflow-wrap: anywhere; }
 
 .profile-field-row.membership-setting-field-row {
   grid-template-columns: minmax(180px, 38%) 1fr;

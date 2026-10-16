@@ -1,0 +1,18 @@
+<%# Grows the #mail_preview iframe to fit the rendered message, so the page scrolls rather than
+    the frame. %>
+<script>
+  (function() {
+    function resizeIframe() {
+      var iframe = document.getElementById('mail_preview');
+      if (!iframe) return;
+      iframe.addEventListener('load', function() {
+        try {
+          var height = iframe.contentDocument.documentElement.scrollHeight;
+          iframe.style.height = Math.max(height + 20, 400) + 'px';
+        } catch(e) {}
+      });
+    }
+    document.addEventListener('DOMContentLoaded', resizeIframe);
+    document.addEventListener('turbo:load', resizeIframe);
+  })();
+</script>

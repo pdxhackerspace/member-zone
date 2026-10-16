@@ -1,158 +1,122 @@
-<div class="d-flex align-items-end justify-content-between mb-3">
-  <div>
-    <h1 class="h-page-title mb-0">Mail Queue</h1>
-    <%# Per-bucket counts live on the filter chips below; the header carries only the totals that
-        frame them. %>
-    <div class="text-13 text-secondary mt-1">
-      <span class="text-body"><%= @filter_counts.fetch('all') %></span> messages
-      <% if @pending_count > 0 %>
-        · <span class="text-body"><%= @pending_count %></span> awaiting review
-      <% end %>
-      <% if @failed_count > 0 %>
-        · <%= link_to "#{@failed_count} failed to send", queued_mails_path(filter: 'failed'),
-                      class: "text-danger text-decoration-none" %>
-      <% end %>
+<%# Per-bucket counts live on the tiles below; the header carries only the totals that frame them. %>
+<% summary = capture do %>
+  <span class="text-body"><%= number_with_delimiter(@filter_counts.fetch('all')) %></span>
+  <%= 'message'.pluralize(@filter_counts.fetch('all')) %>
+  <% if @pending_count > 0 %>
+    · <span class="text-warning"><%= @pending_count %></span> awaiting review
+  <% end %>
+  <% if @failed_count > 0 %>
+    · <%= link_to "#{@failed_count} failed to send", queued_mails_path(filter: 'failed'),
+                  class: 'text-danger text-decoration-none' %>
+  <% end %>
+<% end %>
+
+<%# Approving or rejecting the whole queue in one click is a different scale from reviewing a
+    message, and no catalog key separates them — so it stays with administrators. %>
+<% bulk_actions = @filter == 'pending' && @pending_count > 0 && current_user_admin? %>
+
+<%= render layout: 'shared/list_page_header', locals: { title: 'Mail queue', summary: summary } do %>
+  <% if bulk_actions %>
+    <% if smtp_configured? %>
+      <%= button_to 'Approve and send all', approve_all_queued_mails_path, method: :post,
+                    class: 'btn btn-primary btn-sm',
+                    data: { turbo_confirm: "This will approve and send all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" } %>
+    <% else %>
+      <button type="button" class="btn btn-primary btn-sm" disabled title="SMTP not configured">Approve and send all</button>
+    <% end %>
+  <% end %>
+  <% if can?(:'mail_log.view') %>
+    <%= link_to 'Mail log', mail_log_path, class: 'btn btn-outline-secondary btn-sm' %>
+  <% end %>
+  <% if bulk_actions %>
+    <div class="dropdown">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+              aria-expanded="false" aria-label="More actions">&hellip;</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <%= button_to 'Reject all pending', reject_all_queued_mails_path, method: :post,
+                        class: 'dropdown-item text-danger',
+                        data: { turbo_confirm: "This will reject all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" } %>
+        </li>
+      </ul>
     </div>
-  </div>
-  <div>
-    <%= link_to "Dashboard", root_path, class: "btn btn-outline-secondary btn-sm" %>
-  </div>
-</div>
+  <% end %>
+<% end %>
 
 <%= render 'shared/smtp_warning' %>
 
-<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-  <% QueuedMailsHelper::FILTER_CHIPS.each do |chip| %>
-    <%= render 'shared/filter_chip',
-               label: chip[:label],
-               variant: chip[:variant],
-               count: @filter_counts.fetch(chip[:filter], 0),
-               path: queued_mails_path(filter: chip[:filter]),
-               active: queued_mail_chip_active?(chip[:filter]) %>
-  <% end %>
-</div>
-
-<%# Approving or rejecting the whole queue in one click is a different scale from reviewing
-    a message, and no catalog key separates them — so it stays with administrators. %>
-<% if @filter == 'pending' && @pending_count > 0 && current_user_admin? %>
-  <div class="d-flex gap-2 mb-3">
-    <% if smtp_configured? %>
-      <%= button_to "Approve & Send All", approve_all_queued_mails_path, method: :post,
-          class: "btn btn-success",
-          data: { turbo_confirm: "This will approve and send all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" } %>
-    <% else %>
-      <button class="btn btn-success" disabled title="SMTP not configured">Approve & Send All</button>
-    <% end %>
-    <%= button_to "Reject All", reject_all_queued_mails_path, method: :post,
-        class: "btn btn-danger",
-        data: { turbo_confirm: "This will reject all #{@pending_count} pending message#{'s' if @pending_count != 1}. Continue?" } %>
-  </div>
-<% end %>
+<%= render 'shared/list_filter_tiles', tiles: queued_mail_filter_tiles(@filter_counts) %>
 
 <% if @queued_mails.any? %>
-  <div class="card shadow-sm border-0">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>To</th>
-            <th>Subject</th>
-            <th>Reason</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @queued_mails.each do |qm| %>
-            <tr class="<%= 'table-danger' if qm.delivery_failed? %><%= 'table-success' if qm.sent? %><%= 'table-secondary' if qm.rejected? %>">
-              <td>
-                <div class="fw-semibold"><%= qm.to %></div>
-                <% if qm.recipient %>
-                  <div class="text-muted small"><%= link_to qm.recipient.display_name, user_path(qm.recipient), class: "text-decoration-none" %></div>
-                <% end %>
-              </td>
-              <td>
-                <span class="text-truncate d-inline-block" style="max-width: 250px;">
-                  <%= qm.subject %>
-                </span>
-              </td>
-              <td class="text-muted small"><%= qm.reason %></td>
-              <td>
-                <% if qm.delivery_failed? %>
-                  <span class="badge text-bg-danger-subtle">Send failed</span>
-                  <% if qm.retries_exhausted? %>
-                    <div class="text-11 text-secondary mt-1">Gave up after <%= qm.send_attempts %> attempts</div>
-                  <% elsif qm.next_retry_at&.future? %>
-                    <div class="text-11 text-secondary mt-1">
-                      Retrying in <%= distance_of_time_in_words_to_now(qm.next_retry_at) %>
-                    </div>
-                  <% end %>
-                <% elsif qm.delivery_pending? %>
-                  <span class="badge text-bg-info-subtle">Sending</span>
-                <% elsif qm.sent? %>
-                  <span class="status-dot status-success" title="Sent <%= qm.sent_at.strftime('%b %d, %Y %l:%M %p') %>"></span>
-                <% elsif qm.pending? %>
-                  <span class="badge text-bg-warning-subtle">Pending</span>
-                <% elsif qm.approved? %>
-                  <span class="badge text-bg-success-subtle">Approved</span>
-                <% elsif qm.rejected? %>
-                  <span class="badge text-bg-secondary-subtle">Rejected</span>
-                <% end %>
-              </td>
-              <td class="text-muted small"><%= time_ago_in_words(qm.created_at) %> ago</td>
-              <td class="text-end">
-                <div class="btn-group btn-group-sm">
-                  <%= link_to "View", queued_mail_path(qm), class: "btn btn-outline-primary" %>
-                  <% if qm.delivery_failed? %>
-                    <% if current_user_admin? %>
-                    <%= button_to "Retry", retry_queued_mail_path(qm), method: :post,
-                        class: "btn btn-outline-warning",
-                        data: { turbo_confirm: "Retry sending this email to #{qm.to}?" } %>
-                    <% end %>
-                  <% end %>
-                  <% if qm.pending? %>
-                    <% if smtp_configured? %>
-                      <%= button_to "Approve & Send", approve_queued_mail_path(qm), method: :post,
-                          class: "btn btn-outline-success",
-                          data: { turbo_confirm: "This will send this email to #{qm.to}. Continue?" } %>
-                    <% else %>
-                      <button class="btn btn-outline-success" disabled title="SMTP not configured">Approve & Send</button>
-                    <% end %>
-                    <%= button_to "Reject", reject_queued_mail_path(qm), method: :post,
-                        class: "btn btn-outline-danger",
-                        data: { turbo_confirm: "Reject this email?" } %>
-                  <% end %>
-                </div>
-              </td>
-            </tr>
+  <%= render layout: 'shared/list_table',
+             locals: { body_id: 'queued_mails_table_body',
+                       headers: ['Message', 'Reason', 'Status', 'Queued', ['', 'text-end']] } do %>
+    <% @queued_mails.each do |qm| %>
+      <tr class="queued-mail-row <%= 'row-attention' if qm.delivery_failed? %>">
+        <td>
+          <%= link_to qm.subject.presence || '(no subject)', queued_mail_path(qm),
+                      class: 'fw-medium text-decoration-none cell-truncate', title: qm.subject %>
+          <div class="text-12 text-secondary">
+            <%= qm.to %>
+            <% if qm.recipient %>
+              · <%= link_to qm.recipient.display_name, user_path(qm.recipient), class: 'text-secondary' %>
+            <% end %>
+          </div>
+        </td>
+        <td>
+          <span class="text-secondary text-13 cell-truncate" title="<%= qm.reason %>"><%= qm.reason %></span>
+        </td>
+        <td>
+          <%= queued_mail_status_cell(qm) %>
+          <% if qm.delivery_failed? %>
+            <% if qm.retries_exhausted? %>
+              <div class="text-11 text-secondary mt-1">Gave up after <%= qm.send_attempts %> attempts</div>
+            <% elsif qm.next_retry_at&.future? %>
+              <div class="text-11 text-secondary mt-1">
+                Retrying in <%= distance_of_time_in_words_to_now(qm.next_retry_at) %>
+              </div>
+            <% end %>
           <% end %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <% if @pagy.pages > 1 %>
-    <div class="d-flex align-items-center justify-content-between mt-3">
-      <div class="text-12 text-secondary">
-        <%= @pagy.from %>–<%= @pagy.to %> of <%= @pagy.count %>
-      </div>
-      <%== pagy_bootstrap_nav(@pagy) %>
-    </div>
+        </td>
+        <td class="text-nowrap"><%= list_time_tag(qm.created_at) %></td>
+        <td class="text-end text-nowrap">
+          <% if qm.delivery_failed? && current_user_admin? %>
+            <%= button_to 'Retry', retry_queued_mail_path(qm), method: :post,
+                          class: 'btn btn-sm btn-outline-secondary',
+                          data: { turbo_confirm: "Retry sending this email to #{qm.to}?" } %>
+          <% elsif qm.pending? && can?(:'queued_mail.approve') %>
+            <div class="d-inline-flex gap-1">
+              <% if smtp_configured? %>
+                <%= button_to 'Approve and send', approve_queued_mail_path(qm), method: :post,
+                              class: 'btn btn-sm btn-outline-secondary',
+                              data: { turbo_confirm: "This will send this email to #{qm.to}. Continue?" } %>
+              <% else %>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="SMTP not configured">Approve and send</button>
+              <% end %>
+              <div class="dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                        aria-expanded="false" aria-label="More actions">&hellip;</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <%= button_to 'Reject', reject_queued_mail_path(qm), method: :post,
+                                  class: 'dropdown-item text-danger',
+                                  data: { turbo_confirm: 'Reject this email?' } %>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
   <% end %>
 <% else %>
-  <div class="card shadow-sm border-0">
-    <div class="card-body text-center py-5">
-      <i class="bi bi-envelope-check display-4 mb-3 d-block text-muted opacity-25"></i>
-      <p class="text-muted mb-0">
-        <% if @filter == 'pending' %>
-          No pending messages. The queue is empty.
-        <% elsif @filter == 'failed' %>
-          Nothing has failed to send. Messages wait here when the mail server will not take them.
-        <% else %>
-          No <%= @filter %> messages found.
-        <% end %>
-      </p>
-    </div>
-  </div>
+  <% empty_message = case @filter
+                     when 'pending' then 'Nothing is waiting for review.'
+                     when 'failed' then 'Nothing has failed to send. Messages wait here when the mail server will not take them.'
+                     else "No #{@filter == 'all' ? '' : "#{@filter} "}messages yet."
+                     end %>
+  <%= render 'shared/list_empty', icon: 'envelope-check', message: empty_message %>
 <% end %>
+
+<%= render 'shared/pagination', pagy: @pagy %>

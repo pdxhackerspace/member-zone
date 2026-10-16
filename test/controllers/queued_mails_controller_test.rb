@@ -22,7 +22,13 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
   test 'shows index with pending filter by default' do
     get queued_mails_path
     assert_response :success
-    assert_select 'h1', /Mail Queue/
+    assert_select 'h1', /Mail queue/
+  end
+
+  test 'index links to the mail log' do
+    get queued_mails_path
+
+    assert_select 'a.btn[href=?]', mail_log_path, text: 'Mail log'
   end
 
   test 'shows index with approved filter' do
@@ -58,24 +64,27 @@ class QueuedMailsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'a[href=?]', queued_mail_path(@pending)
   end
 
-  test 'every filter chip carries the size of its bucket' do
+  test 'every filter tile carries the size of its bucket' do
     get queued_mails_path
 
     assert_response :success
-    QueuedMailsHelper::FILTER_CHIPS.each do |chip|
-      assert_select '.filter-chip', text: /#{chip[:label]}\s+\d+/, count: 1
+    QueuedMailsHelper::FILTER_TILES.each do |tile|
+      assert_select 'a.kpi-tile[href=?]', queued_mails_path(filter: tile[:filter]), count: 1 do
+        assert_select '.kpi-label', tile[:label]
+        assert_select '.kpi-value', /\d+/
+      end
     end
-    assert_select '.filter-chip.active', text: /Pending\s+\d+/, count: 1
+    assert_select 'a.kpi-tile.active .kpi-label', 'Pending'
   end
 
-  test 'a chip for an empty bucket is not a link' do
-    QueuedMail.where(status: 'rejected').delete_all
+  test 'an empty bucket keeps its tile neutral' do
+    QueuedMail.where.not(last_error: nil).update_all(last_error: nil)
 
     get queued_mails_path
 
     assert_response :success
-    assert_select 'span.filter-chip.muted', text: /Rejected\s+0/
-    assert_select 'a.filter-chip[href=?]', queued_mails_path(filter: 'rejected'), false
+    assert_select 'a.kpi-tile.danger', false
+    assert_select 'a.kpi-tile[href=?]', queued_mails_path(filter: 'failed')
   end
 
   test 'index shows 50 messages a page' do

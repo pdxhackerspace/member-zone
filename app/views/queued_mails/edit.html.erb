@@ -1,11 +1,12 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Edit Queued Message</h1>
-    <p class="text-muted mb-0">Modify the message before approving it for delivery.</p>
-  </div>
-  <div>
-    <%= link_to "Cancel", queued_mail_path(@queued_mail), class: "btn btn-secondary" %>
-  </div>
+<div class="mb-2 text-13">
+  <%= link_to queued_mail_path(@queued_mail), class: 'text-secondary text-decoration-none' do %>
+    <i class="bi bi-arrow-left me-1"></i>Queued message
+  <% end %>
+</div>
+
+<div class="mb-3">
+  <h1 class="h-page-title mb-0">Edit queued message</h1>
+  <div class="text-13 text-secondary mt-1">Changes apply to this message only, before it is approved for delivery.</div>
 </div>
 
 <%= render 'shared/smtp_warning' %>
@@ -22,7 +23,7 @@
           }
         ) do |f| %>
       <div class="mb-3">
-        <%= f.label :to, "Recipient Email", class: "form-label" %>
+        <%= f.label :to, "Recipient email", class: "form-label" %>
         <%= f.text_field :to, class: "form-control #{'is-invalid' if @queued_mail.errors.key?(:to)}", required: true %>
         <% if @queued_mail.errors.key?(:to) %>
           <div class="invalid-feedback"><%= @queued_mail.errors[:to].join(', ') %></div>
@@ -41,7 +42,7 @@
       </div>
 
       <div class="mb-3" data-controller="rich-editor" data-rich-editor-variables-value="[]">
-        <%= f.label :body_html, "HTML Body", class: "form-label" %>
+        <%= f.label :body_html, "HTML body", class: "form-label" %>
         <div class="mb-2">
           <small class="text-muted">Use the toolbar to format, or click "Source Code" (&lt;&gt;) to edit raw HTML.</small>
         </div>
@@ -62,7 +63,7 @@
 
       <div class="mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-          <%= f.label :body_text, "Plain Text Body", class: "form-label mb-0" %>
+          <%= f.label :body_text, "Plain text body", class: "form-label mb-0" %>
           <div class="form-check">
             <%= check_box_tag :sync_body_text,
                               "1",
@@ -89,10 +90,10 @@
       <div class="mb-3 border rounded bg-body-tertiary p-3">
         <div class="d-flex flex-wrap gap-2 align-items-center">
           <button type="button"
-                  class="btn btn-outline-primary"
+                  class="btn btn-outline-secondary"
                   data-action="queued-mail-rewrite#rewrite"
                   data-queued-mail-rewrite-target="rewriteButton">
-            Rewrite With AI
+            Rewrite with AI
             <span class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"
                   data-queued-mail-rewrite-target="spinner"></span>
           </button>
@@ -100,7 +101,7 @@
                   class="btn btn-outline-secondary d-none"
                   data-action="queued-mail-rewrite#undo"
                   data-queued-mail-rewrite-target="undoButton">
-            Undo AI Rewrite
+            Undo AI rewrite
           </button>
           <span class="small text-muted"
                 data-queued-mail-rewrite-target="status">Rewrites both HTML and plain text body in place.</span>
@@ -109,7 +110,7 @@
       <% end %>
 
       <div class="d-flex gap-2">
-        <%= f.submit "Save Changes", class: "btn btn-primary" %>
+        <%= f.submit "Save changes", class: "btn btn-primary" %>
         <%= link_to "Cancel", queued_mail_path(@queued_mail), class: "btn btn-outline-secondary" %>
       </div>
     <% end %>
@@ -117,13 +118,16 @@
 </div>
 
 <% if @queued_mail.email_template %>
-  <div class="alert alert-info">
-    <i class="bi bi-info-circle me-2"></i>
-    This message was generated from the
+  <div class="text-13 text-secondary">
+    <i class="bi bi-info-circle me-1"></i>
+    Generated from the
     <%= link_to @queued_mail.email_template.name, email_template_path(@queued_mail.email_template) %>
-    template. You can
-    <%= link_to "regenerate it", regenerate_queued_mail_path(@queued_mail), method: :post,
-        data: { turbo_confirm: "This will overwrite your edits with a fresh render from the template. Continue?" } %>
-    to reset to the current template content.
+    template.
+    <% if @queued_mail.can_regenerate? && current_user_admin? %>
+      <%= link_to 'Regenerate it', regenerate_queued_mail_path(@queued_mail),
+                  data: { turbo_method: :post,
+                          turbo_confirm: 'This will overwrite your edits with a fresh render from the template. Continue?' } %>
+      to reset to the current template content.
+    <% end %>
   </div>
 <% end %>
