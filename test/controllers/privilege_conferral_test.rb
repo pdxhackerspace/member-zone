@@ -119,7 +119,7 @@ class PrivilegeConferralTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test 'a director who trains nothing can still reach the trainer panel' do
+  test 'a director who trains nothing can still reach the record page to appoint trainers' do
     director = sign_in_as_member_user
     grant_privilege_to(director, @grant_trainer)
 

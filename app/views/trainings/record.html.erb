@@ -1,8 +1,4 @@
-<div id="record-training-page"
-     class="d-flex flex-column"
-     data-initial-trainee-ids="<%= @initial_trainee_ids.join(',') %>"
-     data-initial-topic-id="<%= @initial_topic_id %>"
-     data-is-admin="<%= current_user_admin? %>">
+<div class="d-flex flex-column">
   <div class="text-12 text-secondary mb-2">
     <%= link_to "&lsaquo; Dashboard".html_safe, root_path, class: "text-decoration-none" %>
   </div>
@@ -10,12 +6,12 @@
   <div class="mb-3">
     <h1 class="h-page-title mb-0">Record training</h1>
     <div class="text-13 text-secondary mt-1">
-      Add one member or a whole class. Already-trained members are skipped automatically. Inactive members
-      can be trained; you'll be asked whether to email them.
+      Pick topics, add members, then record them as trained or make them trainers. Anything already done is
+      skipped.
     </div>
   </div>
 
-  <% if @trainable_topics.empty? %>
+  <% if @record_topics.empty? %>
     <div class="alert alert-warning text-13">
       No training topics are available for you to record.
     </div>
@@ -24,529 +20,144 @@
                   method: :post,
                   local: true,
                   id: "record-training-form",
-                  data: { controller: "inactive-training-notice",
-                          action: "submit->inactive-training-notice#confirm" } do %>
-      <%= hidden_field_tag :training_topic_id, nil, id: "record-training-topic-id" %>
-
-      <div class="form-section mb-2" id="record-topic-picker">
+                  data: { controller: "record-training inactive-training-notice",
+                          action: "submit->record-training#guard submit->inactive-training-notice#confirm",
+                          record_training_initial_trainee_ids_value: @initial_trainee_ids,
+                          record_training_initial_topic_ids_value: @initial_topic_ids,
+                          record_training_record_as_value: @initial_record_as } do %>
+      <div class="form-section mb-2">
         <div class="form-section-header">
-          <span class="h-section-label">Topic</span>
-          <span class="text-12 text-secondary">Pick a topic to record training in</span>
+          <span class="h-section-label"><span class="step-number">1</span>Topics</span>
+          <span class="text-12 text-secondary" data-record-training-target="topicCount">Pick one or more</span>
         </div>
-
-        <div class="mb-2">
-          <div class="text-11 text-secondary text-uppercase mb-1">Topics you can train</div>
-          <div class="d-flex flex-wrap gap-1">
-            <% @trainable_topics.each do |topic| %>
-              <button type="button"
-                      class="topic-chip"
-                      data-topic-id="<%= topic.id %>"
-                      data-topic-name="<%= topic.name %>">
-                <%= topic.name %>
-              </button>
-            <% end %>
-          </div>
+        <div class="d-flex flex-wrap gap-1">
+          <% @record_topics.each do |topic| %>
+            <button type="button"
+                    class="topic-chip"
+                    data-record-training-target="topic"
+                    data-action="record-training#toggleTopic"
+                    data-topic-id="<%= topic.id %>"
+                    data-topic-name="<%= topic.name %>"
+                    data-can-record="<%= @recordable_topic_ids.include?(topic.id) %>"
+                    data-can-appoint="<%= @appointable_topic_ids.include?(topic.id) %>"
+                    aria-pressed="false">
+              <%= topic.name %>
+            </button>
+          <% end %>
         </div>
-      </div>
-
-      <div class="form-section mb-2 d-none" id="record-topic-selected">
-        <div class="form-section-header">
-          <span class="h-section-label">Topic</span>
-          <span class="text-12 text-success">Selected</span>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="topic-chip-selected" id="record-selected-topic-name"></span>
-          <span class="text-12 text-secondary">Training topic</span>
-          <button type="button" class="btn btn-link btn-sm text-12 ms-auto p-0" id="record-change-topic">Change</button>
-        </div>
+        <div data-record-training-target="topicInputs"></div>
+        <div class="text-11 text-secondary mt-2 d-none" data-record-training-target="topicNote"></div>
       </div>
 
       <div class="form-section mb-2">
         <div class="form-section-header">
-          <span class="h-section-label">Details</span>
+          <span class="h-section-label"><span class="step-number">2</span>Members</span>
+          <span class="text-12 text-secondary">
+            <span data-record-training-target="memberCount">0</span> added
+          </span>
         </div>
-        <div class="row g-2">
+
+        <div class="position-relative">
+          <div class="member-search-input mb-2">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text"
+                   placeholder="Add by name, email, or username"
+                   autocomplete="off"
+                   autocorrect="off"
+                   autocapitalize="off"
+                   spellcheck="false"
+                   data-record-training-target="search"
+                   data-action="input->record-training#search">
+            <a href="#"
+               class="paste-list-link"
+               data-bs-toggle="modal"
+               data-bs-target="#pasteListModal">Paste list</a>
+          </div>
+          <div class="list-group position-absolute w-100 shadow-sm d-none"
+               style="z-index: 1000; max-height: 280px; overflow-y: auto;"
+               data-record-training-target="results"></div>
+        </div>
+
+        <div class="alert alert-warning py-2 px-3 text-12 d-none" data-record-training-target="unresolved"></div>
+        <div class="d-flex flex-column gap-1" data-record-training-target="members"></div>
+      </div>
+
+      <div class="form-section mb-3">
+        <div class="form-section-header">
+          <span class="h-section-label"><span class="step-number">3</span>Record as</span>
+        </div>
+        <div class="row g-3 align-items-start">
           <div class="col-md-6">
+            <% if @appointable_topic_ids.any? %>
+              <div class="btn-group btn-group-sm record-mode" role="group" aria-label="Record as">
+                <input type="radio" class="btn-check" name="record_as" value="trained" id="record-as-trained"
+                       data-record-training-target="mode" data-action="change->record-training#setMode"
+                       <%= 'disabled' if @recordable_topic_ids.empty? %>>
+                <label class="btn btn-outline-secondary" for="record-as-trained">Trained</label>
+                <input type="radio" class="btn-check" name="record_as" value="trainer" id="record-as-trainer"
+                       data-record-training-target="mode" data-action="change->record-training#setMode">
+                <label class="btn btn-outline-secondary" for="record-as-trainer">Trainer</label>
+              </div>
+            <% else %>
+              <%= hidden_field_tag :record_as, 'trained' %>
+            <% end %>
+            <div class="text-12 text-secondary mt-2" data-record-training-target="modeHelp"></div>
+          </div>
+          <div class="col-6 col-md-3">
             <label for="record-trained-at" class="text-12 text-secondary mb-1">Date</label>
-            <%= date_field_tag :trained_at, Date.current, class: "form-control form-control-sm", id: "record-trained-at" %>
-            <div class="text-11 text-warning mt-1 d-none" id="record-backdate-warning">
-              Recording training over 30 days old. Make sure this is correct.
+            <%= date_field_tag :trained_at, Date.current, class: "form-control form-control-sm", id: "record-trained-at",
+                               data: { record_training_target: "date", action: "change->record-training#checkDate" } %>
+            <div class="text-11 text-warning mt-1 d-none" data-record-training-target="backdateWarning">
+              Over 30 days ago. Make sure this is right.
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-6 col-md-3">
             <label for="record-trainer-id" class="text-12 text-secondary mb-1">Trainer</label>
             <%= select_tag :trainer_id,
-                           options_from_collection_for_select(@trainer_options, :id, :display_name, current_user.id),
+                           options_from_collection_for_select(@trainer_options, :id, :display_name, true_user.id),
                            class: "form-select form-select-sm",
                            id: "record-trainer-id" %>
           </div>
         </div>
       </div>
 
-      <div class="form-section mb-3">
-        <div class="form-section-header">
-          <span class="h-section-label">Members trained</span>
-          <span class="text-12 text-body"><span class="text-success" id="record-added-count">0</span> added</span>
-        </div>
-
-        <div class="member-search-input mb-2">
-          <i class="bi bi-search search-icon"></i>
-          <input type="text"
-                 id="record-member-search"
-                 placeholder="Pick a topic first"
-                 autocomplete="off"
-                 autocorrect="off"
-                 autocapitalize="off"
-                 spellcheck="false"
-                 disabled>
-          <a href="#"
-             class="paste-list-link"
-             id="record-open-paste"
-             data-bs-toggle="modal"
-             data-bs-target="#pasteListModal">Paste list</a>
-        </div>
-
-        <div id="record-search-results"
-             class="list-group position-absolute shadow-sm d-none"
-             style="z-index: 1000; max-height: 280px; overflow-y: auto;"></div>
-
-        <div id="record-unresolved-entries" class="alert alert-warning py-2 px-3 text-12 d-none"></div>
-        <div id="record-trainee-list" class="d-flex flex-column gap-1">
-          <div class="text-13 text-secondary py-3" id="record-empty-members">
-            No members added yet. Search above to add.
-          </div>
-        </div>
-      </div>
-
-      <div class="form-action-bar" id="record-action-bar">
+      <div class="form-action-bar">
         <div>
-          <div class="form-action-bar-summary" id="record-action-summary">
-            Pick a topic to start adding members.
-          </div>
-          <div class="form-action-bar-detail d-none" id="record-action-detail"></div>
+          <div class="form-action-bar-summary" data-record-training-target="summary">Pick a topic to start.</div>
+          <div class="form-action-bar-detail d-none" data-record-training-target="detail"></div>
         </div>
         <div class="d-flex gap-2">
           <%= link_to "Cancel", training_catalog_path, class: "btn btn-outline-secondary btn-sm" %>
-          <button type="submit" class="btn btn-primary btn-sm fw-medium" id="record-submit" disabled>
+          <button type="submit" class="btn btn-primary btn-sm fw-medium" data-record-training-target="submit" disabled>
             Record training
           </button>
         </div>
       </div>
+
+      <div class="modal fade" id="pasteListModal" tabindex="-1" aria-labelledby="pasteListModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="pasteListModalLabel">Paste list of members</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="text-13 text-secondary">
+                Paste names, emails, or usernames. Use one per line, or separate entries with commas.
+              </p>
+              <textarea class="form-control" rows="6" data-record-training-target="paste"
+                        placeholder="annaroan&#10;kevin@example.com&#10;@liamwatson"></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
+                      data-action="record-training#processPaste">Add to list</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script type="application/json" data-record-training-target="users"><%= raw json_escape(@recording_users.to_json) %></script>
     <% end %>
   <% end %>
-
-  <%= render 'trainings/trainer_capabilities_panel' %>
 </div>
-
-<div class="modal fade" id="pasteListModal" tabindex="-1" aria-labelledby="pasteListModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="pasteListModalLabel">Paste list of members</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="text-13 text-secondary">
-          Paste names, emails, or usernames. Use one per line, or separate entries with commas.
-        </p>
-        <textarea class="form-control" rows="6" id="pasteListInput"
-                  placeholder="annaroan&#10;kevin@example.com&#10;@liamwatson"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="record-process-paste">Add to list</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script type="application/json" id="record-training-users-data"><%= raw json_escape(@recording_users.to_json) %></script>
-
-<script>
-  (function() {
-    function initRecordTraining() {
-      var root = document.getElementById('record-training-page');
-      if (!root || root.dataset.initialized === 'true') return;
-      root.dataset.initialized = 'true';
-
-      var usersData = document.getElementById('record-training-users-data');
-      var users = usersData ? JSON.parse(usersData.textContent) : [];
-      var usersById = {};
-      users.forEach(function(user) { usersById[String(user.id)] = user; });
-
-      var selectedTopicId = null;
-      var selectedTopicName = null;
-      var selectedMembers = new Map();
-
-      var form = document.getElementById('record-training-form');
-      var topicInput = document.getElementById('record-training-topic-id');
-      var topicPicker = document.getElementById('record-topic-picker');
-      var topicSelected = document.getElementById('record-topic-selected');
-      var selectedTopicNameEl = document.getElementById('record-selected-topic-name');
-      var changeTopicButton = document.getElementById('record-change-topic');
-      var searchInput = document.getElementById('record-member-search');
-      var searchResults = document.getElementById('record-search-results');
-      var traineeList = document.getElementById('record-trainee-list');
-      var addedCount = document.getElementById('record-added-count');
-      var summary = document.getElementById('record-action-summary');
-      var detail = document.getElementById('record-action-detail');
-      var submit = document.getElementById('record-submit');
-      var trainedAtInput = document.getElementById('record-trained-at');
-      var backdateWarning = document.getElementById('record-backdate-warning');
-      var pasteInput = document.getElementById('pasteListInput');
-      var unresolvedEntries = document.getElementById('record-unresolved-entries');
-      var isAdmin = root.dataset.isAdmin === 'true';
-      var csrfToken = document.querySelector('meta[name="csrf-token"]');
-      csrfToken = csrfToken ? csrfToken.getAttribute('content') : '';
-
-      function currentTraineeIds() {
-        return Array.from(selectedMembers.keys()).join(',');
-      }
-
-      function syncTrainerReturnState() {
-        document.querySelectorAll('.trainer-capability-form').forEach(function(capabilityForm) {
-          var topicField = capabilityForm.querySelector('input[name="return_topic_id"]');
-          var traineeField = capabilityForm.querySelector('input[name="return_trainee_ids"]');
-          if (topicField) topicField.value = selectedTopicId || '';
-          if (traineeField) traineeField.value = currentTraineeIds();
-        });
-      }
-
-      function buildTrainerCapabilityForm(userId, topicId, action) {
-        var form = document.createElement('form');
-        form.method = 'post';
-        form.action = '/train/' + userId + '/trainer/' + topicId;
-        form.className = 'd-inline trainer-capability-form ms-1';
-
-        var methodInput = document.createElement('input');
-        methodInput.type = 'hidden';
-        methodInput.name = '_method';
-        methodInput.value = action === 'delete' ? 'delete' : 'post';
-        form.appendChild(methodInput);
-
-        var tokenInput = document.createElement('input');
-        tokenInput.type = 'hidden';
-        tokenInput.name = 'authenticity_token';
-        tokenInput.value = csrfToken;
-        form.appendChild(tokenInput);
-
-        var topicField = document.createElement('input');
-        topicField.type = 'hidden';
-        topicField.name = 'return_topic_id';
-        topicField.value = selectedTopicId || '';
-        form.appendChild(topicField);
-
-        var traineeField = document.createElement('input');
-        traineeField.type = 'hidden';
-        traineeField.name = 'return_trainee_ids';
-        traineeField.value = currentTraineeIds();
-        form.appendChild(traineeField);
-
-        return form;
-      }
-
-      function userCanTrainTopic(user) {
-        return (user.can_train_topic_ids || []).map(String).indexOf(String(selectedTopicId)) !== -1;
-      }
-
-      function appendInlineTrainerAction(row, user) {
-        if (!isAdmin || !selectedTopicId) return;
-
-        if (userCanTrainTopic(user)) {
-          var label = document.createElement('span');
-          label.className = 'text-11 text-secondary ms-2';
-          label.textContent = 'Can train';
-          row.appendChild(label);
-
-          var revokeForm = buildTrainerCapabilityForm(user.id, selectedTopicId, 'delete');
-          var revokeButton = document.createElement('button');
-          revokeButton.type = 'submit';
-          revokeButton.className = 'btn btn-sm btn-outline-danger py-0 px-1 ms-1';
-          revokeButton.title = 'Revoke trainer capability';
-          revokeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
-          revokeForm.addEventListener('submit', function(event) {
-            if (!confirm('Remove trainer capability for ' + selectedTopicName + ' from ' + user.name + '?')) {
-              event.preventDefault();
-            }
-          });
-          revokeForm.appendChild(revokeButton);
-          row.appendChild(revokeForm);
-        } else {
-          var grantForm = buildTrainerCapabilityForm(user.id, selectedTopicId, 'post');
-          var grantButton = document.createElement('button');
-          grantButton.type = 'submit';
-          grantButton.className = 'btn btn-sm btn-outline-secondary py-0 px-1 ms-2 text-11';
-          grantButton.textContent = 'Grant can train';
-          grantForm.appendChild(grantButton);
-          row.appendChild(grantForm);
-        }
-      }
-
-      function userLabel(user) {
-        var parts = [user.name];
-        if (user.username) parts.push('@' + user.username);
-        if (user.email) parts.push(user.email);
-        return parts.filter(Boolean).join(' ');
-      }
-
-      function memberStatus(user) {
-        if (!selectedTopicId) return { key: 'skip', text: 'Pick topic first' };
-        if ((user.trained_topic_ids || []).map(String).indexOf(String(selectedTopicId)) !== -1) {
-          return { key: 'skip', text: 'Already trained - skip' };
-        }
-        if (user.banned) {
-          return { key: 'skip', text: 'Banned - cannot train' };
-        }
-        if (!user.active) {
-          return { key: 'add', tone: 'skip', text: 'Inactive - will be trained' };
-        }
-        return { key: 'add', tone: 'add', text: 'Will be trained' };
-      }
-
-      function hideResults() {
-        searchResults.classList.add('d-none');
-        searchResults.innerHTML = '';
-      }
-
-      function setTopic(id, name) {
-        selectedTopicId = String(id);
-        selectedTopicName = name;
-        topicInput.value = selectedTopicId;
-        selectedTopicNameEl.textContent = name;
-        topicPicker.classList.add('d-none');
-        topicSelected.classList.remove('d-none');
-        searchInput.disabled = false;
-        searchInput.placeholder = 'Add by name, email, or username';
-        renderMembers();
-        syncTrainerReturnState();
-        searchInput.focus();
-      }
-
-      function clearTopic() {
-        selectedTopicId = null;
-        selectedTopicName = null;
-        topicInput.value = '';
-        topicPicker.classList.remove('d-none');
-        topicSelected.classList.add('d-none');
-        searchInput.disabled = true;
-        searchInput.value = '';
-        searchInput.placeholder = 'Pick a topic first';
-        hideResults();
-        renderMembers();
-        syncTrainerReturnState();
-      }
-
-      function addMember(user) {
-        selectedMembers.set(String(user.id), user);
-        searchInput.value = '';
-        hideResults();
-        renderMembers();
-      }
-
-      function removeMember(id) {
-        selectedMembers.delete(String(id));
-        renderMembers();
-      }
-
-      function renderMembers() {
-        traineeList.innerHTML = '';
-        var effectiveCount = 0;
-        var skipCount = 0;
-        var inactiveNames = [];
-
-        selectedMembers.forEach(function(user) {
-          var status = memberStatus(user);
-          if (status.key === 'add') {
-            effectiveCount += 1;
-            if (!user.active) inactiveNames.push(user.name);
-          } else {
-            skipCount += 1;
-          }
-
-          var row = document.createElement('div');
-          var isInactive = status.key === 'add' && !user.active;
-          row.className = 'trainee-row' + (status.key === 'skip' || isInactive ? ' trainee-row-warning' : '');
-
-          var hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'trainee_ids[]';
-          hiddenInput.value = user.id;
-          row.appendChild(hiddenInput);
-
-          var avatar = document.createElement('div');
-          avatar.className = 'trainee-avatar';
-          avatar.textContent = (user.name || '?').slice(0, 1).toUpperCase();
-          row.appendChild(avatar);
-
-          var info = document.createElement('div');
-          info.className = 'trainee-info';
-          var name = document.createElement('div');
-          name.className = 'trainee-name';
-          name.textContent = user.name;
-          var meta = document.createElement('div');
-          meta.className = 'trainee-meta';
-          meta.textContent = user.username ? '@' + user.username : (user.email || '');
-          info.appendChild(name);
-          info.appendChild(meta);
-          row.appendChild(info);
-
-          var statusEl = document.createElement('span');
-          statusEl.className = 'trainee-status status-' + (status.tone || status.key);
-          statusEl.textContent = status.text;
-          row.appendChild(statusEl);
-
-          appendInlineTrainerAction(row, user);
-
-          var removeButton = document.createElement('button');
-          removeButton.type = 'button';
-          removeButton.className = 'trainee-remove';
-          removeButton.innerHTML = '&times;';
-          removeButton.addEventListener('click', function() { removeMember(user.id); });
-          row.appendChild(removeButton);
-
-          traineeList.appendChild(row);
-        });
-
-        if (selectedMembers.size === 0) {
-          var empty = document.createElement('div');
-          empty.className = 'text-13 text-secondary py-3';
-          empty.textContent = 'No members added yet. Search above to add.';
-          traineeList.appendChild(empty);
-        }
-
-        addedCount.textContent = selectedMembers.size;
-        submit.disabled = effectiveCount === 0;
-        form.dataset.inactiveTrainingNoticeNamesValue = JSON.stringify(inactiveNames);
-
-        var notes = [];
-        if (skipCount > 0) {
-          notes.push(skipCount + ' already-trained or banned ' + (skipCount === 1 ? 'member' : 'members') + ' will be skipped.');
-        }
-        if (inactiveNames.length > 0) {
-          notes.push(inactiveNames.length + ' inactive ' + (inactiveNames.length === 1 ? 'member' : 'members') + " will be trained; you'll be asked whether to email them.");
-        }
-
-        if (!selectedTopicId) {
-          summary.textContent = 'Pick a topic to start adding members.';
-        } else if (selectedMembers.size === 0) {
-          summary.textContent = 'Add members trained in ' + selectedTopicName + '.';
-        } else if (effectiveCount === 0) {
-          summary.textContent = 'All selected members will be skipped.';
-        } else {
-          summary.innerHTML = 'Record <strong>' + effectiveCount + ' training ' + (effectiveCount === 1 ? 'event' : 'events') + '</strong> for <strong>' + selectedTopicName + '</strong>.';
-        }
-
-        if (notes.length > 0 && selectedTopicId && selectedMembers.size > 0) {
-          detail.textContent = notes.join(' ');
-          detail.classList.remove('d-none');
-        } else {
-          detail.classList.add('d-none');
-        }
-
-        syncTrainerReturnState();
-      }
-
-      function renderSearchResults() {
-        var term = searchInput.value.trim().toLowerCase();
-        hideResults();
-        if (term.length < 2 || !selectedTopicId) return;
-
-        users.filter(function(user) {
-          return userLabel(user).toLowerCase().indexOf(term) !== -1;
-        }).slice(0, 12).forEach(function(user) {
-          var item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'list-group-item list-group-item-action text-start';
-          if (selectedMembers.has(String(user.id))) item.disabled = true;
-
-          var title = document.createElement('div');
-          title.className = 'fw-medium text-13';
-          title.textContent = user.name + (selectedMembers.has(String(user.id)) ? ' (already in list)' : '');
-          var meta = document.createElement('div');
-          meta.className = 'text-11 text-secondary';
-          meta.textContent = [user.username ? '@' + user.username : null, user.email].filter(Boolean).join(' - ');
-          item.appendChild(title);
-          item.appendChild(meta);
-          item.addEventListener('click', function() { addMember(user); });
-          searchResults.appendChild(item);
-        });
-
-        searchResults.classList.toggle('d-none', searchResults.children.length === 0);
-      }
-
-      function processPasteList() {
-        var entries = (pasteInput.value || '').split(/[\n,]+/).map(function(entry) {
-          return entry.trim();
-        }).filter(Boolean);
-        var unresolved = [];
-
-        entries.forEach(function(entry) {
-          var normalized = entry.toLowerCase().replace(/^@/, '');
-          var match = users.find(function(user) {
-            return (user.username || '').toLowerCase() === normalized ||
-                   (user.email || '').toLowerCase() === normalized ||
-                   (user.name || '').toLowerCase() === normalized;
-          });
-
-          if (match) {
-            selectedMembers.set(String(match.id), match);
-          } else {
-            unresolved.push(entry);
-          }
-        });
-
-        if (unresolved.length > 0) {
-          unresolvedEntries.textContent = unresolved.length + " entries couldn't be matched: " + unresolved.join(', ');
-          unresolvedEntries.classList.remove('d-none');
-        } else {
-          unresolvedEntries.classList.add('d-none');
-        }
-
-        pasteInput.value = '';
-        renderMembers();
-      }
-
-      function updateBackdateWarning() {
-        var selectedDate = new Date(trainedAtInput.value + 'T00:00:00');
-        var now = new Date();
-        var daysOld = (now - selectedDate) / (1000 * 60 * 60 * 24);
-        backdateWarning.classList.toggle('d-none', !(daysOld > 30));
-      }
-
-      document.querySelectorAll('.topic-chip').forEach(function(button) {
-        button.addEventListener('click', function() {
-          setTopic(button.dataset.topicId, button.dataset.topicName);
-        });
-      });
-      changeTopicButton.addEventListener('click', clearTopic);
-      searchInput.addEventListener('input', renderSearchResults);
-      trainedAtInput.addEventListener('change', updateBackdateWarning);
-      document.getElementById('record-process-paste').addEventListener('click', processPasteList);
-      document.addEventListener('click', function(event) {
-        if (!event.target.closest('#record-search-results, #record-member-search')) hideResults();
-      });
-      form.addEventListener('submit', function(event) {
-        if (!selectedTopicId || submit.disabled) event.preventDefault();
-      });
-
-      root.dataset.initialTraineeIds.split(',').filter(Boolean).forEach(function(id) {
-        if (usersById[id]) selectedMembers.set(id, usersById[id]);
-      });
-
-      var initialTopicId = root.dataset.initialTopicId;
-      if (initialTopicId) {
-        var topicButton = document.querySelector('.topic-chip[data-topic-id="' + initialTopicId + '"]');
-        if (topicButton) {
-          setTopic(topicButton.dataset.topicId, topicButton.dataset.topicName);
-        }
-      }
-
-      renderMembers();
-      updateBackdateWarning();
-      syncTrainerReturnState();
-    }
-
-    document.addEventListener('DOMContentLoaded', initRecordTraining);
-    document.addEventListener('turbo:load', initRecordTraining);
-  })();
-</script>

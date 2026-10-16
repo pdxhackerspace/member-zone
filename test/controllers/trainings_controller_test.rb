@@ -121,47 +121,105 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to root_path
   end
 
-  test 'admin sees trainer capabilities panel on record page' do
+  test 'admin can choose to record members as trainers' do
     sign_in_as_admin
 
     get record_training_path
 
     assert_response :success
-    assert_match 'Trainer capabilities', response.body
-    assert_match 'Grant or revoke who can train others', response.body
+    assert_select '#record-as-trainer'
+    assert_select '#trainer-capabilities-panel', count: 0
   end
 
-  test 'trainer does not see trainer capabilities panel on record page' do
+  test 'trainer who cannot appoint trainers is not offered the trainer option' do
     trainer = sign_in_as_trainer
     TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
 
     get record_training_path
 
     assert_response :success
-    assert_no_match 'Trainer capabilities', response.body
-    assert_no_match 'trainer-capabilities-panel', response.body
+    assert_select '#record-as-trainer', count: 0
+    assert_select 'input[type=hidden][name=record_as][value=trained]'
   end
 
-  test 'admin grant trainer capability redirects to record page with state' do
+  test 'admin grant trainer capability returns to the member profile' do
     sign_in_as_admin
     trainee = users(:no_email)
 
     assert_difference 'TrainerCapability.count', 1 do
-      post add_trainer_capability_path(user_id: trainee.id, topic_id: @laser_topic.id),
-           params: {
-             return_topic_id: @laser_topic.id,
-             return_trainee_ids: "#{users(:one).id},#{trainee.id}"
-           }
+      post add_trainer_capability_path(user_id: trainee.id, topic_id: @laser_topic.id)
     end
 
-    assert_redirected_to record_training_path(
-      trainer_user_id: trainee.id,
-      topic_id: @laser_topic.id,
-      trainee_ids: "#{users(:one).id},#{trainee.id}"
-    )
-    follow_redirect!
-    assert_response :success
-    assert_match trainee.display_name, response.body
+    assert_redirected_to user_path(trainee, anchor: 'training-access-section')
+  end
+
+  test 'bulk record trains every member in every selected topic' do
+    sign_in_as_admin
+    trainees = [users(:no_email), users(:three)]
+
+    assert_difference 'Training.count', 4 do
+      post record_training_path, params: {
+        training_topic_ids: [@laser_topic.id, @woodworking_topic.id],
+        trained_at: Date.current.iso8601,
+        trainee_ids: trainees.map(&:id)
+      }
+    end
+
+    assert_redirected_to training_catalog_path
+    assert_match 'Recorded 4 trainings in Laser Cutting and Woodworking.', flash[:notice]
+  end
+
+  test 'bulk record refuses every topic when the trainer may not train one of them' do
+    trainer = sign_in_as_trainer
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    assert_no_difference 'Training.count' do
+      post record_training_path, params: {
+        training_topic_ids: [@laser_topic.id, @woodworking_topic.id],
+        trainee_ids: [users(:no_email).id]
+      }
+    end
+
+    assert_redirected_to record_training_path
+    assert_match 'Woodworking', flash[:alert]
+  end
+
+  test 'bulk record as trainer appoints trainers and records missing training' do
+    sign_in_as_admin
+    already_trained = users(:no_email)
+    untrained = users(:three)
+    Training.create!(trainee: already_trained, training_topic: @laser_topic, trained_at: 1.week.ago)
+
+    assert_difference 'TrainerCapability.count', 2 do
+      assert_difference 'Training.count', 1 do
+        post record_training_path, params: {
+          record_as: 'trainer',
+          training_topic_ids: [@laser_topic.id],
+          trained_at: Date.current.iso8601,
+          trainee_ids: [already_trained.id, untrained.id]
+        }
+      end
+    end
+
+    assert TrainerCapability.exists?(user: untrained, training_topic: @laser_topic)
+    assert Training.exists?(trainee: untrained, training_topic: @laser_topic)
+    assert_match 'Made 2 trainers in Laser Cutting. Also recorded 1 training.', flash[:notice]
+  end
+
+  test 'bulk record as trainer is refused without the grant privilege' do
+    trainer = sign_in_as_trainer
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    assert_no_difference ['TrainerCapability.count', 'Training.count'] do
+      post record_training_path, params: {
+        record_as: 'trainer',
+        training_topic_ids: [@laser_topic.id],
+        trainee_ids: [users(:no_email).id]
+      }
+    end
+
+    assert_redirected_to record_training_path
+    assert_match 'appoint trainers', flash[:alert]
   end
 
   test 'admin grant trainer capability creates capability and training when not trained' do
