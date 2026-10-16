@@ -1,0 +1,114 @@
+<% editable = @can_manage_links || @can_manage_documents %>
+<div class="card shadow-sm border-0 mt-4" id="topic-resources">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h5 mb-0"><i class="bi bi-link-45deg me-2"></i>Resources</h2>
+      <% if @can_manage_documents %>
+        <%= link_to 'Add document',
+                    new_document_path(training_topic_id: @training_topic.id, return_to_topic: @training_topic.id,
+                                      return_to: 'topic_page'),
+                    class: 'btn btn-outline-secondary btn-sm' %>
+      <% end %>
+    </div>
+
+    <% if @topic_links.any? %>
+      <h3 class="h-section-label mb-2">Links</h3>
+      <div class="d-flex flex-column gap-1 mb-3">
+        <% @topic_links.each do |link| %>
+          <% if @can_manage_links %>
+            <div class="topic-resource d-flex align-items-start gap-1" id="topic-link-<%= link.id %>">
+              <details class="flex-grow-1 min-w-0">
+                <summary class="d-flex align-items-center gap-2">
+                  <i class="bi bi-link-45deg text-secondary"></i>
+                  <%= link_to link.title, link.url, target: '_blank', rel: 'noopener', class: 'text-decoration-none' %>
+                  <span class="text-12 text-secondary text-truncate"><%= link.url %></span>
+                  <span class="btn btn-outline-secondary btn-sm ms-auto">Edit</span>
+                </summary>
+                <%= form_with model: link, url: training_topic_link_path(@training_topic, link), local: true,
+                              class: 'row g-2 align-items-end mt-1' do |f| %>
+                  <%= hidden_field_tag :return_to, 'topic_page' %>
+                  <div class="col-md-4">
+                    <%= f.label :title, 'Title', class: 'text-12 text-secondary mb-1' %>
+                    <%= f.text_field :title, class: 'form-control form-control-sm', required: true %>
+                  </div>
+                  <div class="col-md-6">
+                    <%= f.label :url, 'URL', class: 'text-12 text-secondary mb-1' %>
+                    <%= f.url_field :url, class: 'form-control form-control-sm', required: true %>
+                  </div>
+                  <div class="col-md-2">
+                    <%= f.submit 'Save', class: 'btn btn-outline-secondary btn-sm w-100' %>
+                  </div>
+                <% end %>
+              </details>
+              <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+                        aria-expanded="false" aria-label="More actions for <%= link.title %>">&hellip;</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <%= button_to 'Remove link',
+                                  training_topic_link_path(@training_topic, link, return_to: 'topic_page'),
+                                  method: :delete, class: 'dropdown-item text-danger',
+                                  data: { turbo_confirm: "Remove \"#{link.title}\"?" } %>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          <% else %>
+            <div class="topic-resource d-flex align-items-center gap-2">
+              <i class="bi bi-link-45deg text-secondary"></i>
+              <%= link_to link.title, link.url, target: '_blank', rel: 'noopener', class: 'text-decoration-none' %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @topic_documents.any? %>
+      <h3 class="h-section-label mb-2">Documents</h3>
+      <div class="d-flex flex-column gap-1 mb-3">
+        <% @topic_documents.each do |doc| %>
+          <div class="topic-resource d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark text-secondary"></i>
+            <% if doc.file.attached? %>
+              <%= link_to doc.title, download_document_path(doc), class: 'text-decoration-none' %>
+              <span class="text-12 text-secondary"><%= number_to_human_size(doc.file.byte_size) %></span>
+            <% else %>
+              <span><%= doc.title %></span>
+            <% end %>
+            <% if @can_manage_documents %>
+              <%= link_to 'Edit',
+                          edit_document_path(doc, return_to_topic: @training_topic.id, return_to: 'topic_page'),
+                          class: 'btn btn-outline-secondary btn-sm ms-auto' %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @topic_links.empty? && @topic_documents.empty? %>
+      <p class="text-13 text-secondary mb-3">
+        <%= editable ? 'No resources yet. Add a link or document for people learning this topic.' :
+                       'No resources have been added for this topic yet.' %>
+      </p>
+    <% end %>
+
+    <% if @can_manage_links %>
+      <%= form_with model: TrainingTopicLink.new, url: training_topic_links_path(@training_topic), local: true,
+                    class: 'row g-2 align-items-end border-top pt-3' do |f| %>
+        <%= hidden_field_tag :return_to, 'topic_page' %>
+        <div class="col-md-4">
+          <%= f.label :title, 'Link title', class: 'text-12 text-secondary mb-1' %>
+          <%= f.text_field :title, class: 'form-control form-control-sm', placeholder: 'Safety guide', required: true %>
+        </div>
+        <div class="col-md-6">
+          <%= f.label :url, 'URL', class: 'text-12 text-secondary mb-1' %>
+          <%= f.url_field :url, class: 'form-control form-control-sm', placeholder: 'https://example.com/guide',
+                                required: true %>
+        </div>
+        <div class="col-md-2">
+          <%= f.submit 'Add link', class: 'btn btn-primary btn-sm w-100' %>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+</div>

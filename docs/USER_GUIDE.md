@@ -284,6 +284,12 @@ The bar at the bottom totals it (for example, *4 members × 2 topics → 6 train
 
 To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
 
+## Topic resources
+
+Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open.
+
+People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.

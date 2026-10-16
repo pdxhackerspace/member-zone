@@ -34,6 +34,9 @@ class TrainingCatalogController < AuthenticatedController
     @topic_documents = visible_documents_for(@training_topic)
     @requestable = @training_topic.offered_to_members? &&
                    @training_topic.trainers.active.exists?
+    @can_manage_links = can?(:'training.topics.manage') ||
+                        can?(:'training.topics.manage_links', topic: @training_topic)
+    @can_manage_documents = can_manage_topic_documents?(@training_topic)
   end
 
   private
@@ -107,6 +110,14 @@ class TrainingCatalogController < AuthenticatedController
     return TrainingTopic.all if current_user_admin? || can?(:'training.catalog.view_all')
 
     TrainingTopic.offered_for_members
+  end
+
+  # Mirrors DocumentsController#manageable_topic_ids, which decides what the links lead to.
+  def can_manage_topic_documents?(topic)
+    return true if current_user_admin?
+
+    current_user.training_topics.exists?(topic.id) ||
+      current_user.topics_with_privilege(:'training.documents.manage').exists?(topic.id)
   end
 
   # Non-admins may only see documents they are allowed to download
