@@ -1,75 +1,45 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h-page-title mb-0">Recharge payments</h1>
-    <p class="text-13 text-secondary mb-0 mt-1">
-      <span class="text-body"><%= @payment_count %></span> records ·
-      Total <span class="text-body">$<%= number_to_currency(@total_amount || 0, unit: "") %> USD</span>
-    </p>
-  </div>
-  <div class="d-flex gap-2">
-    <% if can?(:'payments.sync') %>
-    <%= button_to "Sync now", sync_recharge_payments_path, method: :post, class: "btn btn-primary btn-sm", data: { turbo: false } %>
-    <% end %>
-    <% if can?(:'payments.import_export') || current_user_admin? %>
+<%= render layout: 'shared/payment_index_header',
+           locals: { title: 'Recharge payments', count: @payment_count, total_amount: @total_amount } do %>
+  <% if can?(:'payments.sync') %>
+    <%= button_to 'Sync now', sync_recharge_payments_path, method: :post,
+                  class: 'btn btn-primary btn-sm', data: { turbo: false } %>
+  <% end %>
+  <% if can?(:'payments.import_export') || current_user_admin? %>
     <div class="dropdown">
-      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" aria-expanded="false">...</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+              aria-expanded="false" aria-label="More actions">&hellip;</button>
       <ul class="dropdown-menu dropdown-menu-end">
         <% if can?(:'payments.import_export') %>
-        <li><%= link_to "Export JSON", export_recharge_payments_path, class: "dropdown-item", data: { turbo: false } %></li>
-        <% end %>
-        <% if can?(:'payments.import_export') %>
-        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importModal">Import JSON</button></li>
+          <li><%= link_to 'Export JSON', export_recharge_payments_path, class: 'dropdown-item', data: { turbo: false } %></li>
+          <li>
+            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importModal">
+              Import JSON
+            </button>
+          </li>
         <% end %>
         <% if current_user_admin? %>
-        <li><%= link_to "Test", test_recharge_payments_path, class: "dropdown-item" %></li>
+          <li><%= link_to 'Test', test_recharge_payments_path, class: 'dropdown-item' %></li>
         <% end %>
       </ul>
     </div>
-    <% end %>
-  </div>
-</div>
-
-<% if @filter_active %>
-  <div class="alert alert-info py-2 mb-3 d-flex justify-content-between align-items-center">
-    <small>
-      <i class="bi bi-funnel me-1"></i> Filtering:
-      <%= case params[:linked]
-          when 'yes' then 'Linked'
-          when 'no' then 'Unlinked'
-          when 'dont_link' then "Don't Link"
-          end %> payments
-      (<%= @payment_count %> of <%= @total_count %>)
-    </small>
-    <%= link_to "Clear filter", recharge_payments_path, class: "btn btn-outline-secondary btn-sm" %>
-  </div>
+  <% end %>
 <% end %>
 
-<div class="row g-2 mb-3">
-  <div class="col-sm-6 col-lg-3">
-      <%= link_to recharge_payments_path, class: "kpi-tile clickable d-block text-decoration-none h-100 #{'active' unless @filter_active}" do %>
-        <div class="kpi-label">All</div>
-        <div class="kpi-value"><%= @total_count %></div>
-      <% end %>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-      <%= link_to recharge_payments_path(linked: 'yes'), class: "kpi-tile clickable d-block text-decoration-none h-100 #{'active' if params[:linked] == 'yes'}" do %>
-        <div class="kpi-label">Linked</div>
-        <div class="kpi-value"><%= @linked_count %></div>
-      <% end %>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-      <%= link_to recharge_payments_path(linked: 'no'), class: "kpi-tile clickable warning d-block text-decoration-none h-100 #{'active' if params[:linked] == 'no'}" do %>
-        <div class="kpi-label">Unlinked</div>
-        <div class="kpi-value"><%= @unlinked_count %></div>
-      <% end %>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-      <%= link_to recharge_payments_path(linked: 'dont_link'), class: "kpi-tile clickable d-block text-decoration-none h-100 #{'active' if params[:linked] == 'dont_link'}" do %>
-        <div class="kpi-label">Don't link</div>
-        <div class="kpi-value"><%= @dont_link_count %></div>
-      <% end %>
-  </div>
-</div>
+<% if @filter_active %>
+  <% filter_label = { 'yes' => 'Linked', 'no' => 'Unlinked', 'dont_link' => "Don't link" }[params[:linked]] %>
+  <%= render 'shared/payment_filter_banner', label: "#{filter_label || 'Searched'} payments",
+             shown: @payment_count, total: @total_count, clear_path: recharge_payments_path %>
+<% end %>
+
+<%= render 'shared/payment_filter_tiles', tiles: [
+      { label: 'All', count: @total_count, path: recharge_payments_path, active: params[:linked].blank? },
+      { label: 'Linked', count: @linked_count, path: recharge_payments_path(linked: 'yes'),
+        active: params[:linked] == 'yes' },
+      { label: 'Unlinked', count: @unlinked_count, path: recharge_payments_path(linked: 'no'),
+        active: params[:linked] == 'no', variant: 'warning' },
+      { label: "Don't link", count: @dont_link_count, path: recharge_payments_path(linked: 'dont_link'),
+        active: params[:linked] == 'dont_link' }
+    ] %>
 
 <!-- Import Modal -->
 <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
@@ -98,109 +68,46 @@
   </div>
 </div>
 
-<%= form_with url: recharge_payments_path, method: :get, local: true,
-              data: { controller: "live-filter", live_filter_server_value: true, turbo_frame: "recharge_payments_results" } do |form| %>
-  <% request.query_parameters.except('q', 'page').each do |key, value| %>
-    <%= hidden_field_tag key, value %>
-  <% end %>
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-      <div class="d-flex gap-2">
-        <%= form.text_field :q, value: params[:q], class: "form-control form-control-sm",
-                            placeholder: "Search by charge ID, customer name, full email, or status…",
-                            autocomplete: "off", autocorrect: "off", autocapitalize: "off", spellcheck: "false",
-                            data: { live_filter_target: "input", action: "input->live-filter#filter" } %>
-        <button type="button" class="btn btn-outline-secondary <%= 'd-none' unless params[:q].present? %>"
-                data-live-filter-target="clearButton" data-action="click->live-filter#clear">Clear</button>
-      </div>
-    </div>
-  </div>
-<% end %>
+<%= render 'shared/payment_search', url: recharge_payments_path, frame: 'recharge_payments_results',
+           placeholder: 'Search by charge ID, customer name, full email, or status…' %>
 
-<%= turbo_frame_tag "recharge_payments_results" do %>
-  <div class="card shadow-sm border-0">
-    <div class="table-responsive">
-      <table class="table table-compact mb-0 align-middle">
-      <thead>
-        <tr>
-          <th scope="col">Charge</th>
-          <th scope="col">Status</th>
-          <th scope="col">Amount</th>
-          <th scope="col">Member</th>
-          <th scope="col">Processed</th>
+<%= turbo_frame_tag 'recharge_payments_results' do %>
+  <% if @payments.any? %>
+    <%= render layout: 'shared/payment_table',
+               locals: { body_id: 'recharge_payments_table_body',
+                         headers: ['Charge', 'Status', ['Amount', 'num'], 'Member', 'Processed'] } do %>
+      <% @payments.each do |payment| %>
+        <% unlinked = payment.user.blank? && !payment.dont_link? %>
+        <tr class="recharge-payment-row <%= 'row-attention' if unlinked %>"
+            data-live-filter-target="item"
+            data-search-text="<%= [
+              payment.recharge_id,
+              payment.customer_name,
+              payment.status.presence || 'unknown',
+              payment.amount_with_currency,
+              payment.user&.display_name,
+              payment.user_id.present? ? 'linked' : 'unlinked'
+            ].compact.join(' ').downcase %>">
+          <td>
+            <%= link_to payment.recharge_id, recharge_payment_path(payment),
+                        class: 'fw-medium text-decoration-none', data: { turbo_frame: '_top' } %>
+          </td>
+          <td><%= payment_status_cell(payment.status) %></td>
+          <td class="num"><%= payment_money_tag(payment.amount, payment.currency) %></td>
+          <td class="recharge-payment-member">
+            <%= render 'shared/payment_member_cell', payment: payment, name: payment.customer_name,
+                       link_path: recharge_payment_path(payment), unlinked: unlinked,
+                       empty_label: 'Unnamed customer' %>
+          </td>
+          <td><%= payment_time_tag(payment.processed_at) %></td>
         </tr>
-      </thead>
-      <tbody id="recharge_payments_table_body">
-        <% @payments.each do |payment| %>
-          <% unlinked = payment.user.blank? && !payment.dont_link? %>
-          <tr class="recharge-payment-row" style="<%= 'background: rgba(255, 193, 7, 0.04);' if unlinked %>"
-              data-live-filter-target="item"
-              data-search-text="<%= [
-                payment.recharge_id,
-                payment.customer_name,
-                payment.customer_email,
-                payment.status.presence || "unknown",
-                payment.amount_with_currency,
-                payment.user&.display_name,
-                payment.user_id.present? ? "linked" : "unlinked"
-              ].compact.join(' ').downcase %>">
-            <td class="font-monospace text-12"><%= link_to payment.recharge_id, recharge_payment_path(payment), class: "text-info text-decoration-none", data: { turbo_frame: "_top" } %></td>
-            <td>
-              <% if payment.status.to_s.casecmp("success").zero? %>
-                <span class="status-dot status-success" title="Success"></span>
-              <% else %>
-                <span class="status-dot status-danger me-1" title="<%= payment.status.presence || 'Unknown' %>"></span>
-                <span class="badge text-bg-danger-subtle small"><%= payment.status.presence || "Unknown" %></span>
-              <% end %>
-            </td>
-            <td class="num">
-              <% if payment.amount.present? %>
-                <% amount = payment.amount.to_d %>
-                <% whole = amount.truncate %>
-                <% cents = ((amount - whole) * 100).round %>
-                <span class="money <%= 'fw-medium' unless amount == 40.to_d %>"><span class="currency">$</span><%= whole %><span class="cents">.<%= format('%02d', cents) %></span></span>
-              <% else %>
-                <span class="text-secondary">—</span>
-              <% end %>
-            </td>
-            <td class="recharge-payment-member">
-              <% if payment.user.present? %>
-                <%= link_to payment.user.display_name, user_path(payment.user), class: "text-decoration-none", data: { turbo_frame: "_top" } %>
-              <% elsif unlinked %>
-                <% if payment.customer_name.present? %>
-                  <div class="mb-1"><%= payment.customer_name %></div>
-                <% else %>
-                  <div class="text-muted fst-italic mb-1">Unnamed customer</div>
-                <% end %>
-                <%= gate :'payments.link' do %>
-                  <%= link_to "Link member...", recharge_payment_path(payment), class: "btn btn-sm btn-warning", data: { turbo_frame: "_top" } %>
-                <% end %>
-              <% else %>
-                <% if payment.customer_name.present? %>
-                  <div><%= payment.customer_name %></div>
-                <% else %>
-                  <span class="text-muted fst-italic">Not linked</span>
-                <% end %>
-              <% end %>
-            </td>
-            <td>
-              <% if payment.processed_at %>
-                <span class="text-secondary text-12" title="<%= l(payment.processed_at, format: :long) %>"><%= time_ago_in_words(payment.processed_at) %> ago</span>
-              <% else %>
-                <span class="text-secondary text-12">n/a</span>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-  </div>
-  <% if @pagy.pages > 1 %>
-    <div class="mt-3 d-flex justify-content-between align-items-center">
-      <div class="text-secondary text-12">Showing <%= @pagy.from %>-<%= @pagy.to %> of <%= @pagy.count %></div>
-      <%== @pagy.series_nav(:bootstrap) %>
-    </div>
+      <% end %>
+    <% end %>
+  <% elsif @filter_active %>
+    <%= render 'shared/payment_empty', icon: 'arrow-repeat', message: 'No Recharge payments match these filters.' %>
+  <% else %>
+    <%= render 'shared/payment_empty', icon: 'arrow-repeat',
+               message: 'No Recharge payments have been synced yet.' %>
   <% end %>
+  <%= render 'shared/pagination', pagy: @pagy %>
 <% end %>
-

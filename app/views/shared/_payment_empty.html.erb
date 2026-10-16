@@ -1,0 +1,9 @@
+<%# What a payment index shows when the filters or the search leave nothing behind.
+    Locals: message; optional icon, action (already-rendered markup). %>
+<div class="card shadow-sm border-0">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-<%= local_assigns[:icon] || 'inbox' %> display-6 text-secondary mb-3 d-block"></i>
+    <p class="text-secondary mb-<%= local_assigns[:action].present? ? 3 : 0 %>"><%= message %></p>
+    <%= local_assigns[:action] %>
+  </div>
+</div>

@@ -10,6 +10,19 @@ class CashPayment < ApplicationRecord
 
   scope :ordered, -> { order(paid_on: :desc, created_at: :desc) }
   scope :for_user, ->(user) { where(user_id: user.id) }
+  scope :paid_between, ->(from, to) { where(paid_on: from..to) }
+  scope :search, lambda { |term|
+    pattern = "%#{term.to_s.downcase}%"
+    # Member emails are encrypted, so they match only on a whole address, via the digest.
+    digest = SensitiveData.email_digest(term)
+    joins(:user, :membership_plan).where(
+      "LOWER(COALESCE(users.full_name, '')) LIKE :q " \
+      "OR LOWER(COALESCE(membership_plans.name, '')) LIKE :q " \
+      "OR LOWER(COALESCE(cash_payments.notes, '')) LIKE :q " \
+      'OR users.email_lookup_digest = :d',
+      q: pattern, d: digest
+    )
+  }
 
   def identifier
     "CASH-#{id}"

@@ -31,7 +31,7 @@ class KofiPaymentsControllerTest < ActionDispatch::IntegrationTest
     get kofi_payments_path
 
     assert_response :success
-    assert_select 'h1', text: 'Ko-Fi Payments'
+    assert_select 'h1', text: 'Ko-fi payments'
     assert_match @payment.kofi_transaction_id, response.body
     assert_no_match(/kofi-private@example\.com/, response.body)
     assert_select 'a[href^=?]', 'mailto:', count: 0

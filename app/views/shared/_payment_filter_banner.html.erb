@@ -1,0 +1,9 @@
+<%# Says which bucket the list is showing and offers the way back out.
+    Locals: label, shown, total, clear_path. %>
+<div class="alert alert-info py-2 mb-3 d-flex justify-content-between align-items-center">
+  <small>
+    <i class="bi bi-funnel me-1"></i> Filtering: <%= label %>
+    (<%= number_with_delimiter(shown) %> of <%= number_with_delimiter(total) %>)
+  </small>
+  <%= link_to 'Clear filters', clear_path, class: 'btn btn-outline-secondary btn-sm' %>
+</div>

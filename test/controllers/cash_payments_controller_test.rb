@@ -17,7 +17,7 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
   test 'shows index' do
     get cash_payments_path
     assert_response :success
-    assert_select 'h1', /Cash Payments/
+    assert_select 'h1', /Cash payments/i
   end
 
   test 'shows payment' do
