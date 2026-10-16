@@ -321,6 +321,20 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "#topic-resources a[href^='#{new_document_path}']", text: 'Add document'
   end
 
+  test 'curator who manages a parent topic sees a subtopic document on the topic page' do
+    sign_in_as_member
+    parent = TrainingTopic.create!(name: 'Curated area', offered_to_members: true)
+    grant_privileges(signed_in_member, 'training.documents.manage', topic: parent)
+    subtopic = TrainingTopic.create!(name: 'Curated subtopic', parent: parent, offered_to_members: true)
+    doc = Document.new(title: 'Subtopic handbook', training_topics: [subtopic])
+    doc.file.attach(io: StringIO.new('handbook'), filename: 'handbook.txt', content_type: 'text/plain')
+    doc.save!
+
+    get training_catalog_topic_path(subtopic)
+
+    assert_select '#topic-resources', text: /Subtopic handbook/
+  end
+
   test 'show displays edit button for admin' do
     sign_in_as_admin
     get training_catalog_topic_path(@laser_topic)
