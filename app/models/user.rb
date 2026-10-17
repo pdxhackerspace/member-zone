@@ -334,6 +334,33 @@ class User < ApplicationRecord
     end
   end
 
+  # Topic-scoped privileges that each open a topic's edit page: whoever holds one of them for a
+  # topic (or its parent) gets the page, limited there to the parts that privilege covers.
+  TOPIC_PAGE_PRIVILEGES = %w[
+    training.topics.manage_links
+    training.documents.manage
+    training.topics.edit_details
+    training.subtopics.create
+  ].freeze
+
+  # May this member open the topic's edit page? Shared by TrainingTopicsController, which
+  # guards the page, and the catalog, which links to it and shows the topics it leads to.
+  def may_open_topic_page?(topic)
+    return true if can?(:'training.topics.manage')
+
+    TOPIC_PAGE_PRIVILEGES.any? { |key| can?(key, topic: topic) } || may_manage_subtopic?(topic)
+  end
+
+  # The topics may_open_topic_page? lets this member open, as one query for list pages.
+  def topics_with_page_access
+    return TrainingTopic.all if can?(:'training.topics.manage')
+
+    page_ids = conferring_topic_ids_for(TOPIC_PAGE_PRIVILEGES)
+    subtopic_parent_ids = conferring_topic_ids_for(['training.subtopics.manage'])
+
+    TrainingTopic.where(id: page_ids).or(TrainingTopic.where(parent_id: page_ids + subtopic_parent_ids))
+  end
+
   # Appointing or removing a trainer confers the topic's can_train roles, and the Training
   # record created alongside confers its trained_in roles, so containment covers both.
   #
@@ -379,6 +406,10 @@ class User < ApplicationRecord
   # Cached per instance; call reset_privilege_cache! after changing the member's training.
   def conferred_privileges
     @conferred_privileges ||= build_conferred_privileges
+  end
+
+  def conferring_topic_ids_for(privilege_keys)
+    conferred_privileges.filter_map { |topic_id, privilege| topic_id if privilege_keys.include?(privilege.key) }.uniq
   end
 
   def reset_privilege_cache!

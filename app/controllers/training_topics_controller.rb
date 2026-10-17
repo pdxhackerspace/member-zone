@@ -3,13 +3,6 @@
 # nested directly under those.
 class TrainingTopicsController < AuthenticatedController
   # Any one of these is enough to reach a topic's page; each unlocks a different part of it.
-  TOPIC_PAGE_PRIVILEGES = %i[
-    training.topics.manage_links
-    training.documents.manage
-    training.topics.edit_details
-    training.subtopics.create
-  ].freeze
-
   before_action :set_training_topic, only: %i[edit update destroy revoke_training revoke_trainer_capability]
   before_action -> { require_privilege!(:'training.topics.manage') }, only: %i[index]
   before_action :require_destroy_permission!, only: %i[destroy]
@@ -99,9 +92,7 @@ class TrainingTopicsController < AuthenticatedController
   end
 
   def require_topic_page_access!
-    return if can?(:'training.topics.manage')
-    return if TOPIC_PAGE_PRIVILEGES.any? { |privilege| can?(privilege, topic: @training_topic) }
-    return if current_user&.may_manage_subtopic?(@training_topic)
+    return if current_user&.may_open_topic_page?(@training_topic)
 
     redirect_to root_path, alert: "You don't have permission to manage that training topic."
   end
