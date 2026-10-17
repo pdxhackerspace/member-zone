@@ -1,7 +1,7 @@
 # Member-facing catalog of training topics.
 #
-# Admins see every topic; non-admins only see topics with
-# `offered_to_members = true`. Each topic has a detail page showing
+# Admins see every topic; non-admins see topics with `offered_to_members = true`
+# plus any whose edit page they may open (stewards and curators). Each topic has a detail page showing
 # trainers, trainees, and training materials (links + documents).
 # From the detail page, both admins and non-admins can request training
 # for any topic that is offered to members and has at least one trainer.
@@ -100,16 +100,19 @@ class TrainingCatalogController < AuthenticatedController
   def authorize_topic_visibility!
     return if current_user_admin? || can?(:'training.catalog.view_all')
     return if @training_topic.offered_to_members?
+    return if current_user.may_open_topic_page?(@training_topic)
 
     redirect_to training_catalog_path, alert: 'That training topic is not available.'
   end
 
   # A privilege here only ever widens what a member sees: every member keeps the topics on
-  # offer, and training.catalog.view_all adds the ones that are not.
+  # offer, training.catalog.view_all adds the ones that are not, and a steward or curator also
+  # sees the unoffered topics whose page they may edit.
   def visible_topics
     return TrainingTopic.all if current_user_admin? || can?(:'training.catalog.view_all')
 
     TrainingTopic.offered_for_members
+                 .or(TrainingTopic.where(id: current_user.topics_with_page_access.select(:id)))
   end
 
   # Mirrors DocumentsController#manageable_topic_ids, which decides what the links lead to.
