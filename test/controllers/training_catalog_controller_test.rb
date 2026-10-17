@@ -344,12 +344,75 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_match(/>\s*Edit\s*</, response.body)
   end
 
-  test 'show does not display edit button for non-admin' do
+  test 'show does not display edit button for a member without topic privileges' do
     sign_in_as_member
     get training_catalog_topic_path(@laser_topic)
 
     assert_response :success
     assert_no_match(/#{Regexp.escape(edit_training_topic_path(@laser_topic))}/, response.body)
+  end
+
+  # Stewards and curators
+
+  test 'curator can open an unoffered topic they curate and see its edit button' do
+    sign_in_as_member
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    grant_privileges(signed_in_member, 'training.topics.manage_links', topic: area)
+
+    get training_catalog_topic_path(area)
+
+    assert_response :success
+    assert_select "a[href='#{edit_training_topic_path(area)}']", text: /Edit/
+  end
+
+  test 'curator can open an unoffered direct subtopic of a topic they curate' do
+    sign_in_as_member
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    subtopic = TrainingTopic.create!(name: 'Sewing machines', parent: area, offered_to_members: false)
+    grant_privileges(signed_in_member, 'training.topics.edit_details', topic: area)
+
+    get training_catalog_topic_path(subtopic)
+
+    assert_response :success
+    assert_select "a[href='#{edit_training_topic_path(subtopic)}']", text: /Edit/
+  end
+
+  test 'curator cannot open an unrelated unoffered topic' do
+    sign_in_as_member
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    grant_privileges(signed_in_member, 'training.topics.manage_links', topic: area)
+    unrelated = TrainingTopic.create!(name: 'Metal shop', offered_to_members: false)
+
+    get training_catalog_topic_path(unrelated)
+
+    assert_redirected_to training_catalog_path
+  end
+
+  test 'curator sees no edit button on an offered topic they do not curate' do
+    sign_in_as_member
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    grant_privileges(signed_in_member, 'training.topics.manage_links', topic: area)
+
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select "a[href='#{edit_training_topic_path(@laser_topic)}']", count: 0
+  end
+
+  test 'catalog index lists unoffered topics the curator may edit and no others' do
+    sign_in_as_member
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    subtopic = TrainingTopic.create!(name: 'Sewing machines', parent: area, offered_to_members: false)
+    grant_privileges(signed_in_member, 'training.documents.manage', topic: area)
+    TrainingTopic.create!(name: 'Metal shop', offered_to_members: false)
+
+    get training_catalog_path
+
+    assert_response :success
+    assert_match area.name, response.body
+    assert_match subtopic.name, response.body
+    assert_no_match 'Metal shop', response.body
+    assert_match @laser_topic.name, response.body
   end
 
   test 'show returns friendly error for unknown topic' do

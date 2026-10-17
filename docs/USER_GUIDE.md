@@ -290,6 +290,8 @@ Each topic's page in the training catalog ends with **Resources**, after Trainer
 
 People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
 
+Stewards and curators can reach every topic they look after, even ones not offered to members: a topic shows up in the catalog, and its page opens, for anyone who holds *Edit topic resource links*, *Manage topic documents*, *Edit topic descriptions*, or *Create subtopics* for it (or for its parent topic). The same people get the **Edit** button at the top of the topic page, which opens the topic's settings limited to what their role covers.
+
 ## Membership states
 
 A member's standing is a single state, shown on their profile and filterable on the member list. Members in an **Active** state can get into the building; the rest cannot.
