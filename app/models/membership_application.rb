@@ -6,7 +6,9 @@ class MembershipApplication < ApplicationRecord
 
   STATUSES = %w[draft submitted under_review needs_review approved rejected].freeze
   IN_REVIEW_STATUSES = %w[under_review needs_review].freeze
-  NAGGABLE_PENDING_STATUSES = %w[submitted under_review].freeze
+  # Only open applications chase anyone: one held for review (under_review or needs_review) is
+  # already in someone's hands, so it neither reminds the directors nor counts as urgent.
+  NAGGABLE_PENDING_STATUSES = %w[submitted].freeze
 
   # Form question labels whose answers are masked (with reveal control) for viewers who do not
   # hold the applications.view_pii privilege.
@@ -55,10 +57,10 @@ class MembershipApplication < ApplicationRecord
     submitted_apps.where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) < ?',
                          cutoff)
   }
-  scope :stale_pending, lambda { |stale_cutoff = 1.week.ago|
-    naggable_pending
-      .where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) <= ?', stale_cutoff)
+  scope :older_than, lambda { |cutoff|
+    where('COALESCE(membership_applications.submitted_at, membership_applications.created_at) <= ?', cutoff)
   }
+  scope :stale_pending, ->(stale_cutoff = 1.week.ago) { naggable_pending.older_than(stale_cutoff) }
   # Newest by when the application was submitted (or created if not yet submitted); tie-break on id for stable ordering.
   scope :newest_first, lambda {
     reorder(

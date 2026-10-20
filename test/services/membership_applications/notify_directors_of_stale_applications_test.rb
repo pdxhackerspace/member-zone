@@ -182,6 +182,22 @@ module MembershipApplications
       assert_nil ReminderDelivery.state_for('staff_application', application)
     end
 
+    test 'does not email applications held under review' do
+      now = Time.zone.local(2026, 5, 1, 9, 0, 0)
+      train_staff(users(:one))
+      application = stale_application(now: now, email: 'held-under-review@example.com', status: 'under_review')
+
+      travel_to now do
+        assert_no_difference 'ActionMailer::Base.deliveries.size' do
+          perform_enqueued_jobs only: ActionMailer::MailDeliveryJob do
+            NotifyDirectorsOfStaleApplications.call(now: now)
+          end
+        end
+      end
+
+      assert_nil ReminderDelivery.state_for('staff_application', application)
+    end
+
     test 'sends nothing while the reminder is disabled' do
       now = Time.zone.local(2026, 5, 1, 9, 0, 0)
       train_staff(users(:one))
