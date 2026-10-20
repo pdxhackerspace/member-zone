@@ -10,6 +10,9 @@ module JournalsHelper
     return render_key_fob_change(changes_hash['key_fob']) if changes_hash['key_fob'].is_a?(Hash)
     return render_audit_log_change(changes_hash['audit_log_entry']) if changes_hash['audit_log_entry'].is_a?(Hash)
     return render_parking_notice_change(changes_hash['parking_notice']) if changes_hash['parking_notice'].is_a?(Hash)
+    if changes_hash['parking_permit_link'].is_a?(Hash)
+      return render_parking_permit_link_change(changes_hash['parking_permit_link'])
+    end
     return render_credential_change(changes_hash['credential']) if changes_hash['credential'].is_a?(Hash)
 
     if changes_hash['trainer_capability'].is_a?(Hash)

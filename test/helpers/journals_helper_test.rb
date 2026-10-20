@@ -32,6 +32,33 @@ class JournalsHelperTest < ActionView::TestCase
     assert_includes html, 'View ticket'
   end
 
+  test 'parking notice entry shows its note and the API token that made the change' do
+    html = render_change_rows(
+      'parking_notice' => {
+        'id' => 42, 'notice_type' => 'permit', 'location' => 'Lot A',
+        'note' => 'Changed location.', 'api_token' => { 'id' => 3, 'name' => 'Front door kiosk' }
+      }
+    )
+
+    assert_includes html, 'Changed location.'
+    assert_includes html, 'Via API token Front door kiosk'
+    assert_includes html, parking_notice_path(42)
+  end
+
+  test 'emailed permit form links to the permit once it has been submitted' do
+    link = ParkingPermitLink.issue_for_new_permit!(user: users(:one))
+    data = { 'id' => link.id, 'expires_at' => link.expires_at.iso8601, 'api_token' => { 'name' => 'Kiosk' } }
+
+    html = render_change_rows('parking_permit_link' => data)
+    assert_includes html, 'Permit form emailed'
+    assert_includes html, 'Via API token Kiosk'
+    assert_not_includes html, 'View permit'
+
+    link.update!(parking_notice: parking_notices(:active_permit))
+    html = render_change_rows('parking_permit_link' => data)
+    assert_includes html, parking_notice_path(parking_notices(:active_permit))
+  end
+
   test 'parking notice entry without an id renders no link' do
     html = render_change_rows('parking_notice' => { 'notice_type' => 'permit', 'location' => 'Lot A' })
 
