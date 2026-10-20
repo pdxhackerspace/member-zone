@@ -26,8 +26,13 @@
           </div>
 
           <div class="mb-3">
-            <%= f.label :script_path, "Script Path", class: "form-label" %>
-            <%= f.text_field :script_path, class: "form-control", required: true, placeholder: "/opt/access/update_keys.sh" %>
+            <%= f.label :script_path, "Program", class: "form-label" %>
+            <%= f.select :script_path, @script_options, { include_blank: "Choose a program" },
+                         class: "form-select font-monospace", required: true %>
+            <div class="form-text">
+              Only executables in the <code>access</code> subdirectory under <code>scripts/</code> or
+              <code>ACCESS_SCRIPTS_DIR</code> can be chosen.
+            </div>
           </div>
 
           <div class="mb-4">

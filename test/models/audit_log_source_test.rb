@@ -1,20 +1,29 @@
 require 'test_helper'
 
 class AuditLogSourceTest < ActiveSupport::TestCase
+  test 'requires a program in an audit script directory' do
+    source = AuditLogSource.new(name: 'Doors', script_path: audit_log_script('json_lines.sh'), run_interval: 'daily')
+    assert_predicate source, :valid?
+
+    source.script_path = '/bin/sh'
+    assert_not source.valid?
+    assert_includes source.errors[:script_path].to_sentence, 'audit script directory'
+  end
+
   test 'requires a name, a program and a known interval' do
     source = AuditLogSource.new
     assert_not source.valid?
     assert_includes source.errors[:name], "can't be blank"
     assert_includes source.errors[:script_path], "can't be blank"
 
-    source = AuditLogSource.new(name: 'x', script_path: '/bin/true', run_interval: 'weekly')
+    source = AuditLogSource.new(name: 'x', script_path: audit_log_script('json_lines.sh'), run_interval: 'weekly')
     assert_not source.valid?
     assert source.errors.key?(:run_interval)
   end
 
   test 'names are unique regardless of case' do
     create_audit_log_source(name: 'Door log')
-    duplicate = AuditLogSource.new(name: 'door LOG', script_path: '/bin/true')
+    duplicate = AuditLogSource.new(name: 'door LOG', script_path: audit_log_script('json_lines.sh'))
     assert_not duplicate.valid?
   end
 

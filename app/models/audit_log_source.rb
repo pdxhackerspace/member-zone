@@ -2,7 +2,7 @@
 # AuditLogs::RunSourceJob and its output is stored, append-only, as AuditLogEntry rows.
 #
 # Modelled on AccessController/AccessControllerType: the program is a path the administrator
-# types (by convention inside the audit-log/ subdirectory beside the access controller
+# types (by convention inside the audit/ subdirectory beside the access controller
 # scripts), arguments are split on whitespace, and environment variables are encrypted.
 class AuditLogSource < ApplicationRecord
   include SensitiveFields
@@ -42,6 +42,7 @@ class AuditLogSource < ApplicationRecord
   validates :script_path, presence: true
   validates :run_interval, inclusion: { in: INTERVALS.keys }
   validates :run_status, inclusion: { in: RUN_STATUSES }
+  validate :script_path_in_catalog, if: :will_save_change_to_script_path?
 
   scope :enabled, -> { where(enabled: true) }
   scope :ordered, -> { order(:name) }
@@ -106,5 +107,14 @@ class AuditLogSource < ApplicationRecord
     when 'running' then 'info'
     else 'secondary'
     end
+  end
+
+  private
+
+  def script_path_in_catalog
+    return if script_path.blank?
+    return if AuditLogs::ScriptCatalog.allowed?(script_path)
+
+    errors.add(:script_path, 'must be an executable file in an audit script directory')
   end
 end

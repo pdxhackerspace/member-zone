@@ -207,7 +207,7 @@ module AuditLogs
     test 'a failed script run still retries alerts left over from an earlier run' do
       source = alerting_source
       failing_mailer { RunSource.call(source) }
-      source.update!(script_path: '/nonexistent/nope.sh')
+      source.update_columns(script_path: '/nonexistent/nope.sh')
 
       perform_enqueued_jobs { RunSource.call(source.reload) }
 
