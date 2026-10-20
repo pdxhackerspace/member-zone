@@ -194,6 +194,14 @@ module ActiveSupport
       AUDIT_LOG_FIXTURE_DIR.join(name).to_s
     end
 
+    def with_operator_script_roots(*roots)
+      original = Rails.configuration.x.operator_script_roots
+      Rails.configuration.x.operator_script_roots = roots
+      yield
+    ensure
+      Rails.configuration.x.operator_script_roots = original
+    end
+
     def access_script(name)
       ACCESS_SCRIPT_FIXTURE_DIR.join(name).to_s
     end
