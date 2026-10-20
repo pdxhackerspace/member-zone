@@ -1,5 +1,6 @@
 class ParkingNotice < ApplicationRecord
   include ParkingNoticeDeviceDetails
+  include ParkingNoticeJournaling
 
   NOTICE_TYPES = %w[permit ticket].freeze
   STATUSES = %w[active expired cleared].freeze
@@ -191,19 +192,6 @@ class ParkingNotice < ApplicationRecord
     events.create!(event_type: event_type, actor: actor, note: note.presence)
   end
 
-  def record_journal_entry!(action_name, actor: nil)
-    members.find_each do |member|
-      Journal.create!(
-        user: member,
-        actor_user: actor,
-        action: action_name,
-        changes_json: journal_payload,
-        changed_at: Time.current,
-        highlight: true
-      )
-    end
-  end
-
   def enqueue_notification!(template_key, recipient: nil)
     targets = recipient.present? ? [recipient] : deliverable_members
     results = targets.filter_map { |member| enqueue_notification_to!(template_key, member) }
@@ -254,18 +242,6 @@ class ParkingNotice < ApplicationRecord
     return if count.positive?
 
     errors.add(:members, 'must include at least one member')
-  end
-
-  def journal_payload
-    {
-      'parking_notice' => {
-        'id' => id,
-        'notice_type' => notice_type,
-        'location' => location_display,
-        'expires_at' => expires_at.strftime('%B %d, %Y'),
-        'description' => description.to_s.truncate(100)
-      }
-    }
   end
 
   def enqueue_notification_to!(template_key, user)

@@ -48,7 +48,8 @@ module Api
 
       def print
         printer = Printer.find(params.require(:printer_id))
-        result = ParkingNotices::Print.call(notice: @notice, printer: printer, layout: params[:layout])
+        result = ParkingNotices::Print.call(notice: @notice, printer: printer, layout: params[:layout],
+                                            actor: current_user)
         return respond_with_error(result) unless result.success?
 
         render json: { data: { printer_id: printer.id, job_id: result.job_id.to_s } }

@@ -126,7 +126,7 @@ class ParkingNoticesController < AuthenticatedController
 
   def remove_photo
     photo = @parking_notice.photos.find(params[:photo_id])
-    photo.purge
+    ParkingNotices::RemovePhoto.call(notice: @parking_notice, actor: current_user, photo: photo)
     redirect_to parking_notice_path(@parking_notice), notice: 'Photo removed.'
   end
 

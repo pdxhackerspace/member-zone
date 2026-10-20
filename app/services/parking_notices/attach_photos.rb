@@ -20,7 +20,9 @@ module ParkingNotices
       return Result.new(notice: @notice, error: :invalid_photo, message: problem) if problem
 
       @notice.photos.attach(@photos)
-      @notice.log_event!('note', actor: @actor, note: "Added #{@photos.size} #{'photo'.pluralize(@photos.size)}.")
+      note = "Added #{@photos.size} #{'photo'.pluralize(@photos.size)}."
+      @notice.log_event!('note', actor: @actor, note: note)
+      @notice.record_journal_entry!('parking_notice_photos_added', actor: @actor, note: note)
       Result.new(notice: @notice)
     end
 
