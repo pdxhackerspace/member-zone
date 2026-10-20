@@ -309,4 +309,48 @@ class RfidWebhookServiceTest < ActiveSupport::TestCase
     assert_operator ttl, :>, 0
     assert_operator ttl, :<=, RfidWebhookService::EXPIRATION_TIME.to_i
   end
+
+  # Namespaces
+
+  # Claiming and clearing up both walk every key under the prefix rather than looking one fob
+  # up, so they are the two operations that can reach across namespaces — and the two that made
+  # parallel workers sharing a Redis fail each other's tests.
+  test 'a scan in another namespace is neither claimed nor cleared from this one' do
+    started = 1.minute.ago
+    other_rfid = unique_rfid
+    in_namespace("#{RfidWebhookService.key_namespace}neighbour:") do
+      RfidWebhookService.store(other_rfid, @pin)
+    end
+
+    assert_nil RfidWebhookService.claim_recent(started, 'token-a')
+
+    reset_rfid_webhook_state!
+
+    in_namespace("#{RfidWebhookService.key_namespace}neighbour:") do
+      assert_not_nil RfidWebhookService.retrieve(other_rfid)
+      reset_rfid_webhook_state!
+    end
+  end
+
+  test 'every key the service writes falls under its namespace' do
+    started = 1.minute.ago
+    RfidWebhookService.store(@rfid, @pin)
+    RfidWebhookService.claim_recent(started, 'token-a')
+    RfidWebhookService.verify_and_consume(@rfid, '9999')
+
+    keys = RfidWebhookService.redis.scan_each(match: RfidWebhookService.key_pattern).to_a
+
+    assert_equal 4, keys.size, 'expected the scan, its claim, its guess count and the session binding'
+    assert(keys.all? { |key| key.start_with?(RfidWebhookService.key_namespace) })
+  end
+
+  private
+
+  def in_namespace(namespace)
+    original = RfidWebhookService.key_namespace
+    RfidWebhookService.key_namespace = namespace
+    yield
+  ensure
+    RfidWebhookService.key_namespace = original
+  end
 end

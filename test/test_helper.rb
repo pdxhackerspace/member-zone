@@ -11,39 +11,21 @@ module ActiveSupport
     parallelize(workers: :number_of_processors)
 
     # Postgres gets one database per worker for free; Redis does not, and the RFID sign-in handoff
-    # is entirely Redis. Two workers sharing a database is not a theoretical problem: scans are
-    # stamped in whole seconds and RfidWebhookService.claim_recent takes the newest one it can
-    # find, so a scan stored by worker 2 is a perfectly good candidate for a claim made by worker
-    # 1 in the same second. Pointing each worker at its own database removes the question.
+    # is entirely Redis. Workers sharing a keyspace is not a theoretical problem: claim_recent
+    # takes the newest scan it can find whatever its fob, so a scan stored by worker 2 is a
+    # perfectly good candidate for a claim made by worker 1, and reset_rfid_webhook_state! in one
+    # worker would delete another's pending scan mid-test. Unique RFID values do not help with
+    # either, because neither is keyed by the fob.
     #
-    # Database 0 is left for anything run outside the suite, so workers take 1 upwards. How many
-    # there are to hand out is asked of the server rather than assumed: Redis ships with 16, this
-    # suite runs one worker per core, and a machine with more than 15 of them wraps around and
-    # puts two workers back in one database. The test container is started with enough of them
-    # (see docker-compose.test.yml); the tests also use RFID values unique to each example, which
-    # is the belt to this braces.
+    # So each worker writes under its own key namespace, and both of those only ever see their
+    # own worker's keys. Unlike a database per worker, this has no ceiling on the worker count.
+    #
+    # The process ID keeps concurrent suite runs sharing a Redis apart too, and is set here as well
+    # as per worker because a run too small to parallelize never calls parallelize_setup.
+    RfidWebhookService.key_namespace = "test:#{Process.pid}:"
+
     parallelize_setup do |worker|
-      ENV['REDIS_URL'] = redis_url_for_test_worker(worker)
-      # The connection is memoized, and reading ENV again is the only way to pick up the new
-      # database. Nothing has touched Redis this early, so there is no live connection to lose.
-      RfidWebhookService.remove_instance_variable(:@redis) if RfidWebhookService.instance_variable_defined?(:@redis)
-    end
-
-    def self.redis_url_for_test_worker(worker)
-      base = ENV.fetch('REDIS_URL', 'redis://localhost:6379/0')
-      uri = URI.parse(base)
-      uri.path = "/#{(worker % (redis_database_count(base) - 1)) + 1}"
-      uri.to_s
-    end
-
-    # Falls back to the stock 16 if the server will not say, which is no worse than assuming it.
-    def self.redis_database_count(url)
-      @redis_database_count ||= begin
-        reported = Redis.new(url: url).config(:get, 'databases')['databases'].to_i
-        reported > 1 ? reported : 16
-      rescue StandardError
-        16
-      end
+      RfidWebhookService.key_namespace = "test:#{Process.pid}:#{worker}:"
     end
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
@@ -61,10 +43,11 @@ module ActiveSupport
     # One scan covers the scans, the claims on them, the failed-guess counts and the session
     # bindings, because every key the service writes begins this way. Matching each prefix
     # separately walked the whole keyspace once per prefix, and this runs in the setup and the
-    # teardown of every RFID test.
+    # teardown of every RFID test. The pattern includes this worker's namespace, so it never
+    # touches a neighbour's keys.
     def reset_rfid_webhook_state!
       redis = RfidWebhookService.redis
-      keys = redis.scan_each(match: "#{RfidWebhookService::REDIS_KEY_PREFIX.chomp(':')}*").to_a
+      keys = redis.scan_each(match: RfidWebhookService.key_pattern).to_a
       redis.del(*keys) if keys.any?
     end
 
