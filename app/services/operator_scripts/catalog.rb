@@ -12,6 +12,7 @@ module OperatorScripts
   # outside it does not count.
   module Catalog
     ROLES = %w[access audit credential].freeze
+    AUDIT_LEGACY_DIR = 'audit-log'.freeze
 
     module_function
 
@@ -19,6 +20,7 @@ module OperatorScripts
       raise ArgumentError, "unknown role #{role.inspect}" unless ROLES.include?(role.to_s)
 
       role_dirs = roots.map { |root| root.join(role.to_s) }
+      role_dirs.concat(legacy_audit_directories) if role.to_s == 'audit'
       role_dirs.concat(legacy_credential_directories) if role.to_s == 'credential'
       role_dirs.uniq
     end
@@ -29,6 +31,11 @@ module OperatorScripts
         ENV['ACCESS_SCRIPTS_DIR'].presence,
         *Array(Rails.configuration.x.operator_script_roots)
       ].compact.map { |dir| Pathname(dir.to_s) }.uniq
+    end
+
+    # Bundled audit programs lived under audit-log/ before the shared audit/ layout.
+    def legacy_audit_directories
+      roots.map { |root| root.join(AUDIT_LEGACY_DIR) }
     end
 
     # CREDENTIAL_SCRIPTS_DIR pointed at a credential directory before the shared layout;
@@ -42,10 +49,33 @@ module OperatorScripts
     end
 
     def allowed?(path, role)
+      candidate_paths(path, role).any? { |candidate| executable_in_role_directories?(candidate, role) }
+    end
+
+    # Returns the first executable path among stored and legacy-audit aliases (audit-log → audit).
+    def resolve_script_path(path, role)
+      candidate_paths(path, role).find { |candidate| executable_in_role_directories?(candidate, role) } ||
+        path.to_s.strip
+    end
+
+    def executable_in_role_directories?(path, role)
       real = realpath(path)
       return false unless real && File.file?(real) && executable?(real)
 
       resolved_directories_for(role).any? { |dir| real.start_with?("#{dir}/") }
+    end
+
+    def candidate_paths(path, role)
+      normalized = path.to_s.strip
+      return [] if normalized.blank?
+
+      paths = [normalized]
+      if role.to_s == 'audit'
+        legacy_segment = "/#{AUDIT_LEGACY_DIR}/"
+        current_segment = "/#{role}/"
+        paths << normalized.sub(legacy_segment, current_segment) if normalized.include?(legacy_segment)
+      end
+      paths.uniq
     end
 
     def executable?(real)

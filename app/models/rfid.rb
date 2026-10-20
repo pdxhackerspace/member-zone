@@ -14,8 +14,6 @@ class Rfid < ApplicationRecord
   private
 
   def enqueue_access_controller_member_keys_sync!
-    return if destroyed_by_association.present?
-
     AccessControllerMemberKeysSyncJob.perform_later(Current.actor&.id)
   end
 

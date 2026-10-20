@@ -93,7 +93,11 @@ class AuditLogSource < ApplicationRecord
 
   # The command line as it will be run, for the run log.
   def command_arguments
-    [script_path.to_s.strip, *script_arguments.to_s.split(/\s+/).compact_blank]
+    [resolved_script_path, *script_arguments.to_s.split(/\s+/).compact_blank]
+  end
+
+  def resolved_script_path
+    AuditLogs::ScriptCatalog.resolve_script_path(script_path)
   end
 
   def status_label

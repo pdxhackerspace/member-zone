@@ -40,6 +40,22 @@ class RfidTest < ActiveJob::TestCase
     end
   end
 
+  test 'destroying key fobs with a member enqueues a sync for each fob' do
+    user = User.create!(
+      authentik_id: "rfid-cascade-#{SecureRandom.hex(4)}",
+      full_name: 'Rfid cascade',
+      email: "rfid-cascade-#{SecureRandom.hex(4)}@example.com",
+      membership_state: 'inactive_member'
+    )
+    Current.user = users(:two)
+    user.rfids.create!(rfid: "CAS#{SecureRandom.hex(3)}")
+    user.rfids.create!(rfid: "CAS#{SecureRandom.hex(3)}")
+
+    assert_enqueued_jobs 2, only: AccessControllerMemberKeysSyncJob do
+      user.destroy!
+    end
+  end
+
   test 'destroying a key fob creates a highlighted journal entry' do
     actor = users(:two)
     rfid = rfids(:one)
