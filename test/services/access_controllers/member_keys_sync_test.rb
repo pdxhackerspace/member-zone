@@ -16,7 +16,7 @@ module AccessControllers
 
     test 'key change notices describe syncing when controllers exist' do
       AccessController.create!(name: 'Flash test door', hostname: 'flash.local',
-                                 access_controller_type: access_controller_types(:door_lock))
+                               access_controller_type: access_controller_types(:door_lock))
 
       assert_match(/are syncing/i, MemberKeysSync.rfid_removed_notice)
     end
