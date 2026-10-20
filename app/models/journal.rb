@@ -43,6 +43,7 @@ class Journal < ApplicationRecord
     parking_ticket_issued
     parking_notice_expired
     parking_notice_cleared
+    parking_notice_clearance_requested
     application_submitted
     application_approved
     application_rejected

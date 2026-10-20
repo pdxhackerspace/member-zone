@@ -521,6 +521,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'pause_key_access pauses the member and redirects to profile' do
+    create_syncable_access_controller!
     assert_not @user.key_access_paused?
 
     post pause_key_access_user_path(@user)
@@ -529,9 +530,11 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert @user.reload.key_access_paused?
     follow_redirect!
     assert_match(/Key access paused/i, response.body)
+    assert_match(/syncing/i, response.body)
   end
 
   test 'resume_key_access resumes the member and redirects to profile' do
+    create_syncable_access_controller!
     @user.pause_key_access!
 
     post resume_key_access_user_path(@user)
@@ -540,6 +543,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_not @user.reload.key_access_paused?
     follow_redirect!
     assert_match(/Key access resumed/i, response.body)
+    assert_match(/syncing/i, response.body)
   end
 
   test 'pause_key_access redirects to the add key screen when return_to=add_key' do
@@ -693,6 +697,11 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
       }
     }
     User.find_by!(authentik_id: "local:#{account.id}")
+  end
+
+  def create_syncable_access_controller!
+    AccessController.create!(name: 'Users controller sync test', hostname: 'users-sync.local',
+                             access_controller_type: access_controller_types(:door_lock))
   end
 
   # One notice in each status for exercising the member parking tab filters.

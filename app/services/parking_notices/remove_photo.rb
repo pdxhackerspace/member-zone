@@ -14,7 +14,9 @@ module ParkingNotices
     def call
       filename = @photo.filename.to_s
       @photo.purge
-      @notice.log_event!('note', actor: @actor, note: "Removed photo #{filename}.")
+      note = "Removed photo #{filename}."
+      @notice.log_event!('note', actor: @actor, note: note)
+      @notice.record_journal_entry!('parking_notice_photo_removed', actor: @actor, note: note)
       Result.new(notice: @notice)
     end
   end

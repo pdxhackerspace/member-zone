@@ -60,6 +60,7 @@ module ParkingPermits
 
       link = ParkingPermitLink.issue_for_new_permit!(user: user, api_token: @api_token, now: @now)
       MemberMailer.parking_permit_form_link(user, **link_mail_args(link)).deliver_later
+      journal_link_sent!(link)
       Result.new(status: :created, error: nil, mode: @mode, user: user, parking_notice: nil, link: link)
     end
 
@@ -88,6 +89,23 @@ module ParkingPermits
 
     def link_mail_args(link)
       self.class.link_mail_args(link)
+    end
+
+    # No permit exists until the member submits the form, so the entry names the link; the journal
+    # finds the permit through it once there is one.
+    def journal_link_sent!(link)
+      Journal.create!(
+        user: link.user,
+        action: 'parking_permit_link_sent',
+        changes_json: {
+          'parking_permit_link' => {
+            'id' => link.id,
+            'expires_at' => link.expires_at.iso8601,
+            'api_token' => @api_token && { 'id' => @api_token.id, 'name' => @api_token.name }
+          }.compact
+        },
+        changed_at: @now
+      )
     end
 
     def failure(status, error)

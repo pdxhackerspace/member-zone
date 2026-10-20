@@ -8,16 +8,19 @@ module ParkingNotices
       new(...).call
     end
 
-    def initialize(notice:, printer:, layout: nil)
+    def initialize(notice:, printer:, layout: nil, actor: nil)
       @notice = notice
       @printer = printer
       @layout = layout.to_s
+      @actor = actor
     end
 
     def call
       return Result.new(notice: @notice, error: :not_printable) unless @notice.active?
 
-      Result.new(notice: @notice, job_id: print!)
+      job_id = print!
+      @notice.record_journal_entry!('parking_notice_printed', actor: @actor, note: "Sent to #{@printer.name}.")
+      Result.new(notice: @notice, job_id: job_id)
     rescue CupsService::PrintError => e
       Result.new(notice: @notice, error: :print_failed, message: e.message)
     end

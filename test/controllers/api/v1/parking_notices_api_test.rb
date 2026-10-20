@@ -196,6 +196,25 @@ module Api
         assert_equal 'Moved', json_body.dig('data', 'events').last['note']
       end
 
+      test 'changes made through the API are journaled for the members, naming the token' do
+        notice = parking_notices(:active_permit)
+        token = ApiToken.find_by(token_digest: ApiToken.digest(@raw))
+
+        patch api_v1_parking_notice_path(notice), params: { location: 'Laser room' }, as: :json,
+                                                  headers: api_headers(@raw)
+        post notes_api_v1_parking_notice_path(notice), params: { note: 'Moved' }, as: :json, headers: api_headers(@raw)
+        post clear_api_v1_parking_notice_path(notice), headers: api_headers(@raw)
+
+        entries = Journal.where(user: users(:one)).where('action LIKE ?', 'parking_%').order(:id).last(3)
+        assert_equal %w[parking_notice_updated parking_notice_note_added parking_notice_cleared], entries.map(&:action)
+        entries.each do |entry|
+          assert_equal @staff, entry.actor_user
+          assert_equal notice.id, entry.changes_json.dig('parking_notice', 'id')
+          assert_equal({ 'id' => token.id, 'name' => token.name },
+                       entry.changes_json.dig('parking_notice', 'api_token'))
+        end
+      end
+
       test 'a blank note is a validation error' do
         post notes_api_v1_parking_notice_path(parking_notices(:active_permit)), params: { note: ' ' }, as: :json,
                                                                                 headers: api_headers(@raw)

@@ -20,7 +20,8 @@ against the source's alert rules and records the run.
 ## Writing a program
 
 Programs are configured the same way access controller types are: the source holds the path to an
-executable. By convention they live in an `audit-log/` subdirectory beside the access controller scripts.
+executable. By convention they live in the `audit/` subdirectory under the same root as access
+controller and credential scripts (`scripts/` in the app, or `ACCESS_SCRIPTS_DIR` on the server).
 
 - The file must be executable and start with a shebang (`#!/bin/sh`, `#!/usr/bin/env python3`,
   `#!/usr/bin/env ruby`). Shell, Python and Ruby all work; the production image includes all three.
@@ -97,9 +98,9 @@ bin/rails 'audit_logs:run[Door log]'       # runs it and stores the result
 
 ## Bundled programs
 
-`scripts/audit-log/` in this repository holds programs ready to use as sources. Point a source's program path at
-the file (in the production image it is under `/rails/scripts/audit-log/`) or copy it beside your access
-controller scripts.
+`scripts/audit/` in this repository holds programs ready to use as sources. Point a source's program path at
+the file (in the production image it is under `/rails/scripts/audit/`) or copy it into the `audit`
+subdirectory of your `ACCESS_SCRIPTS_DIR` mount.
 
 ### `unifi_protect.rb`: UniFi Protect events
 

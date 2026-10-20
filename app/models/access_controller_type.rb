@@ -8,6 +8,7 @@ class AccessControllerType < ApplicationRecord
   validates :name, presence: true, uniqueness: true
   validates :script_path, presence: true
   validates :enabled, inclusion: { in: [true, false] }
+  validate :script_path_in_catalog, if: :will_save_change_to_script_path?
 
   scope :enabled, -> { where(enabled: true) }
   scope :ordered, -> { order(:name) }
@@ -20,5 +21,14 @@ class AccessControllerType < ApplicationRecord
 
     trained_ids = user.trainings_as_trainee.pluck(:training_topic_id).uniq
     (required_ids - trained_ids).empty?
+  end
+
+  private
+
+  def script_path_in_catalog
+    return if script_path.blank?
+    return if AccessControllers::ScriptCatalog.allowed?(script_path)
+
+    errors.add(:script_path, 'must be an executable file in an access script directory')
   end
 end

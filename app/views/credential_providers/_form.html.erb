@@ -22,7 +22,8 @@
     <%= f.select :script_path, @script_options, { include_blank: "Choose a program" },
                  class: "form-select font-monospace", required: true %>
     <div class="form-text">
-      Only executables in <code>scripts/credentials</code> or <code>CREDENTIAL_SCRIPTS_DIR</code> can be chosen.
+      Only executables in the <code>credential</code> subdirectory under <code>scripts/</code> or
+      <code>ACCESS_SCRIPTS_DIR</code> can be chosen.
       Saving asks the program what it issues.
     </div>
   </div>

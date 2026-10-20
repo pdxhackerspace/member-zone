@@ -62,7 +62,8 @@ Set these variables in your shell, `.env`, or Docker Compose environment:
 | `RECHARGE_API_KEY` | Recharge API access token |
 | `RECHARGE_API_BASE_URL` | Optional override (defaults to `https://api.rechargeapps.com`) |
 | `RECHARGE_TRANSACTIONS_LOOKBACK_DAYS` | Days of Recharge history to pull during sync (default 30) |
-| `CREDENTIAL_SCRIPTS_DIR` | Optional extra directory of credential provider programs (beside `scripts/credentials/`) — see [docs/credentials.md](docs/credentials.md) |
+| `ACCESS_SCRIPTS_DIR` | Root directory of operator-mounted programs; use subdirectories `access/`, `audit/` and `credential/` — see [docs/credentials.md](docs/credentials.md) and [docs/audit-logs.md](docs/audit-logs.md) |
+| `CREDENTIAL_SCRIPTS_DIR` | Legacy optional credential program directory (prefer `ACCESS_SCRIPTS_DIR/credential/`) |
 | `DATABASE_FIELD_ENCRYPTION_KEY` | Key for encrypting personal data and credentials at rest — see [docs/encrypted-fields.md](docs/encrypted-fields.md) |
 | `EMAIL_LOOKUP_HMAC_KEY` | Key for deriving the email lookup digests that make encrypted addresses searchable |
 
@@ -265,7 +266,7 @@ The sync job pulls recent charges from Recharge, records them in `recharge_payme
 
 ## Audit Logs
 
-Audit logs are collected from external programs, combined under **Audit** in the navbar, and kept permanently. Configure sources under **Settings → Audit log sources**: each names an executable (by convention in an `audit-log/` directory beside the access controller scripts), how often to run it (hourly, every 6 hours, every 12 hours, daily), environment variables (encrypted at rest) and optional alert rules. Programs may be shell, Python or Ruby — the production image includes `python3`, and anything with a shebang line works. Entries cannot be deleted; readers may add an explanation to any entry.
+Audit logs are collected from external programs, combined under **Audit** in the navbar, and kept permanently. Configure sources under **Settings → Audit log sources**: each names an executable (by convention in the `audit/` subdirectory under `scripts/` or `ACCESS_SCRIPTS_DIR`), how often to run it (hourly, every 6 hours, every 12 hours, daily), environment variables (encrypted at rest) and optional alert rules. Programs may be shell, Python or Ruby — the production image includes `python3`, and anything with a shebang line works. Entries cannot be deleted; readers may add an explanation to any entry.
 
 ```bash
 rails 'audit_logs:preview[Door log]'   # dry run: what would be stored
@@ -276,7 +277,7 @@ rails 'audit_logs:run[Door log]'       # run now and store
 
 ## Credentials
 
-Members can request API keys, app passwords and similar credentials from external systems under **Your credentials**; administrators configure the systems under **Settings → Credential providers**. Each provider is an executable in `scripts/credentials/` (or the directory named by `CREDENTIAL_SCRIPTS_DIR`) that speaks a small JSON protocol. MemberZone shows each secret once, keeps only its first and last four characters, revokes credentials when a member stops being active, and monitors each provider's health. `docs/credentials.md` describes the protocol, what is stored, the pause, expiry and rotation behaviour, the rake tasks and an example program. Nothing ships in `scripts/credentials/`.
+Members can request API keys, app passwords and similar credentials from external systems under **Your credentials**; administrators configure the systems under **Settings → Credential providers**. Each provider is an executable in `scripts/credential/` (or `ACCESS_SCRIPTS_DIR/credential/`) that speaks a small JSON protocol. MemberZone shows each secret once, keeps only its first and last four characters, revokes credentials when a member stops being active, and monitors each provider's health. `docs/credentials.md` describes the protocol, what is stored, the pause, expiry and rotation behaviour, the rake tasks and an example program. Nothing ships in `scripts/credential/`.
 
 ```bash
 rails credentials:reconcile_preview   # dry run: what the daily reconcile would do
