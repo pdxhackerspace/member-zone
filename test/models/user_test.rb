@@ -87,6 +87,21 @@ class UserTest < ActiveSupport::TestCase
     assert_not_includes User.key_access_active, paused
   end
 
+  test 'pausing and resuming key access enqueue access controller sync' do
+    user = users(:one)
+    Current.user = users(:two)
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob, args: [users(:two).id]) do
+      user.pause_key_access!
+    end
+
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob, args: [users(:two).id]) do
+      user.resume_key_access!
+    end
+  end
+
   test 'pausing key access does not mark the user dirty for authentik sync' do
     # cash_payer is paying + current, so its computed active status stays stable across saves
     user = users(:cash_payer)

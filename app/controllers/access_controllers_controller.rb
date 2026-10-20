@@ -77,14 +77,11 @@ class AccessControllersController < AuthenticatedController
   end
 
   def sync_all
-    enabled = AccessController.enabled
-    count = enabled.count
-    enabled.find_each { |controller| AccessControllerVerbJob.perform_later(controller.id, 'sync', current_user.id) }
-
+    count = AccessControllers::MemberKeysSync.enqueue!(actor_user_id: current_user.id)
     notice = if count.positive?
                "Sync started for #{count} access controller#{'s' if count != 1}."
              else
-               'No enabled access controllers to sync. Configure them under Settings → Access Controllers.'
+               AccessControllers::MemberKeysSync.user_notice(0).strip
              end
 
     redirect_user_id = params[:redirect_user_id].presence

@@ -208,7 +208,8 @@ class User < ApplicationRecord
   end
 
   # Pause this member's RFID key access without removing or deactivating their keys.
-  # Paused members are excluded from access controller syncs (see AccessControllerPayloadBuilder).
+  # Paused members are omitted from the sync payload (see AccessControllerPayloadBuilder); a sync
+  # is enqueued automatically so doors drop their keys.
   def pause_key_access!
     return false if key_access_paused?
 
@@ -790,8 +791,15 @@ class User < ApplicationRecord
   after_update_commit :sync_authentik_user_if_needed
   after_update_commit :sync_application_group_memberships_on_update
   after_update_commit :enqueue_mailing_geocoding_if_needed
+  after_update_commit :enqueue_access_controller_sync_on_key_access_change
 
   private
+
+  def enqueue_access_controller_sync_on_key_access_change
+    return unless saved_change_to_key_access_paused?
+
+    AccessControllerMemberKeysSyncJob.perform_later(Current.actor&.id)
+  end
 
   # Which topics can satisfy a topic-scoped check against this one: the topic itself, plus its
   # parent, whose privileges reach one level down into its subtopics.

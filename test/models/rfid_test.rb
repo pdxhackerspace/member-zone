@@ -1,6 +1,6 @@
 require 'test_helper'
 
-class RfidTest < ActiveSupport::TestCase
+class RfidTest < ActiveJob::TestCase
   teardown do
     Current.reset
   end
@@ -29,6 +29,15 @@ class RfidTest < ActiveSupport::TestCase
     rfid = Rfid.create!(user: user, rfid: '7001, 00456842')
     rfid.reload
     assert_equal '7001,456842', rfid.rfid
+  end
+
+  test 'destroying a key fob enqueues an access controller sync' do
+    rfid = rfids(:one)
+    Current.user = users(:two)
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob, args: [users(:two).id]) do
+      rfid.destroy!
+    end
   end
 
   test 'destroying a key fob creates a highlighted journal entry' do
