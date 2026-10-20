@@ -121,10 +121,10 @@ when :unread_messages %>
         <strong><%= @pending_applications_count %></strong> pending membership <%= 'application'.pluralize(@pending_applications_count) %>
       <% end %>
       <div class="text-muted small mt-1">
-        <% if stale %>
-          <%= @stale_applications_count %> over a week old
-          <% if @pending_applications_count > @stale_applications_count %>
-            · <%= @pending_applications_count - @stale_applications_count %> newer
+        <% if @old_applications_count.to_i > 0 %>
+          <%= @old_applications_count %> over a week old
+          <% if @pending_applications_count > @old_applications_count %>
+            · <%= @pending_applications_count - @old_applications_count %> newer
           <% end %>
         <% else %>
           <% parts = [] %>
