@@ -44,11 +44,7 @@ class RfidsController < AuthenticatedController
   def destroy
     user = @rfid.user
     @rfid.destroy!
-    sync_notice = AccessControllers::MemberKeysSync.user_notice(
-      AccessControllers::MemberKeysSync.syncable_controllers.count
-    )
-    notice = "Key fob removed. Access controllers are syncing to update door access.#{sync_notice}"
-    redirect_to user_path(user), notice: notice
+    redirect_to user_path(user), notice: AccessControllers::MemberKeysSync.rfid_removed_notice
   end
 
   # After adding a fob: warn that doors need a controller sync before the key works.

@@ -41,6 +41,8 @@ class RfidsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'destroying a key fob notifies that access controllers are syncing' do
+    AccessController.create!(name: 'Rfids destroy sync', hostname: 'rfids-destroy.local',
+                             access_controller_type: access_controller_types(:door_lock))
     rfid = rfids(:one)
     user = rfid.user
 

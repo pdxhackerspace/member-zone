@@ -24,5 +24,32 @@ module AccessControllers
         ' No enabled access controllers to sync — configure them under Settings → Access Controllers.'
       end
     end
+
+    def rfid_removed_notice
+      key_change_notice('Key fob removed.', ' Access controllers are syncing to update door access.')
+    end
+
+    def pause_key_access_notice(display_name)
+      key_change_notice(
+        "Key access paused for #{display_name}. Their keys are kept.",
+        ' Access controllers are syncing to remove door access.'
+      )
+    end
+
+    def resume_key_access_notice(display_name)
+      key_change_notice(
+        "Key access resumed for #{display_name}.",
+        ' Access controllers are syncing to restore door access.'
+      )
+    end
+
+    def key_change_notice(prefix, syncing_phrase)
+      count = syncable_controllers.count
+      if count.positive?
+        "#{prefix}#{syncing_phrase}#{user_notice(count)}"
+      else
+        "#{prefix}#{user_notice(count)}"
+      end
+    end
   end
 end
