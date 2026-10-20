@@ -448,7 +448,7 @@ class CredentialProvidersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'a provider whose program has left the catalog can still be disabled and edited' do
-    stale = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+    stale = Rails.root.join('test/fixtures/files/audit/json_lines.sh').to_s
     @provider.update_columns(script_path: stale)
     sign_in_manager
 
@@ -464,7 +464,7 @@ class CredentialProvidersControllerTest < ActionDispatch::IntegrationTest
   test 'moving a provider to a program outside the catalog is still refused' do
     sign_in_manager
 
-    outside = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+    outside = Rails.root.join('test/fixtures/files/audit/json_lines.sh').to_s
     patch credential_provider_path(@provider), params: { credential_provider: { script_path: outside } }
 
     assert_response :unprocessable_content

@@ -2,13 +2,13 @@ require 'test_helper'
 require 'socket'
 require 'digest'
 require 'open3'
-require Rails.root.join('scripts/audit-log/unifi_protect')
+require Rails.root.join('scripts/audit/unifi_protect')
 
-# scripts/audit-log/unifi_protect.rb is a standalone program Member Zone runs as an audit log
+# scripts/audit/unifi_protect.rb is a standalone program Member Zone runs as an audit log
 # source. These tests drive it against a small fake console that speaks just enough HTTP and
 # WebSocket, and finish by running it through the same path a scheduled run takes.
 class UnifiProtectAuditLogTest < ActiveSupport::TestCase
-  SCRIPT = Rails.root.join('scripts/audit-log/unifi_protect.rb').to_s
+  SCRIPT = Rails.root.join('scripts/audit/unifi_protect.rb').to_s
   KEY = 'test-api-key'.freeze
   GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'.freeze
 

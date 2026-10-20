@@ -13,7 +13,7 @@ Rules for files in this directory:
 - Mark them executable (`chmod +x`) and give them a shebang line. Files that are not
   executable, or that are symlinks pointing outside an allowed directory, do not appear in the
   picker.
-- Operators can mount further directories and list them in `CREDENTIAL_SCRIPTS_DIR`; the
-  picker offers executables from those too.
+- On the server, credential programs usually live in the `credential` subdirectory of the
+  directory named by `ACCESS_SCRIPTS_DIR` (alongside `access` and `audit`).
 - Keep secrets out of this directory. API keys belong in the provider's environment variables
   (stored encrypted), not in the script.

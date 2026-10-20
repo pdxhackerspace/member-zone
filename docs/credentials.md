@@ -12,9 +12,9 @@ to tell credentials apart, and keeps credentials in step with the member's stand
 | Provider: a program plus its encrypted environment | `CredentialProvider`, **Settings → Credential providers** |
 | Credential: one issued credential belonging to a member | `Credential`, **Your credentials** (member) and **Admin → Credentials** |
 | Run: a log of one program call | `CredentialRun`, on the provider's page |
-| Programs | `scripts/credentials/` and `CREDENTIAL_SCRIPTS_DIR` |
+| Programs | `scripts/credential/` and `ACCESS_SCRIPTS_DIR/credential/` |
 
-Nothing ships in `scripts/credentials/`; every provider is specific to the system it talks to.
+Nothing ships in `scripts/credential/`; every provider is specific to the system it talks to.
 The program is **chosen from the executables found in the allowed directories**, never typed,
 so editing a provider cannot be used to run an arbitrary binary.
 
@@ -22,10 +22,12 @@ so editing a provider cannot be used to run an arbitrary binary.
 
 A provider's program must resolve (after following symlinks) to an executable file inside one of:
 
-- `scripts/credentials/` in the app (in the image, `/rails/scripts/credentials/`)
-- the directory named by the `CREDENTIAL_SCRIPTS_DIR` environment variable, for programs an
-  operator mounts in
-- in tests only, `config.x.credential_script_directories` (`test/fixtures/files/credentials/`)
+- `scripts/credential/` in the app (in the image, `/rails/scripts/credential/`)
+- `credential/` inside the directory named by `ACCESS_SCRIPTS_DIR`, for programs an operator
+  mounts in (alongside `access/` and `audit/` under the same root)
+- the legacy `CREDENTIAL_SCRIPTS_DIR` environment variable, if set, as an extra credential
+  directory
+- in tests only, `config.x.operator_script_roots` (`test/fixtures/files/credential/`)
 
 A file without an execute bit, a path that climbs out with `..`, and a symlink pointing outside
 an allowed directory are all refused.
@@ -298,5 +300,5 @@ JSON
 esac
 ```
 
-Install it by placing it in `scripts/credentials/` (or a `CREDENTIAL_SCRIPTS_DIR`), marking it
+Install it by placing it in `scripts/credential/` (or `ACCESS_SCRIPTS_DIR/credential/`), marking it
 executable, then adding a provider that chooses it.

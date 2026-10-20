@@ -185,16 +185,29 @@ module ActiveSupport
       Rails.application.config.x.local_auth.enabled = original
     end
 
-    AUDIT_LOG_FIXTURE_DIR = Rails.root.join('test/fixtures/files/audit-log').freeze
+    OPERATOR_SCRIPT_FIXTURE_ROOT = Rails.root.join('test/fixtures/files').freeze
+    AUDIT_LOG_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('audit').freeze
+    CREDENTIAL_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('credential').freeze
+    ACCESS_SCRIPT_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('access').freeze
 
     def audit_log_script(name)
       AUDIT_LOG_FIXTURE_DIR.join(name).to_s
     end
 
-    def create_audit_log_source(script: 'json_lines.sh', **attributes)
-      AuditLogSource.create!(
-        { name: "Source #{SecureRandom.hex(4)}", script_path: audit_log_script(script) }.merge(attributes)
-      )
+    def access_script(name)
+      ACCESS_SCRIPT_FIXTURE_DIR.join(name).to_s
+    end
+
+    def create_audit_log_source(script: nil, script_path: nil, **attributes)
+      path = script_path || audit_log_script(script || 'json_lines.sh')
+      attrs = { name: "Source #{SecureRandom.hex(4)}", script_path: path }.merge(attributes)
+      source = AuditLogSource.new(attrs)
+      if AuditLogs::ScriptCatalog.allowed?(path)
+        source.save!
+      else
+        source.save(validate: false)
+      end
+      source
     end
 
     def create_audit_log_entry(source, message: 'something happened', occurred_at: Time.current, **attributes)
@@ -210,8 +223,6 @@ module ActiveSupport
       notice.save!
       notice
     end
-
-    CREDENTIAL_FIXTURE_DIR = Rails.root.join('test/fixtures/files/credentials').freeze
 
     def credential_script(name)
       CREDENTIAL_FIXTURE_DIR.join(name).to_s
