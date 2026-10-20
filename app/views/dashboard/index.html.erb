@@ -303,6 +303,14 @@
                     <small class="text-muted d-block">
                       <%= ir['type'] %>: <%= truncate(ir['subject'], length: 40) %>
                     </small>
+                  <% elsif j.changes_json['parking_notice'].is_a?(Hash) %>
+                    <% notice = j.changes_json['parking_notice'] %>
+                    <small class="text-muted d-block">
+                      <%= notice['location'].presence || notice['notice_type'].to_s.capitalize %>
+                      <% if notice['id'].present? %>
+                        &middot; <%= parking_notice_journal_link(notice) %>
+                      <% end %>
+                    </small>
                   <% elsif j.changes_json['training'].is_a?(Hash) %>
                     <small class="text-muted d-block">
                       <span class="badge text-bg-primary-subtle"><%= j.changes_json['training']['topic'] %></span>
