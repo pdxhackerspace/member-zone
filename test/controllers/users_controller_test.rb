@@ -529,6 +529,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert @user.reload.key_access_paused?
     follow_redirect!
     assert_match(/Key access paused/i, response.body)
+    assert_match(/syncing/i, response.body)
   end
 
   test 'resume_key_access resumes the member and redirects to profile' do
@@ -540,6 +541,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_not @user.reload.key_access_paused?
     follow_redirect!
     assert_match(/Key access resumed/i, response.body)
+    assert_match(/syncing/i, response.body)
   end
 
   test 'pause_key_access redirects to the add key screen when return_to=add_key' do

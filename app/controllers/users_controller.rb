@@ -404,9 +404,12 @@ class UsersController < AuthenticatedController
     end
 
     @user.pause_key_access!
+    sync_notice = AccessControllers::MemberKeysSync.user_notice(
+      AccessControllers::MemberKeysSync.syncable_controllers.count
+    )
     redirect_to key_access_redirect_path,
                 notice: "Key access paused for #{@user.display_name}. " \
-                        'Their keys are kept but will not be synced to the access controllers.'
+                        "Their keys are kept; access controllers are syncing to remove door access.#{sync_notice}"
   end
 
   def resume_key_access
@@ -416,9 +419,12 @@ class UsersController < AuthenticatedController
     end
 
     @user.resume_key_access!
+    sync_notice = AccessControllers::MemberKeysSync.user_notice(
+      AccessControllers::MemberKeysSync.syncable_controllers.count
+    )
     redirect_to key_access_redirect_path,
                 notice: "Key access resumed for #{@user.display_name}. " \
-                        'Sync the access controllers to restore their access.'
+                        "Access controllers are syncing to restore door access.#{sync_notice}"
   end
 
   def enable_emergency_active_override
