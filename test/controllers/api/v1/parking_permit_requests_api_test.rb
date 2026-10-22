@@ -205,6 +205,20 @@ module Api
         assert_equal @member, ParkingPermitLink.last.user
       end
 
+      test 'finds the member by slack uid on the user or linked slack account' do
+        @member.update_columns(slack_id: 'UKIOSKUSER')
+        request_permit(slack_uid: 'UKIOSKUSER', mode: 'link')
+        assert_response :created
+        assert_equal @member, ParkingPermitLink.last.user
+
+        @member.update_columns(slack_id: nil)
+        slack_user = slack_users(:with_dept)
+        slack_user.update!(user: @member)
+        request_permit(slack_uid: slack_user.slack_id, mode: 'link')
+        assert_response :created
+        assert_equal @member, ParkingPermitLink.last.user
+      end
+
       test 'an unknown member is not found' do
         request_permit(rfid: 'NOPE', mode: 'blank')
 
