@@ -491,7 +491,8 @@ paths:
       summary: Request a permit for a member at a kiosk
       description: |
         For an access control device acting for the member who just badged in. Identify the member
-        by exactly one of `rfid` (their key fob), `username`, or full `email`, and choose a `mode`:
+        by exactly one of `rfid` (their key fob), `slack_uid` (their Slack user ID), `username`, or
+        full `email`, and choose a `mode`:
 
         - `link` emails the member a link, good for 12 hours, to a form where they describe the
           permit, choose an expiry of up to two weeks, and print it. The link does not sign them in.
@@ -524,6 +525,9 @@ paths:
                 rfid:
                   type: string
                   description: The key fob the member badged with.
+                slack_uid:
+                  type: string
+                  description: The member's Slack user ID (e.g. U0123456789).
                 username:
                   type: string
                 email:

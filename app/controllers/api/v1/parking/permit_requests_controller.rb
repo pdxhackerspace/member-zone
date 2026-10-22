@@ -3,7 +3,7 @@ module Api
     module Parking
       # A parking permit for whoever just badged in at an access control device. The device holds
       # a service-account token with parking.issue_for_members, which lets it act for a member it
-      # identifies by key fob, username, or full email address — and nothing more.
+      # identifies by key fob, Slack UID, username, or full email address — and nothing more.
       #
       # Mode `link` emails the member a 12-hour, no-login form; mode `blank` issues a two-week
       # permit to hand-write and emails a link to fill in its details. See
@@ -31,7 +31,10 @@ module Api
           result = ParkingPermits::DeviceIssuer.call(
             api_token: current_api_token,
             mode: params[:mode],
-            member_params: { rfid: params[:rfid], username: params[:username], email: params[:email] }
+            member_params: {
+              rfid: params[:rfid], slack_uid: params[:slack_uid], username: params[:username],
+              email: params[:email]
+            }
           )
           return render_refusal(result) unless result.success?
 
