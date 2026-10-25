@@ -241,7 +241,9 @@ GEM
       timeout
     net-smtp (0.5.1)
       net-protocol
-    net-ssh (7.3.6)
+    net-ssh (8.0.2)
+      logger
+      openssl (>= 3.2.0)
     nio4r (2.7.5)
     nokogiri (1.19.4)
       mini_portile2 (~> 2.8.2)
@@ -275,6 +277,7 @@ GEM
       tzinfo
       validate_url
       webfinger (~> 2.0)
+    openssl (4.0.2)
     os (1.1.4)
     pagy (43.7.1)
       json
@@ -522,7 +525,7 @@ DEPENDENCIES
   letter_opener_web (~> 3.0)
   minitest (~> 6.0)
   multi_json
-  net-ssh (~> 7.3)
+  net-ssh (~> 8.0)
   omniauth (~> 2.1)
   omniauth-rails_csrf_protection
   omniauth_openid_connect (~> 0.8.0)
