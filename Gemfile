@@ -73,7 +73,8 @@ gem 'sentry-ruby', '~> 7.0'
 gem 'sentry-sidekiq', '~> 7.1'
 gem 'stackprof'
 
-# SSH client for Ruby scripts
+# SSH client for scripts that log into old hosts. Stay on 7.x: net-ssh 8
+# drops SHA-1 ssh-rsa and the deprecated host-key options those hosts need.
 gem 'net-ssh', '~> 7.3'
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
