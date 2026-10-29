@@ -20,14 +20,28 @@ module ParkingNotices
       SelfServiceDuration.validate(@notice) if @self_service
       return invalid unless @notice.errors.empty?
 
-      newly_added = save_with_members!
-      @notice.notify_issued!(newly_added) if newly_added.any?
-      Result.new(notice: @notice, newly_added: newly_added)
+      changed = changed_parts { save_with_members! }
+      if changed.any?
+        @notice.record_journal_entry!('parking_notice_updated', actor: @actor, note: "Changed #{changed.to_sentence}.")
+      end
+      @notice.notify_issued!(@newly_added) if @newly_added.any?
+      Result.new(notice: @notice, newly_added: @newly_added)
     rescue ActiveRecord::RecordInvalid
       invalid
     end
 
     private
+
+    # What the save changed, in words: fields, photos, and the member list.
+    def changed_parts
+      photos_changed = @notice.attachment_changes.key?('photos')
+      members_before = @notice.member_ids.sort
+      @newly_added = yield
+      parts = @notice.journaled_field_changes
+      parts << 'photos' if photos_changed
+      parts << 'members' if @notice.members.reload.ids.sort != members_before
+      parts
+    end
 
     def save_with_members!
       ParkingNotice.transaction do

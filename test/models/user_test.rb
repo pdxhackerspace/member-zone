@@ -87,6 +87,50 @@ class UserTest < ActiveSupport::TestCase
     assert_not_includes User.key_access_active, paused
   end
 
+  test 'deleting a member with key fobs enqueues one access controller sync' do
+    user = User.create!(
+      authentik_id: "member-delete-sync-#{SecureRandom.hex(4)}",
+      full_name: 'Member delete sync',
+      email: "member-delete-sync-#{SecureRandom.hex(4)}@example.com",
+      membership_state: 'inactive_member'
+    )
+    Current.user = users(:two)
+    user.rfids.create!(rfid: "MDS#{SecureRandom.hex(3)}")
+    user.rfids.create!(rfid: "MDS#{SecureRandom.hex(3)}")
+
+    assert_enqueued_jobs 2, only: AccessControllerMemberKeysSyncJob do
+      user.destroy!
+    end
+  end
+
+  test 'deleting a member without key fobs does not enqueue access controller sync' do
+    user = User.create!(
+      authentik_id: "member-no-fob-#{SecureRandom.hex(4)}",
+      full_name: 'Member no fob',
+      email: "member-no-fob-#{SecureRandom.hex(4)}@example.com",
+      membership_state: 'inactive_member'
+    )
+
+    assert_no_enqueued_jobs only: AccessControllerMemberKeysSyncJob do
+      user.destroy!
+    end
+  end
+
+  test 'pausing and resuming key access enqueue access controller sync' do
+    user = users(:one)
+    Current.user = users(:two)
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob, args: [users(:two).id]) do
+      user.pause_key_access!
+    end
+
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob, args: [users(:two).id]) do
+      user.resume_key_access!
+    end
+  end
+
   test 'pausing key access does not mark the user dirty for authentik sync' do
     # cash_payer is paying + current, so its computed active status stays stable across saves
     user = users(:cash_payer)

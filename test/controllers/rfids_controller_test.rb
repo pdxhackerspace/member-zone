@@ -1,6 +1,8 @@
 require 'test_helper'
 
 class RfidsControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   setup do
     @original_local_auth_enabled = Rails.application.config.x.local_auth.enabled
     Rails.application.config.x.local_auth.enabled = true
@@ -36,6 +38,22 @@ class RfidsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select ".member-result[data-user-id=?][data-key-access-paused='true']", users(:one).id.to_s
+  end
+
+  test 'destroying a key fob notifies that access controllers are syncing' do
+    AccessController.create!(name: 'Rfids destroy sync', hostname: 'rfids-destroy.local',
+                             access_controller_type: access_controller_types(:door_lock))
+    rfid = rfids(:one)
+    user = rfid.user
+
+    assert_enqueued_with(job: AccessControllerMemberKeysSyncJob) do
+      delete rfid_path(rfid)
+    end
+
+    assert_redirected_to user_path(user)
+    follow_redirect!
+    assert_match(/Key fob removed/i, response.body)
+    assert_match(/syncing/i, response.body)
   end
 
   private

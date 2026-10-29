@@ -76,18 +76,20 @@ class MembershipApplicationTest < ActiveSupport::TestCase
     end
   end
 
-  test 'stale_pending excludes needs_review applications' do
+  test 'stale_pending excludes applications held for review' do
     travel_to Time.zone.local(2026, 5, 28, 12, 0, 0) do
-      parked = MembershipApplication.create!(
-        email: 'parked-needs-review@example.com',
-        status: 'needs_review',
-        submitted_at: 8.days.ago,
-        created_at: 8.days.ago,
-        reviewed_at: Time.current
-      )
+      held = %w[needs_review under_review].map do |status|
+        MembershipApplication.create!(
+          email: "held-#{status}@example.com",
+          status: status,
+          submitted_at: 8.days.ago,
+          created_at: 8.days.ago,
+          reviewed_at: Time.current
+        )
+      end
 
       ids = MembershipApplication.stale_pending.pluck(:id)
-      assert_not_includes ids, parked.id
+      held.each { |app| assert_not_includes ids, app.id }
     end
   end
 

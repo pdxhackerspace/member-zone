@@ -235,6 +235,23 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_match(/pending membership application/i, response.body)
   end
 
+  test 'admin dashboard counts old held applications by age without making them urgent' do
+    MembershipApplication.create!(email: 'held-old@example.com', status: 'under_review',
+                                  submitted_at: 40.days.ago, created_at: 40.days.ago)
+    MembershipApplication.create!(email: 'parked-old@example.com', status: 'needs_review',
+                                  submitted_at: 150.days.ago, created_at: 150.days.ago)
+    MembershipApplication.create!(email: 'open-new@example.com', status: 'submitted',
+                                  submitted_at: 2.days.ago, created_at: 2.days.ago)
+
+    with_urgent_snapshot(urgent_snapshot) { get root_path }
+
+    assert_response :success
+    assert_match(/2 over a week old/, response.body)
+    assert_match(/1 newer/, response.body)
+    assert_select '.bi-x-circle-fill.text-danger + a[href=?]', membership_applications_path(status: 'submitted'),
+                  count: 0
+  end
+
   test 'admin dashboard shows recent pending applications without stale warning' do
     MembershipApplication.create!(
       email: 'recent-dashboard@example.com',

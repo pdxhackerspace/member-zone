@@ -79,8 +79,10 @@ class DashboardController < AuthenticatedController
     # Important: Member-suggested interests needing review
     @interests_needing_review_count = Interest.needs_review.count
 
-    # Pending membership applications (open or under review); stale ones (>1 week) are urgent on the dashboard
+    # Pending membership applications (open or under review). Age is reported across all of them,
+    # but only open ones over a week old (stale) make the item urgent; held ones are already in hand.
     @pending_applications_count = MembershipApplication.pending.count
+    @old_applications_count = MembershipApplication.pending.older_than(1.week.ago).count
     @stale_applications_count = MembershipApplication.stale_pending.count
     @submitted_applications_count = MembershipApplication.submitted_apps.count
     @under_review_applications_count = MembershipApplication.under_review_apps.count

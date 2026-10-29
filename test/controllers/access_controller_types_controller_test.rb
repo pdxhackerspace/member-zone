@@ -83,7 +83,7 @@ class AccessControllerTypesControllerTest < ActionDispatch::IntegrationTest
       post access_controller_types_url, params: {
         access_controller_type: {
           name: 'New Type',
-          script_path: '/opt/access/new.sh',
+          script_path: access_script('new.sh'),
           enabled: true,
           required_training_topic_ids: [@woodworking_topic.id]
         }

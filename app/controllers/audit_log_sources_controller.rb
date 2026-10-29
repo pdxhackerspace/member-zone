@@ -22,11 +22,11 @@ class AuditLogSourcesController < AuthenticatedController
 
   def new
     @source = AuditLogSource.new
-    load_topics
+    load_form_options
   end
 
   def edit
-    load_topics
+    load_form_options
   end
 
   def create
@@ -35,7 +35,7 @@ class AuditLogSourcesController < AuthenticatedController
     if @source.save
       redirect_to audit_log_source_path(@source), notice: "Audit log source '#{@source.name}' created."
     else
-      load_topics
+      load_form_options
       render :new, status: :unprocessable_content
     end
   end
@@ -44,7 +44,7 @@ class AuditLogSourcesController < AuthenticatedController
     if @source.update(source_params)
       redirect_to audit_log_source_path(@source), notice: "Audit log source '#{@source.name}' updated."
     else
-      load_topics
+      load_form_options
       render :edit, status: :unprocessable_content
     end
   end
@@ -91,8 +91,16 @@ class AuditLogSourcesController < AuthenticatedController
     @source = AuditLogSource.find(params[:id])
   end
 
-  def load_topics
+  def load_form_options
+    @script_options = script_options
     @training_topics = TrainingTopic.order(:name)
+  end
+
+  def script_options
+    options = AuditLogs::ScriptCatalog.scripts.map { |path| [File.basename(path), path] }
+    current = @source.script_path
+    options << [current, current] if current.present? && options.none? { |_name, path| path == current }
+    options
   end
 
   def source_params

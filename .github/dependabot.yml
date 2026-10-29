@@ -6,10 +6,14 @@ updates:
     schedule:
       interval: weekly
     target-branch: staging
-    # The Gemfile pins json to 2.x because json 3.0 breaks every
-    # ActiveSupport::JSON.decode call. Remove this once the pin goes away.
+    # json 3.0 breaks every ActiveSupport::JSON.decode call. Remove that
+    # ignore once the Gemfile pin goes away.
+    # net-ssh 8 drops SHA-1 ssh-rsa and deprecated host-key options. We still
+    # connect to hosts that need both, so stay on the latest 7.x.
     ignore:
       - dependency-name: json
+        update-types: ["version-update:semver-major"]
+      - dependency-name: net-ssh
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm

@@ -103,6 +103,23 @@ module Api
         assert_equal notice.id, json_body.dig('data', 'permit', 'id')
       end
 
+      test 'link mode journals the emailed form on the member' do
+        request_permit(rfid: 'RFID001', mode: 'link')
+
+        entry = Journal.where(user: @member, action: 'parking_permit_link_sent').last
+        assert_equal ParkingPermitLink.last.id, entry.changes_json.dig('parking_permit_link', 'id')
+        assert_equal 'Front door kiosk', entry.changes_json.dig('parking_permit_link', 'api_token', 'name')
+      end
+
+      test 'blank mode journals the permit, naming the device token' do
+        request_permit(rfid: 'RFID001', mode: 'blank')
+
+        entry = Journal.where(user: @member, action: 'parking_permit_issued').last
+        assert_equal ParkingNotice.order(:id).last.id, entry.changes_json.dig('parking_notice', 'id')
+        assert_equal({ 'id' => @token.id, 'name' => 'Front door kiosk' },
+                     entry.changes_json.dig('parking_notice', 'api_token'))
+      end
+
       test 'print: true prints the blank permit on the default printer' do
         Printer.create!(name: 'Back room', cups_printer_name: 'back_room')
         default = Printer.create!(name: 'Front desk', cups_printer_name: 'front_desk', default_printer: true)

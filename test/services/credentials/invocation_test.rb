@@ -104,7 +104,7 @@ module Credentials
 
     test 'a program that has left the catalog is not run' do
       provider = create_credential_provider(describe: false)
-      outside = Rails.root.join('test/fixtures/files/audit-log/json_lines.sh').to_s
+      outside = Rails.root.join('test/fixtures/files/audit/json_lines.sh').to_s
       provider.update_columns(script_path: outside)
 
       outcome = Invocation.call(provider, 'health')

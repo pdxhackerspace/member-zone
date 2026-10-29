@@ -18,10 +18,8 @@
 #   * A PIN gets a small, fixed number of guesses. A four-digit code with unlimited attempts
 #     inside the five-minute window is 10,000 possibilities and no obstacle at all.
 class RfidWebhookService
-  REDIS_KEY_PREFIX = 'rfid_webhook:'.freeze
-  CLAIM_KEY_PREFIX = 'rfid_webhook_claim:'.freeze
-  ATTEMPTS_KEY_PREFIX = 'rfid_webhook_attempts:'.freeze
-  BINDING_KEY_PREFIX = 'rfid_webhook_binding:'.freeze
+  # Every key the service writes begins with this, after the namespace.
+  KEY_ROOT = 'rfid_webhook'.freeze
   EXPIRATION_TIME = 5.minutes
   MAX_PIN_ATTEMPTS = 5
 
@@ -37,6 +35,22 @@ class RfidWebhookService
   SCAN_BATCH_SIZE = 100
 
   class << self
+    # Prepended to every key, and the only part of the keyspace claim_recent searches. Empty in
+    # the app. The test suite gives each parallel worker its own, because finding the newest scan
+    # means scanning every key with the prefix, and workers sharing a Redis would otherwise claim
+    # each other's scans. Must end in a separator so that one namespace is never a prefix of
+    # another ("w1:" vs "w10:").
+    attr_writer :key_namespace
+
+    def key_namespace
+      @key_namespace.to_s
+    end
+
+    # A glob matching every key the service writes in the current namespace.
+    def key_pattern
+      "#{key_namespace}#{KEY_ROOT}*"
+    end
+
     def store(rfid_code, pin_code, reader_id = nil, reader_name = nil)
       rfid_code = RfidNormalizer.call(rfid_code)
       return nil if rfid_code.blank?
@@ -173,7 +187,7 @@ class RfidWebhookService
     end
 
     def redis_key(rfid_code)
-      "#{REDIS_KEY_PREFIX}#{normalized(rfid_code)}"
+      "#{scan_key_prefix}#{normalized(rfid_code)}"
     end
 
     def redis
@@ -182,12 +196,16 @@ class RfidWebhookService
 
     private
 
+    def scan_key_prefix
+      "#{key_namespace}#{KEY_ROOT}:"
+    end
+
     def claim_key(rfid_code)
-      "#{CLAIM_KEY_PREFIX}#{normalized(rfid_code)}"
+      "#{key_namespace}#{KEY_ROOT}_claim:#{normalized(rfid_code)}"
     end
 
     def attempts_key(rfid_code)
-      "#{ATTEMPTS_KEY_PREFIX}#{normalized(rfid_code)}"
+      "#{key_namespace}#{KEY_ROOT}_attempts:#{normalized(rfid_code)}"
     end
 
     def normalized(rfid_code)
@@ -220,7 +238,7 @@ class RfidWebhookService
     # would otherwise carry a live session secret, and key names show up in SCAN output and in
     # anything that dumps the keyspace.
     def binding_key(claim_token)
-      "#{BINDING_KEY_PREFIX}#{OpenSSL::Digest::SHA256.hexdigest(claim_token.to_s)}"
+      "#{key_namespace}#{KEY_ROOT}_binding:#{OpenSSL::Digest::SHA256.hexdigest(claim_token.to_s)}"
     end
 
     def record_failed_attempt(rfid_code)
@@ -239,7 +257,7 @@ class RfidWebhookService
     # waiting is ignored, so a page left open does not pick up a scan from before it asked.
     def recent_scans(since_time)
       keys = []
-      redis.scan_each(match: "#{REDIS_KEY_PREFIX}*", count: SCAN_BATCH_SIZE) { |key| keys << key }
+      redis.scan_each(match: "#{scan_key_prefix}*", count: SCAN_BATCH_SIZE) { |key| keys << key }
       return [] if keys.empty?
 
       redis.mget(*keys).filter_map { |raw| parse_scan(raw, since_time) }

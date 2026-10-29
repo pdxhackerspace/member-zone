@@ -1,20 +1,48 @@
 require 'test_helper'
 
 class AuditLogSourceTest < ActiveSupport::TestCase
+  test 'runs a program stored under the legacy audit-log path' do
+    scratch = Dir.mktmpdir('audit-source-legacy')
+    current_dir = File.join(scratch, 'audit')
+    FileUtils.mkdir_p(current_dir)
+    script = File.join(current_dir, 'legacy_run.sh')
+    File.write(script, "#!/bin/sh\necho legacy\n")
+    File.chmod(0o755, script)
+
+    legacy_path = File.join(scratch, 'audit-log', 'legacy_run.sh')
+    source = AuditLogSource.new(name: 'Legacy doors', script_path: legacy_path, run_interval: 'daily')
+
+    with_operator_script_roots(scratch) do
+      assert_equal File.realpath(script), File.realpath(source.resolved_script_path)
+      assert_equal File.realpath(script), File.realpath(source.command_arguments.first)
+    end
+  ensure
+    FileUtils.rm_rf(scratch)
+  end
+
+  test 'requires a program in an audit script directory' do
+    source = AuditLogSource.new(name: 'Doors', script_path: audit_log_script('json_lines.sh'), run_interval: 'daily')
+    assert_predicate source, :valid?
+
+    source.script_path = '/bin/sh'
+    assert_not source.valid?
+    assert_includes source.errors[:script_path].to_sentence, 'audit script directory'
+  end
+
   test 'requires a name, a program and a known interval' do
     source = AuditLogSource.new
     assert_not source.valid?
     assert_includes source.errors[:name], "can't be blank"
     assert_includes source.errors[:script_path], "can't be blank"
 
-    source = AuditLogSource.new(name: 'x', script_path: '/bin/true', run_interval: 'weekly')
+    source = AuditLogSource.new(name: 'x', script_path: audit_log_script('json_lines.sh'), run_interval: 'weekly')
     assert_not source.valid?
     assert source.errors.key?(:run_interval)
   end
 
   test 'names are unique regardless of case' do
     create_audit_log_source(name: 'Door log')
-    duplicate = AuditLogSource.new(name: 'door LOG', script_path: '/bin/true')
+    duplicate = AuditLogSource.new(name: 'door LOG', script_path: audit_log_script('json_lines.sh'))
     assert_not duplicate.valid?
   end
 

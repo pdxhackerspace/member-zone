@@ -15,6 +15,7 @@ module ParkingNotices
       return Result.new(notice: @notice, error: :already_requested) if @notice.clearance_requested?
 
       @notice.request_clearance!(@actor)
+      @notice.record_journal_entry!('parking_notice_clearance_requested', actor: @actor)
       Result.new(notice: @notice)
     end
   end
