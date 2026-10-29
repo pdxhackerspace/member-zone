@@ -680,8 +680,8 @@ class User < ApplicationRecord
     # and are rewritten on save. A charge the sync has seen before is bookkeeping.
     window = payment_currency_window(billing_plan: billing_plan)
     payment_is_current = window.nil? || payment_date >= window.ago.to_date
-    if payment_is_current
-      updates[:membership_state] = 'current_member' if payment_revives?(payment_time)
+    if payment_is_current && payment_revives?(payment_time)
+      updates[:membership_state] = 'current_member'
       updates[:membership_ended_date] = nil if membership_ended_date.present?
     end
 

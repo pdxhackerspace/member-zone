@@ -133,7 +133,8 @@ inactive member that stamp is the deadline that moved them, so a charge that was
 counted — still inside the billing window, re-read by the nightly sync — cannot bring them
 back. `PAYMENT_IMMUNE_STATES` (cancelled, banned, deceased, sponsored) are a hard stop on
 top of that test. `apply_payment_updates` asks `payment_revives?` before it will set
-`current_member`.
+`current_member` or clear `membership_ended_date`. Editing or deleting a cash payment
+uses the same test, so a note change on an old payment cannot restore standing either.
 
 `Recharge::PaymentSynchronizer` still refreshes `recharge_most_recent_payment_date` and the
 customer id for every member with a charge. It calls `apply_payment_updates` only for

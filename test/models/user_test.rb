@@ -307,6 +307,7 @@ class UserTest < ActiveSupport::TestCase
         membership_cancelled_at: cancelled_at,
         membership_cancelled_email_sent_at: cancelled_at,
         membership_state_entered_at: Time.zone.local(2026, 10, 27, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 27),
         last_payment_date: Date.new(2026, 9, 27)
       )
 
@@ -315,7 +316,9 @@ class UserTest < ActiveSupport::TestCase
 
       user.reload
       assert_nil updates[:membership_state]
+      assert_nil updates[:membership_ended_date]
       assert_equal 'inactive_member', user.membership_state
+      assert_equal Date.new(2026, 10, 27), user.membership_ended_date
       assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
       assert_equal cancelled_at.to_i, user.membership_cancelled_email_sent_at.to_i
     end
@@ -326,7 +329,8 @@ class UserTest < ActiveSupport::TestCase
       user = oscillation_member
       user.update_columns(
         membership_cancelled_at: Time.zone.local(2026, 10, 1, 12, 0, 0),
-        membership_state_entered_at: Time.zone.local(2026, 10, 20, 0, 0, 0)
+        membership_state_entered_at: Time.zone.local(2026, 10, 20, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 20)
       )
 
       updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
@@ -334,6 +338,7 @@ class UserTest < ActiveSupport::TestCase
 
       user.reload
       assert_equal 'current_member', user.membership_state
+      assert_nil user.membership_ended_date
       assert_nil user.membership_cancelled_at
       assert_nil user.membership_cancelled_email_sent_at
     end
