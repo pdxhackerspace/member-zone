@@ -189,21 +189,19 @@ class CashPaymentsController < AuthenticatedController
   end
 
   def apply_cash_payment_membership_update!(user, paid_on:, due_at:)
+    attrs = { payment_type: 'cash', last_payment_date: paid_on, dues_due_at: due_at }
+    if user.sponsored?
+      user.record_payment!(**attrs)
+      return
+    end
+
     unless user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
-      user.record_payment!(
-        payment_type: 'cash',
-        last_payment_date: paid_on,
-        dues_due_at: due_at
-      )
+      user.record_payment!(**attrs)
       user.update!(membership_ended_date: nil) if user.membership_ended_date.present?
       return
     end
 
-    user.update!(
-      payment_type: 'cash',
-      last_payment_date: paid_on,
-      dues_due_at: due_at
-    )
+    user.update!(attrs)
   end
 
   def keep_later_dues_due_at!(updates, current_dues_due_at)

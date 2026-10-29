@@ -73,6 +73,9 @@ module MembershipStateProjection
 
     self.membership_status = MEMBERSHIP_STATUS_PROJECTION.fetch(membership_state, 'unknown')
     self.dues_status = DUES_STATUS_PROJECTION.fetch(membership_state, 'unknown')
+    # The same fact as sponsored_member. A flag that can disagree with the state is what
+    # let a payment sync and the cleanup task take turns moving the member.
+    self.is_sponsored = sponsored_member?
     dictated_payment_type = PAYMENT_TYPE_PROJECTION[membership_state]
     self.payment_type = dictated_payment_type if dictated_payment_type
   end

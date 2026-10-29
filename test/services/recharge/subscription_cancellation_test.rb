@@ -28,7 +28,7 @@ module Recharge
       assert_equal 1, user.journals.where(action: 'subscription_cancelled').count
     end
 
-    test 'a member who is already cancelled is left alone' do
+    test 'a cancelled member missing the date gets it noted without moving' do
       user = User.create!(
         authentik_id: 'recharge-cancelled',
         full_name: 'Already Cancelled',
@@ -36,10 +36,13 @@ module Recharge
         payment_type: 'recharge'
       )
 
-      assert_equal :already_cancelled,
+      assert_equal :noted,
                    SubscriptionCancellation.call(user: user, subscription: { 'id' => '12345' }, source: 'test')
 
-      assert_equal 0, user.payment_events.count
+      user.reload
+      assert_equal 'cancelled_member', user.membership_state
+      assert_predicate user, :cancellation_recorded?
+      assert_equal 1, user.payment_events.where(event_type: 'subscription_cancelled').count
     end
 
     # The subscription really did end at Recharge, so the event is worth keeping; a ban or
@@ -144,12 +147,83 @@ module Recharge
         membership_state: 'current_member',
         payment_type: 'recharge'
       )
-      subscription = { recharge_subscription_id: '555', product_title: 'Monthly', price: 40.0 }
+      cancelled_at = Time.zone.local(2026, 10, 1, 12, 0, 0)
+      subscription = { recharge_subscription_id: '555', product_title: 'Monthly', price: 40.0,
+                       cancelled_at: cancelled_at }
 
       assert_equal :cancelled, SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
-      assert_equal :already_cancelled,
+      assert_equal :already_processed,
                    SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
 
+      assert_equal 1, user.payment_events.where(event_type: 'subscription_cancelled').count
+    end
+
+    test 'a second cancellation after the tick moved them inactive does not change state' do
+      cancelled_at = Time.zone.local(2026, 10, 26, 18, 0, 0)
+      user = User.create!(
+        authentik_id: 'recharge-cancel-retick',
+        full_name: 'Retick Cancel',
+        membership_state: 'current_member',
+        payment_type: 'recharge',
+        last_payment_date: Date.new(2026, 9, 27),
+        dues_due_at: Time.zone.local(2026, 10, 27, 0, 0, 0),
+        membership_plan: membership_plans(:monthly_standard)
+      )
+      subscription = { recharge_subscription_id: 'retick', product_title: 'Monthly', price: 40.0,
+                       cancelled_at: cancelled_at }
+
+      travel_to cancelled_at do
+        assert_equal :cancelled, SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
+      end
+
+      travel_to Time.zone.local(2026, 10, 27, 4, 0, 0) do
+        Membership::TickJob.new.perform
+      end
+
+      user.reload
+      assert_equal 'inactive_member', user.membership_state
+      entered_at = user.membership_state_entered_at
+      stamp = user.membership_cancelled_at
+
+      travel_to Time.zone.local(2026, 10, 27, 12, 0, 0) do
+        assert_equal :already_processed,
+                     SubscriptionCancellation.call(user: user, subscription: subscription, source: 'test')
+      end
+
+      user.reload
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal stamp.to_i, user.membership_cancelled_at.to_i
+      assert_equal entered_at.to_i, user.membership_state_entered_at.to_i
+    end
+
+    test 'a cancellation older than a later subscription start is superseded' do
+      user = User.create!(
+        authentik_id: 'recharge-cancel-superseded',
+        full_name: 'Superseded Cancel',
+        membership_state: 'current_member',
+        payment_type: 'recharge',
+        last_payment_date: 40.days.ago.to_date,
+        dues_due_at: 1.month.from_now
+      )
+      PaymentEvent.create!(
+        user: user,
+        event_type: 'subscription_started',
+        source: 'recharge',
+        occurred_at: 1.day.ago,
+        external_id: 'recharge-sub-new-subscription_started',
+        amount: 40,
+        currency: 'USD'
+      )
+
+      assert_equal :superseded, SubscriptionCancellation.call(
+        user: user,
+        subscription: { recharge_subscription_id: 'old-sub', cancelled_at: 10.days.ago },
+        source: 'test'
+      )
+
+      user.reload
+      assert_equal 'current_member', user.membership_state
+      assert_nil user.membership_cancelled_at
       assert_equal 1, user.payment_events.where(event_type: 'subscription_cancelled').count
     end
   end

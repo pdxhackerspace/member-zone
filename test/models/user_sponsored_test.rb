@@ -4,7 +4,7 @@ class UserSponsoredTest < ActiveSupport::TestCase
   # ─── Scope ─────────────────────────────────────────────────────────
 
   test 'is_sponsored scope returns only sponsored users' do
-    sponsored = create_user(is_sponsored: true)
+    sponsored = create_user(membership_state: 'sponsored_member')
     regular = create_user(is_sponsored: false)
 
     assert_includes User.is_sponsored, sponsored
@@ -66,6 +66,17 @@ class UserSponsoredTest < ActiveSupport::TestCase
     assert_equal 'sponsored', user.payment_type
   end
 
+  test 'is_sponsored follows the state even when set by hand' do
+    sponsored = create_user(membership_state: 'sponsored_member')
+    sponsored.update!(is_sponsored: false)
+
+    assert sponsored.reload.is_sponsored?
+
+    current = create_user(membership_state: 'current_member', is_sponsored: true)
+
+    assert_not current.is_sponsored?
+  end
+
   test 'the payment type follows the state even when set by hand' do
     user = create_user(membership_state: 'sponsored_member')
 
@@ -97,20 +108,20 @@ class UserSponsoredTest < ActiveSupport::TestCase
   # ─── Journal entry for sponsorship ─────────────────────────────────
 
   test 'manually marking as sponsored creates a journal entry' do
-    user = create_user(is_sponsored: false)
+    user = create_user(membership_state: 'inactive_member')
     initial_count = user.journals.count
 
-    user.update!(is_sponsored: true)
+    user.mark_sponsored!
 
     assert_operator user.journals.count, :>, initial_count,
                     'Manual sponsorship should create a journal entry'
   end
 
   test 'removing sponsorship creates a journal entry' do
-    user = create_user(is_sponsored: true)
+    user = create_user(membership_state: 'sponsored_member')
     initial_count = user.journals.count
 
-    user.update!(is_sponsored: false)
+    user.unmark_sponsored!
 
     assert_operator user.journals.count, :>, initial_count,
                     'Removing sponsorship should create a journal entry'

@@ -1,10 +1,10 @@
 namespace :membership do
-  desc 'Preview fixing unknown membership statuses and sponsored members who are paying'
+  desc 'Preview fixing unknown membership statuses'
   task preview_status_fix: :environment do
     MembershipStatusFixer.new(dry_run: true).run
   end
 
-  desc 'Fix unknown membership statuses and sponsored members who are paying'
+  desc 'Fix unknown membership statuses'
   task fix_status: :environment do
     MembershipStatusFixer.new(dry_run: false).run
   end
@@ -18,8 +18,6 @@ class MembershipStatusFixer
     @unknown_to_lapsed = []
     @unknown_no_payments = 0
     @unknown_skipped = 0
-    @sponsored_to_paying = []
-    @sponsored_unchanged = 0
   end
 
   def run
@@ -31,7 +29,6 @@ class MembershipStatusFixer
     puts
 
     fix_unknown_statuses
-    fix_sponsored_who_are_paying
 
     puts
     puts '=' * 60
@@ -40,8 +37,6 @@ class MembershipStatusFixer
     puts "  Unknown -> Lapsed:  #{@unknown_to_lapsed.size}"
     puts "  Unknown with no payments: #{@unknown_no_payments}"
     puts "  Unknown skipped (service/legacy): #{@unknown_skipped}"
-    puts "  Sponsored -> Paying: #{@sponsored_to_paying.size}"
-    puts "  Sponsored unchanged: #{@sponsored_unchanged}"
     puts
     puts @dry_run ? "Run 'rake membership:fix_status' to apply changes." : 'Done!'
   end
@@ -95,46 +90,6 @@ class MembershipStatusFixer
           attrs.each { |k, v| user.send(:"#{k}=", v) }
           user.save!
         end
-      end
-    end
-
-    puts
-  end
-
-  def fix_sponsored_who_are_paying
-    puts '--- Fixing Sponsored Members Who Are Paying ---'
-    puts
-
-    User.where(membership_status: 'sponsored').non_service_accounts.non_legacy.find_each do |user|
-      payments = collect_payments(user)
-      if payments.empty?
-        @sponsored_unchanged += 1
-        next
-      end
-
-      latest = payments.last
-      effective_plan = user.membership_plan || match_plan(latest[:amount])
-      cutoff = MembershipTaskHelpers.cutoff_for_plan(effective_plan)
-      plan_label = if effective_plan
-                     "#{effective_plan.name} (#{effective_plan.billing_frequency})"
-                   else
-                     'no plan (monthly default)'
-                   end
-
-      if latest[:time] >= cutoff
-        @sponsored_to_paying << user
-        action = @dry_run ? 'WOULD SET' : 'SETTING'
-        puts "  #{action} #{user.display_name}: sponsored -> paying " \
-             "(current payments) [#{plan_label}, last payment: #{latest[:time].to_date}]"
-        unless @dry_run
-          attrs = { membership_status: 'paying', dues_status: 'current' }
-          attrs[:membership_plan_id] = effective_plan.id if effective_plan && user.membership_plan_id.blank?
-          attrs[:payment_type] = latest[:type] if user.payment_type.in?(%w[unknown sponsored inactive])
-          attrs.each { |k, v| user.send(:"#{k}=", v) }
-          user.save!
-        end
-      else
-        @sponsored_unchanged += 1
       end
     end
 

@@ -5,6 +5,7 @@ module Recharge
     def initialize(client: Client.new, logger: Rails.logger)
       @client = client
       @logger = logger
+      @apply_payment_user_ids = Set.new
     end
 
     def call
@@ -71,6 +72,7 @@ module Recharge
           record.save!
           # The RechargePayment after_save callback will call user.on_recharge_payment_linked
           # to handle customer ID, email, payment type, and membership status
+          remember_payment_for_membership_update(record, is_new:, previously_linked: user_was_linked)
           saved_count += 1
 
           if is_new
@@ -168,6 +170,18 @@ module Recharge
       value.to_s.strip.downcase
     end
 
+    def remember_payment_for_membership_update(record, is_new:, previously_linked:)
+      return if record.user_id.blank?
+      return unless is_new || !previously_linked
+
+      @apply_payment_user_ids << record.user_id
+    end
+
+    def apply_membership_update_from_payment(user, payment)
+      updates = user.apply_payment_updates({ time: payment.processed_at, amount: payment.amount })
+      user.update!(updates) if updates.any?
+    end
+
     def update_user_recharge_fields
       # Group payments by user and find the most recent payment for each
       User.joins(:recharge_payments).distinct.find_each do |user|
@@ -189,10 +203,11 @@ module Recharge
           recharge_customer_id: customer_id.to_s.presence
         )
 
-        # Use shared method for payment-related membership updates (pass amount for plan matching)
-        updates = user.apply_payment_updates({ time: most_recent_payment.processed_at,
-                                               amount: most_recent_payment.amount })
-        user.update!(updates) if updates.any?
+        # A stored charge re-read on the next sync is not a payment that just arrived.
+        # Only charges created or newly linked in this run may move standing.
+        next unless @apply_payment_user_ids.include?(user.id)
+
+        apply_membership_update_from_payment(user, most_recent_payment)
       end
 
       # Also update users who have no Recharge payments (clear their fields)

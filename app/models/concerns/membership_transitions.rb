@@ -28,8 +28,12 @@ module MembershipTransitions
   end
 
   # A linked payment is the only thing that makes someone a current member.
+  # A sponsored member is the exception: the payment is recorded and their standing
+  # stays put. sponsored_member → current_member stays in TRANSITIONS for
+  # unmark_sponsored! and the admin form; a payment does not take that edge.
   def record_payment!(**attrs)
     return false if terminal_membership_state?
+    return record_sponsored_payment!(**attrs) if sponsored?
 
     transition_to!('current_member', **attrs)
   end
@@ -180,6 +184,12 @@ module MembershipTransitions
   end
 
   private
+
+  def record_sponsored_payment!(**attrs)
+    assign_attributes(attrs)
+    save!
+    true
+  end
 
   # Where a member belongs when a ban or sponsorship is lifted and only their payment
   # history is left to go on. Never 'unknown': we know perfectly well what happened to

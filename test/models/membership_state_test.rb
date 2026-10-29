@@ -66,6 +66,19 @@ class MembershipStateTest < ActiveSupport::TestCase
     end
   end
 
+  test 'recording a payment for a sponsored member keeps them sponsored' do
+    user = create_member(state: 'sponsored_member')
+    paid = Date.new(2026, 10, 28)
+
+    assert user.record_payment!(last_payment_date: paid, dues_due_at: 1.month.from_now)
+
+    user.reload
+    assert_equal 'sponsored_member', user.membership_state
+    assert user.is_sponsored?
+    assert_equal paid, user.last_payment_date
+    assert_equal 'sponsored', user.payment_type
+  end
+
   test 'a payment does not resurrect a banned or deceased member' do
     %w[banned_member deceased_member].each do |state|
       user = create_member(state: state)

@@ -16,19 +16,37 @@ module Recharge
     end
 
     def call
-      return :already_cancelled if @user.cancelled_member?
-
-      old_state = @user.membership_state
       event_is_new = create_payment_event
-      return declined(old_state) unless @user.record_cancellation!(cancelled_at: cancelled_at)
+      return :superseded if @user.returned_after?(cancelled_at)
+      return :already_processed if cancellation_already_processed?
 
-      create_journal_entry(old_state) if event_is_new
-      @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
-                   "(#{old_state} -> #{@user.membership_state})")
-      event_is_new ? :cancelled : :skipped
+      apply_cancellation(event_is_new)
     end
 
     private
+
+    # The same notice, delivered again after the member has already left cancelled_member.
+    # The nightly tick moves a cancelled member to inactive once their paid-through date
+    # passes and leaves the stamp in place; a CANCELLED row still inside the lookback
+    # window is not a new cancellation.
+    def cancellation_already_processed?
+      recorded_at = @user.membership_cancelled_at
+      recorded_at.present? && recorded_at >= cancelled_at
+    end
+
+    def apply_cancellation(event_is_new)
+      old_state = @user.membership_state
+      return declined(old_state) unless @user.record_cancellation!(cancelled_at: cancelled_at)
+
+      create_journal_entry(old_state) if event_is_new
+      log_cancellation(old_state)
+      event_is_new ? :cancelled : :skipped
+    end
+
+    def log_cancellation(old_state)
+      @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
+                   "(#{old_state} -> #{@user.membership_state})")
+    end
 
     # Where record_cancellation! will not follow, which is two different situations wearing
     # the same false. A member who lapsed before anyone processed the notice is already

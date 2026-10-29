@@ -39,7 +39,11 @@ class SponsoredMarker
         unless @dry_run
           # Record journal count before update so we can identify the new entry
           journal_count_before = user.journals.count
-          user.update!(is_sponsored: true)
+          unless user.mark_sponsored!
+            @marked_count -= 1
+            @skipped_count += 1
+            next
+          end
 
           # Find and queue the journal entry created by the update for deletion
           new_journals = user.journals.where('id > ?',
