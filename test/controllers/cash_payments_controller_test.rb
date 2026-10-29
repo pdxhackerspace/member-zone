@@ -321,6 +321,23 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal ended, @user.membership_ended_date
   end
 
+  test 'a cash payment dated on the state entry day revives an overdue member' do
+    @user.cash_payments.destroy_all
+    paid_on = Date.new(2026, 10, 28)
+    @user.update_columns(
+      membership_state: 'overdue_member',
+      membership_state_entered_at: Time.zone.local(2026, 10, 28),
+      dues_due_at: Time.zone.local(2026, 10, 28)
+    )
+
+    post_cash_payment(paid_on: paid_on)
+
+    assert_redirected_to cash_payment_path(CashPayment.last)
+    @user.reload
+    assert_equal 'current_member', @user.membership_state
+    assert_operator @user.dues_due_at.to_date, :>, paid_on
+  end
+
   test 'a cash payment dated after state entry revives an inactive member' do
     @user.cash_payments.destroy_all
     payment = CashPayment.create!(
