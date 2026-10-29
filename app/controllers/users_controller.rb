@@ -330,7 +330,14 @@ class UsersController < AuthenticatedController
   end
 
   def update
-    if @user.update(resolved_user_params)
+    attrs = resolved_user_params
+    if @sponsorship_edit_refused
+      redirect_to edit_user_path(@user),
+                  alert: 'Use the Sponsor action on the member profile to change sponsorship.'
+      return
+    end
+
+    if @user.update(attrs)
       redirect_to user_path(@user), notice: 'Member updated successfully.'
     else
       flash.now[:alert] = 'Unable to update user.'
@@ -1068,11 +1075,14 @@ class UsersController < AuthenticatedController
   end
 
   # Banned and deceased states require their dedicated privileges and flows.
+  # Sponsorship is changed with the Sponsor action, so the flag and the state cannot split.
   def filter_restricted_membership_state!(attrs)
     return unless attrs.key?(:membership_state)
 
     new_state = attrs[:membership_state].to_s
     current = @user&.membership_state.to_s
+    refuse_sponsorship_edit!(attrs, current, new_state)
+    return unless attrs.key?(:membership_state)
 
     restricted_targets = []
     restricted_targets << 'banned_member' unless can?(:'members.ban')
@@ -1086,6 +1096,15 @@ class UsersController < AuthenticatedController
     locked = (current == 'banned_member' && !can?(:'members.ban')) ||
              (current == 'deceased_member' && !can?(:'members.mark_deceased'))
     attrs.delete(:membership_state) if locked && new_state != current
+  end
+
+  def refuse_sponsorship_edit!(attrs, current, new_state)
+    leaving = current == 'sponsored_member' && new_state != current
+    entering = new_state == 'sponsored_member' && current != 'sponsored_member'
+    return unless leaving || entering
+
+    attrs.delete(:membership_state)
+    @sponsorship_edit_refused = true
   end
 
   def apply_greeting_option!(attrs)

@@ -305,7 +305,7 @@ A member's standing is a single state, shown on their profile and filterable on 
 | Cancelled | Yes | They told us they are leaving; access runs to the end of what they paid for |
 | Inactive | No | Lapsed, cancelled and past their paid-through date, or approved and never trained |
 | Guest | Yes | Slack and software access, no dues |
-| Sponsored | Yes | Membership covered by someone else, no dues |
+| Sponsored | Yes | Membership covered by someone else, no dues. Payments are recorded but do not change this standing |
 | Banned | No | Access revoked by an admin |
 | Deceased | No | — |
 | Undetermined | No | A legacy import nobody has matched to a real membership yet; shows up in the data-quality reports. A member who simply never paid is Inactive, not Undetermined |

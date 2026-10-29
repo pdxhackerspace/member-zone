@@ -70,9 +70,10 @@ Director approves it — at which point `FinalizeApproval` creates the record an
 `approve_application!` moves it straight to `new_member`. A rejected application never
 produces a user at all.
 
-`legacy`, `emergency_active_override`, and `is_sponsored` remain orthogonal boolean
-columns, not states. Service accounts bypass the machine entirely: their `active` flag is
-whatever an admin set, and nothing projects over it.
+`legacy` and `emergency_active_override` remain orthogonal boolean columns, not states.
+`is_sponsored` mirrors `sponsored_member`: every save sets it from the state, the same way
+`payment_type` is dictated for a sponsored member. Service accounts bypass the machine
+entirely: their `active` flag is whatever an admin set, and nothing projects over it.
 
 ```mermaid
 stateDiagram-v2
@@ -110,7 +111,7 @@ check the result; a refused move is an ordinary answer, not an exception.
 | --- | --- | --- |
 | `approve_application!` | An application is approved | `new_member` |
 | `grant_building_access!` | Building access training recorded | `provisional_member` |
-| `record_payment!(**attrs)` | A payment is linked | `current_member` |
+| `record_payment!(**attrs)` | A payment is linked | `current_member`, or unchanged when sponsored — the payment is still recorded |
 | `record_cancellation!` | A cancellation notice arrives | `cancelled_member` |
 | `ban!` | Admin bans | `banned_member` |
 | `unban!` | Admin lifts a ban | Recomputed from payment history |
@@ -123,6 +124,40 @@ check the result; a refused move is an ordinary answer, not an exception.
 `unban!` and `unmark_sponsored!` both fall back to `state_from_payment_history`: current if
 the member's payments still cover them, inactive otherwise. Never `unknown` — we know what
 happened to them, and a member with nothing paying for them is inactive.
+
+## What a payment means
+
+A payment changes a member's state only when it is new evidence: its date is after
+`membership_state_entered_at` and after `latest_cancellation_at`. For an expiry-driven
+inactive member that stamp is the deadline that moved them, so a charge that was already
+counted — still inside the billing window, re-read by the nightly sync — cannot bring them
+back. `PAYMENT_IMMUNE_STATES` (cancelled, banned, deceased, sponsored) are a hard stop on
+top of that test. `apply_payment_updates` asks `payment_revives?` before it will set
+`current_member` or clear `membership_ended_date`. Editing or deleting a cash payment
+uses the same test, so a note change on an old payment cannot restore standing either.
+
+`Recharge::PaymentSynchronizer` still refreshes `recharge_most_recent_payment_date` and the
+customer id for every member with a charge. It calls `apply_payment_updates` only for
+charges created or newly linked in that run. PayPal's synchronizer already applies a
+payment only when the row is first linked, so it does not re-apply stored charges.
+
+A sponsored member's payments update the payment bookkeeping (`last_payment_date`, and
+whatever else the caller passed) and leave `sponsored_member` in place. `record_payment!`
+does this for every caller, so a manual payment, a bulk action, or onboarding cannot pull
+a sponsored member into paying. `sponsored_member → current_member` stays in `TRANSITIONS`
+because `unmark_sponsored!` lands there when their payments still cover them. The admin
+edit form refuses a state change into or out of `sponsored_member` and points at the
+Sponsor action, which is what keeps the flag and the state from splitting.
+
+`Recharge::SubscriptionCancellation` files the payment event either way, then returns
+`:already_processed` when `membership_cancelled_at` is present and at least as new as the
+subscription's `cancelled_at`. The nightly tick moves a cancelled member to inactive once
+their paid-through date passes and leaves that stamp in place; a CANCELLED row still inside
+the lookback window is not a new cancellation. It returns `:superseded` when
+`returned_after?(cancelled_at)` — a later payment or a new subscription — so a stale
+CANCELLED row cannot undo someone who came back. An old charge re-synced after a
+cancellation does not enter a rejoined state, so it does not clear
+`membership_cancelled_at` or `membership_cancelled_email_sent_at`.
 
 ### Illegal transitions are refused, not raised
 
