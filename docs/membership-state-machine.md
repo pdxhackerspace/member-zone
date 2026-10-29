@@ -127,14 +127,19 @@ happened to them, and a member with nothing paying for them is inactive.
 
 ## What a payment means
 
-A payment changes a member's state only when it is new evidence: its date is after
-`membership_state_entered_at` and after `latest_cancellation_at`. For an expiry-driven
-inactive member that stamp is the deadline that moved them, so a charge that was already
-counted — still inside the billing window, re-read by the nightly sync — cannot bring them
-back. `PAYMENT_IMMUNE_STATES` (cancelled, banned, deceased, sponsored) are a hard stop on
-top of that test. `apply_payment_updates` asks `payment_revives?` before it will set
-`current_member` or clear `membership_ended_date`. Editing or deleting a cash payment
-uses the same test, so a note change on an old payment cannot restore standing either.
+A payment changes a member's state only when it is new evidence: its date is on or after
+`membership_state_entered_at` and after `latest_cancellation_at`. The entry day counts.
+Overdue entry is stamped at the dues date, and a renewal charge or cash payment usually
+carries that same date; treating it as already counted would refresh the paid-through
+date and leave them overdue until they lapsed. A charge dated before the stamp was
+already counted — still inside the billing window, re-read by the nightly sync — and
+cannot bring them back. A payment on the cancellation date does not count either: the
+payment is a date and the notice is a timestamp, so the two cannot be ordered, matching
+`returned_after?`. `PAYMENT_IMMUNE_STATES` (cancelled, banned, deceased, sponsored) are a
+hard stop on top of that test. `apply_payment_updates` asks `payment_revives?` before it
+will set `current_member` or clear `membership_ended_date`. Editing or deleting a cash
+payment uses the same test, so a note change on an old payment cannot restore standing
+either.
 
 `Recharge::PaymentSynchronizer` still refreshes `recharge_most_recent_payment_date` and the
 customer id for every member with a charge. It calls `apply_payment_updates` only for
