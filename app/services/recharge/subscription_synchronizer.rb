@@ -70,8 +70,12 @@ module Recharge
       return :skipped if user.latest_cancellation_at.blank?
 
       old_state = user.membership_state
-      create_payment_event(user, sub, 'subscription_started')
-      return :skipped unless user.record_subscription_return!(sub[:created_at] || sub[:updated_at])
+      event_type = return_event_type(user, sub)
+      occurred_at = return_occurred_at(sub, event_type)
+      return :skipped if occurred_at.blank?
+
+      create_payment_event(user, sub, event_type)
+      return :skipped unless user.record_subscription_return!(occurred_at)
 
       link_customer_id(user, sub)
       create_journal_entry(user, 'subscription_created', sub, old_state, user.membership_state)
@@ -79,6 +83,36 @@ module Recharge
       @logger.info("[Recharge::SubscriptionSynchronizer] Re-activated #{user.display_name} " \
                    "(#{old_state} -> #{user.membership_state})")
       :created
+    end
+
+    # A new subscription starts at created_at. Reactivating one that was already cancelled
+    # keeps that original start, so the return is when Recharge last updated it — the same
+    # moment the activation webhook would have reported. An active subscription that was
+    # never cancelled is not a return, however recently it was edited.
+    def return_event_type(user, sub)
+      resumed_subscription?(user, sub) ? 'subscription_resumed' : 'subscription_started'
+    end
+
+    def return_occurred_at(sub, event_type)
+      event_type == 'subscription_resumed' ? sub[:updated_at] : (sub[:created_at] || sub[:updated_at])
+    end
+
+    def resumed_subscription?(user, sub)
+      id = sub[:recharge_subscription_id]
+      return false if id.blank?
+
+      cancelled_at = subscription_event_at(user, id, 'subscription_cancelled')
+      return false if cancelled_at.blank?
+
+      returned_at = %w[subscription_started subscription_resumed].filter_map do |type|
+        subscription_event_at(user, id, type)
+      end.max
+      returned_at.blank? || returned_at <= cancelled_at
+    end
+
+    def subscription_event_at(user, id, event_type)
+      user.payment_events.where(source: 'recharge', external_id: "recharge-sub-#{id}-#{event_type}")
+          .maximum(:occurred_at)
     end
 
     def handle_cancelled(sub)
