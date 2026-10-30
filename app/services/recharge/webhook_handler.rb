@@ -146,7 +146,9 @@ module Recharge
     def create_payment_event(user, event_type, occurred_at)
       sub_id = @subscription['id']
       external_id = "recharge-sub-#{sub_id}-#{event_type}"
-      return if PaymentEvent.find_duplicate(source: 'recharge', external_id: external_id, event_type: event_type)
+      return if PaymentEvent.keep_latest!(
+        occurred_at: occurred_at, source: 'recharge', external_id: external_id, event_type: event_type
+      )
 
       PaymentEvent.create!(
         user: user,

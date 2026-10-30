@@ -70,8 +70,12 @@ module Recharge
       return :skipped if user.latest_cancellation_at.blank?
 
       old_state = user.membership_state
-      create_payment_event(user, sub, 'subscription_started')
-      return :skipped unless user.record_subscription_return!(sub[:created_at] || sub[:updated_at])
+      event_type = return_event_type(user, sub)
+      occurred_at = return_occurred_at(sub, event_type)
+      return :skipped if occurred_at.blank?
+
+      create_payment_event(user, sub, event_type)
+      return :skipped unless user.record_subscription_return!(occurred_at)
 
       link_customer_id(user, sub)
       create_journal_entry(user, 'subscription_created', sub, old_state, user.membership_state)
@@ -79,6 +83,47 @@ module Recharge
       @logger.info("[Recharge::SubscriptionSynchronizer] Re-activated #{user.display_name} " \
                    "(#{old_state} -> #{user.membership_state})")
       :created
+    end
+
+    # A new subscription starts at created_at. Reactivating one that was already cancelled
+    # keeps that original start, so the return is when Recharge last updated it — the same
+    # moment the activation webhook would have reported. An active subscription that was
+    # never cancelled is not a return, however recently it was edited.
+    def return_event_type(user, sub)
+      resumed_subscription?(user, sub) ? 'subscription_resumed' : 'subscription_started'
+    end
+
+    def return_occurred_at(sub, event_type)
+      event_type == 'subscription_resumed' ? sub[:updated_at] : (sub[:created_at] || sub[:updated_at])
+    end
+
+    # The last word on this subscription has to be its cancellation. A return already filed
+    # after that is the reactivation we counted; a later updated_at is a charge or an edit,
+    # and moving the resume row forward would revive someone who cancelled since.
+    def resumed_subscription?(user, sub)
+      id = sub[:recharge_subscription_id]
+      updated_at = sub[:updated_at]
+      return false if id.blank? || updated_at.blank?
+
+      cancelled_at = subscription_event_at(user, id, 'subscription_cancelled')
+      return false if cancelled_at.blank?
+
+      returned_at = latest_return_at(user, id)
+      return false if returned_at.present? && returned_at > cancelled_at
+
+      cancellation = user.latest_cancellation_at
+      cancellation.present? && updated_at > cancellation
+    end
+
+    def latest_return_at(user, id)
+      %w[subscription_started subscription_resumed].filter_map do |type|
+        subscription_event_at(user, id, type)
+      end.max
+    end
+
+    def subscription_event_at(user, id, event_type)
+      user.payment_events.where(source: 'recharge', external_id: "recharge-sub-#{id}-#{event_type}")
+          .maximum(:occurred_at)
     end
 
     def handle_cancelled(sub)
@@ -150,12 +195,9 @@ module Recharge
 
     def create_payment_event(user, sub, event_type)
       external_id = "recharge-sub-#{sub[:recharge_subscription_id]}-#{event_type}"
-      return false if PaymentEvent.find_duplicate(source: 'recharge', external_id: external_id, event_type: event_type)
-
-      occurred_at = case event_type
-                    when 'subscription_started' then sub[:created_at]
-                    when 'subscription_cancelled' then sub[:cancelled_at]
-                    end || sub[:updated_at] || Time.current
+      occurred_at = event_occurred_at(sub, event_type)
+      return false if PaymentEvent.keep_latest!(occurred_at: occurred_at, source: 'recharge', external_id: external_id,
+                                                event_type: event_type)
 
       PaymentEvent.create!(
         user: user,
@@ -171,6 +213,13 @@ module Recharge
     rescue ActiveRecord::RecordInvalid => e
       @logger.error("[Recharge::SubscriptionSynchronizer] Failed to create payment event: #{e.message}")
       false
+    end
+
+    def event_occurred_at(sub, event_type)
+      case event_type
+      when 'subscription_started' then sub[:created_at]
+      when 'subscription_cancelled' then sub[:cancelled_at]
+      end || sub[:updated_at] || Time.current
     end
 
     def log_summary(stats)

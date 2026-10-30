@@ -159,7 +159,10 @@ on save, which moves a member whose payment no longer covers them straight on.
 A cancelled member who resubscribes is back as soon as the subscription starts, while their
 last payment still covers them (`record_subscription_return!`). One who has already gone
 inactive comes back with the first charge on the new subscription; the subscription start
-is filed in the ledger either way, so the mail guards know they returned.
+is filed in the ledger either way, so the mail guards know they returned. A new subscription
+is dated from when it was created. Reactivating the one that was cancelled keeps that
+original start, so the nightly sync dates the return from when Recharge last updated it,
+which is the activation a missed webhook would have reported.
 
 `Recharge::PaymentSynchronizer` still refreshes `recharge_most_recent_payment_date` and the
 customer id for every member with a charge, and applies only the newest charge created or
