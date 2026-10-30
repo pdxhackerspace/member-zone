@@ -107,6 +107,8 @@
   <% if can?(:'members.edit_membership') %>
     <% membership_status_locked = (@user.banned? && !can?(:'members.ban')) ||
                                   (@user.deceased? && !can?(:'members.mark_deceased')) %>
+    <% sponsorship_locked = @user.sponsored_member? %>
+    <% state_select_locked = membership_status_locked || sponsorship_locked %>
     <% membership_state_options = [
          ['New member — awaiting building access', 'new_member'],
          ['New member — in grace period', 'provisional_member'],
@@ -115,7 +117,6 @@
          ['Cancelled', 'cancelled_member'],
          ['Inactive', 'inactive_member'],
          ['Guest', 'guest_member'],
-         ['Sponsored', 'sponsored_member'],
          ['Unknown', 'unknown']
        ] %>
     <% membership_state_options << ['Banned', 'banned_member'] if can?(:'members.ban') %>
@@ -123,16 +124,23 @@
 
     <div>
       <%= f.label :membership_state, "Membership state", class: "form-label" %>
-      <% if membership_status_locked %>
+      <% if state_select_locked %>
         <div class="form-control-plaintext"><%= membership_state_label(@user.membership_state) %></div>
-        <div class="form-text">Use the member profile actions to change this state.</div>
+        <div class="form-text">
+          <% if sponsorship_locked %>
+            Use the Sponsor action on the member profile to change sponsorship.
+          <% else %>
+            Use the member profile actions to change this state.
+          <% end %>
+        </div>
       <% else %>
         <%= f.select :membership_state,
             options_for_select(membership_state_options, @user.membership_state),
             {},
             { class: "form-select", id: "user_membership_state" } %>
         <div class="form-text">
-          Setting this by hand overrides the state machine. For Guest or Sponsored, you can set when access ends below.
+          Setting this by hand overrides the state machine. For a guest, you can set when access ends below.
+          Sponsorship is changed with the Sponsor action on the member profile.
         </div>
       <% end %>
     </div>

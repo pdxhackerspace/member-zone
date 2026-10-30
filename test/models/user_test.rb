@@ -297,4 +297,164 @@ class UserTest < ActiveSupport::TestCase
     assert_nil user.mailing_longitude
     assert_nil user.mailing_geocoded_at
   end
+
+  # A charge still inside the billing window is not a payment that just arrived.
+  test 're-applying a payment from before a cancellation does not revive an inactive member' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      cancelled_at = Time.zone.local(2026, 10, 26, 18, 0, 0)
+      user.update_columns(
+        membership_cancelled_at: cancelled_at,
+        membership_cancelled_email_sent_at: cancelled_at,
+        membership_state_entered_at: Time.zone.local(2026, 10, 27, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 27),
+        last_payment_date: Date.new(2026, 9, 27)
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.zone.local(2026, 9, 27, 12), amount: 40 })
+      user.update!(updates) if updates.present?
+
+      user.reload
+      assert_nil updates[:membership_state]
+      assert_nil updates[:membership_ended_date]
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal Date.new(2026, 10, 27), user.membership_ended_date
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+      assert_equal cancelled_at.to_i, user.membership_cancelled_email_sent_at.to_i
+    end
+  end
+
+  test 'a payment dated after an inactive member entered that state makes them current' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      user.update_columns(
+        membership_cancelled_at: Time.zone.local(2026, 10, 1, 12, 0, 0),
+        membership_state_entered_at: Time.zone.local(2026, 10, 20, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 20)
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+      user.update!(updates)
+
+      user.reload
+      assert_equal 'current_member', user.membership_state
+      assert_nil user.membership_ended_date
+      assert_nil user.membership_cancelled_at
+      assert_nil user.membership_cancelled_email_sent_at
+    end
+  end
+
+  test 'an overdue member becomes current when a payment is dated after their dues date' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member(membership_state: 'overdue_member')
+      dues_on = Time.zone.local(2026, 10, 1, 0, 0, 0)
+      user.update_columns(membership_state_entered_at: dues_on, dues_due_at: dues_on)
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+
+      assert_equal 'current_member', updates[:membership_state]
+    end
+  end
+
+  # Overdue entry is stamped at the dues date, and the renewal usually carries that date.
+  test 'an overdue member becomes current when the payment is dated on their dues date' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member(membership_state: 'overdue_member')
+      dues_on = Time.zone.local(2026, 10, 28, 0, 0, 0)
+      user.update_columns(
+        membership_state_entered_at: dues_on,
+        dues_due_at: dues_on,
+        membership_ended_date: dues_on.to_date
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+      user.update!(updates)
+
+      user.reload
+      assert_equal 'current_member', user.membership_state
+      assert_nil user.membership_ended_date
+      assert_operator user.dues_due_at, :>, dues_on
+    end
+  end
+
+  test 'an inactive member becomes current when the payment is dated on the day they lapsed' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      lapsed_at = Time.zone.local(2026, 10, 28, 0, 0, 0)
+      user.update_columns(
+        membership_state_entered_at: lapsed_at,
+        membership_ended_date: lapsed_at.to_date
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+      user.update!(updates)
+
+      user.reload
+      assert_equal 'current_member', user.membership_state
+      assert_nil user.membership_ended_date
+    end
+  end
+
+  test 'a payment dated the day before state entry does not revive an inactive member' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      user.update_columns(
+        membership_state_entered_at: Time.zone.local(2026, 10, 28, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 28)
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.zone.local(2026, 10, 27, 12), amount: 40 })
+      user.update!(updates) if updates.present?
+
+      user.reload
+      assert_nil updates[:membership_state]
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal Date.new(2026, 10, 28), user.membership_ended_date
+    end
+  end
+
+  # A date-only payment cannot be ordered against a cancellation timestamp on that day.
+  test 'a payment dated on the cancellation day does not revive an inactive member' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      cancelled_at = Time.zone.local(2026, 10, 28, 18, 0, 0)
+      user.update_columns(
+        membership_cancelled_at: cancelled_at,
+        membership_state_entered_at: Time.zone.local(2026, 10, 1, 0, 0, 0),
+        membership_ended_date: Date.new(2026, 10, 1)
+      )
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+      user.update!(updates) if updates.present?
+
+      user.reload
+      assert_nil updates[:membership_state]
+      assert_equal 'inactive_member', user.membership_state
+      assert_equal cancelled_at.to_i, user.membership_cancelled_at.to_i
+    end
+  end
+
+  test 'a payment does not move a member flagged sponsored out of a stray state' do
+    travel_to Time.zone.local(2026, 10, 28, 12, 0, 0) do
+      user = oscillation_member
+      user.update_columns(is_sponsored: true, membership_state_entered_at: Time.zone.local(2026, 1, 1))
+
+      updates = user.reload.apply_payment_updates({ time: Time.current, amount: 40 })
+
+      assert_nil updates[:membership_state]
+      assert user.is_sponsored?
+    end
+  end
+
+  private
+
+  def oscillation_member(membership_state: 'inactive_member')
+    User.create!(
+      authentik_id: "oscillation-#{SecureRandom.hex(4)}",
+      full_name: 'Oscillation Member',
+      payment_type: 'recharge',
+      membership_state: membership_state,
+      membership_plan: membership_plans(:monthly_standard)
+    )
+  end
 end

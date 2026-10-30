@@ -16,6 +16,41 @@ class UsersSponsoredTest < ActionDispatch::IntegrationTest
 
   # ─── Mark Sponsored ────────────────────────────────────────────────
 
+  test 'the edit form sends sponsorship changes to the profile action' do
+    get edit_user_path(@user)
+
+    assert_response :success
+    assert_match(/Sponsor action on the member profile/, response.body)
+    assert_no_match(/value="sponsored_member"/, response.body)
+
+    @user.mark_sponsored!
+    get edit_user_path(@user)
+
+    assert_response :success
+    assert_match(/Use the Sponsor action on the member profile to change sponsorship/, response.body)
+    assert_no_match(/<select[^>]*id="user_membership_state"/, response.body)
+  end
+
+  test 'editing membership state off sponsored is refused' do
+    @user.mark_sponsored!
+
+    patch user_path(@user), params: { user: { membership_state: 'current_member', full_name: 'Renamed Anyway' } }
+
+    assert_redirected_to edit_user_path(@user)
+    assert_match(/Sponsor action/, flash[:alert])
+    @user.reload
+    assert_equal 'sponsored_member', @user.membership_state
+    assert_not_equal 'Renamed Anyway', @user.full_name
+  end
+
+  test 'editing membership state onto sponsored is refused' do
+    patch user_path(@user), params: { user: { membership_state: 'sponsored_member' } }
+
+    assert_redirected_to edit_user_path(@user)
+    assert_match(/Sponsor action/, flash[:alert])
+    assert_not @user.reload.sponsored_member?
+  end
+
   test 'mark_sponsored sets the sponsored flag' do
     post mark_sponsored_user_path(@user)
     assert_redirected_to user_path(@user)

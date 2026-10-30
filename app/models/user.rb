@@ -675,17 +675,13 @@ class User < ApplicationRecord
     # Update last_payment_date if this payment is more recent
     updates[:last_payment_date] = payment_date if last_payment_date.nil? || payment_date > last_payment_date
 
-    # A payment inside the billing window makes them a current member. membership_status,
-    # dues_status, and active are projections of that and are rewritten on save.
+    # A payment inside the billing window makes them a current member only when it is
+    # new evidence. membership_status, dues_status, and active are projections of that
+    # and are rewritten on save. A charge the sync has seen before is bookkeeping.
     window = payment_currency_window(billing_plan: billing_plan)
     payment_is_current = window.nil? || payment_date >= window.ago.to_date
-    if payment_is_current
-      # Don't override deliberate states — these are set by admin actions, webhooks, or
-      # subscription sync and should not be reverted by a historical payment turning up
-      # in a sync. A cancelled member's last payment is expected to still be recent.
-      unless membership_state.in?(PAYMENT_IMMUNE_STATES) || current_member?
-        updates[:membership_state] = 'current_member'
-      end
+    if payment_is_current && payment_revives?(payment_time)
+      updates[:membership_state] = 'current_member'
       updates[:membership_ended_date] = nil if membership_ended_date.present?
     end
 

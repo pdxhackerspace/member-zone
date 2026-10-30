@@ -11,8 +11,7 @@ class MembershipRecalculateStatusTest < ActiveSupport::TestCase
     user = User.create!(
       authentik_id: 'recalc-task-sponsored',
       full_name: 'Recalc Sponsored',
-      is_sponsored: true,
-      membership_state: 'current_member',
+      membership_state: 'sponsored_member',
       payment_type: 'paypal'
     )
 

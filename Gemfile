@@ -29,8 +29,8 @@ gem 'stimulus-rails'
 gem 'cssbundling-rails'
 
 # Authentication & integrations
-gem 'faraday', '~> 2.14'
-gem 'google-apis-sheets_v4', '~> 0.49.0'
+gem 'faraday', '~> 2.15'
+gem 'google-apis-sheets_v4', '~> 0.50.0'
 gem 'googleauth', '~> 1.17'
 gem 'multi_json'
 gem 'omniauth', '~> 2.1'
@@ -60,7 +60,7 @@ gem 'prawn', '~> 2.5'
 gem 'prawn-table', '~> 0.2'
 
 # Pagination
-gem 'pagy', '~> 43.7'
+gem 'pagy', '~> 43.8'
 
 # QR code generation
 gem 'rqrcode', '~> 3.2'
@@ -73,7 +73,8 @@ gem 'sentry-ruby', '~> 7.0'
 gem 'sentry-sidekiq', '~> 7.1'
 gem 'stackprof'
 
-# SSH client for Ruby scripts
+# SSH client for scripts that log into old hosts. Stay on 7.x: net-ssh 8
+# drops SHA-1 ssh-rsa and the deprecated host-key options those hosts need.
 gem 'net-ssh', '~> 7.3'
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
