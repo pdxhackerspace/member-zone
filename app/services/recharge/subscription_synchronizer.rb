@@ -97,17 +97,26 @@ module Recharge
       event_type == 'subscription_resumed' ? sub[:updated_at] : (sub[:created_at] || sub[:updated_at])
     end
 
+    # The cancel and return rows are one per subscription, so their stored times are the
+    # first cycle. A later reactivation is the subscription's own updated_at, once that is
+    # after the cancellation the member is on now.
     def resumed_subscription?(user, sub)
       id = sub[:recharge_subscription_id]
-      return false if id.blank?
+      updated_at = sub[:updated_at]
+      return false if id.blank? || updated_at.blank?
+      return false if subscription_event_at(user, id, 'subscription_cancelled').blank?
 
-      cancelled_at = subscription_event_at(user, id, 'subscription_cancelled')
-      return false if cancelled_at.blank?
+      cancellation = user.latest_cancellation_at
+      return false if cancellation.blank? || updated_at <= cancellation
 
-      returned_at = %w[subscription_started subscription_resumed].filter_map do |type|
+      returned_at = latest_return_at(user, id)
+      returned_at.blank? || returned_at < updated_at
+    end
+
+    def latest_return_at(user, id)
+      %w[subscription_started subscription_resumed].filter_map do |type|
         subscription_event_at(user, id, type)
       end.max
-      returned_at.blank? || returned_at <= cancelled_at
     end
 
     def subscription_event_at(user, id, event_type)
@@ -184,12 +193,9 @@ module Recharge
 
     def create_payment_event(user, sub, event_type)
       external_id = "recharge-sub-#{sub[:recharge_subscription_id]}-#{event_type}"
-      return false if PaymentEvent.find_duplicate(source: 'recharge', external_id: external_id, event_type: event_type)
-
-      occurred_at = case event_type
-                    when 'subscription_started' then sub[:created_at]
-                    when 'subscription_cancelled' then sub[:cancelled_at]
-                    end || sub[:updated_at] || Time.current
+      occurred_at = event_occurred_at(sub, event_type)
+      return false if PaymentEvent.keep_latest!(occurred_at: occurred_at, source: 'recharge', external_id: external_id,
+                                                event_type: event_type)
 
       PaymentEvent.create!(
         user: user,
@@ -205,6 +211,13 @@ module Recharge
     rescue ActiveRecord::RecordInvalid => e
       @logger.error("[Recharge::SubscriptionSynchronizer] Failed to create payment event: #{e.message}")
       false
+    end
+
+    def event_occurred_at(sub, event_type)
+      case event_type
+      when 'subscription_started' then sub[:created_at]
+      when 'subscription_cancelled' then sub[:cancelled_at]
+      end || sub[:updated_at] || Time.current
     end
 
     def log_summary(stats)

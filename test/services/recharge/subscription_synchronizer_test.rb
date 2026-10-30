@@ -38,6 +38,28 @@ module Recharge
       assert_not user.returned_after?(user.membership_cancelled_at)
     end
 
+    # The cancel and resume rows are one per subscription, so a second cycle has to move
+    # the resume row forward instead of trusting the time left from the first return.
+    test 'a later reactivation of the same subscription is dated from that reactivation' do
+      user = cancelled_member('sync-resume-again')
+      user.payment_events.create!(event_type: 'subscription_cancelled', source: 'recharge', amount: 40,
+                                  currency: 'USD', occurred_at: 30.days.ago,
+                                  external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_cancelled")
+      user.payment_events.create!(event_type: 'subscription_resumed', source: 'recharge', amount: 40,
+                                  currency: 'USD', occurred_at: 20.days.ago,
+                                  external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_resumed")
+      user.update_columns(membership_cancelled_at: 2.days.ago, membership_state_entered_at: 2.days.ago)
+      reactivated_at = 1.hour.ago
+
+      sync(subscription(user, created_at: 1.year.ago, updated_at: reactivated_at))
+
+      user.reload
+      assert_equal 'current_member', user.membership_state
+      assert_equal 1, user.payment_events.where(event_type: 'subscription_resumed').count
+      assert_equal reactivated_at.to_i, return_event(user, 'subscription_resumed').occurred_at.to_i
+      assert user.returned_after?(2.days.ago)
+    end
+
     private
 
     def sync(subscription)
