@@ -38,17 +38,18 @@ module Recharge
       assert_not user.returned_after?(user.membership_cancelled_at)
     end
 
-    # The cancel and resume rows are one per subscription, so a second cycle has to move
-    # the resume row forward instead of trusting the time left from the first return.
+    # A later cancel moves the cancellation row forward. Only then is an active subscription
+    # a new reactivation; an edit of one that already resumed is not.
     test 'a later reactivation of the same subscription is dated from that reactivation' do
       user = cancelled_member('sync-resume-again')
+      second_cancel = 2.days.ago
       user.payment_events.create!(event_type: 'subscription_cancelled', source: 'recharge', amount: 40,
-                                  currency: 'USD', occurred_at: 30.days.ago,
+                                  currency: 'USD', occurred_at: second_cancel,
                                   external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_cancelled")
       user.payment_events.create!(event_type: 'subscription_resumed', source: 'recharge', amount: 40,
                                   currency: 'USD', occurred_at: 20.days.ago,
                                   external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_resumed")
-      user.update_columns(membership_cancelled_at: 2.days.ago, membership_state_entered_at: 2.days.ago)
+      user.update_columns(membership_cancelled_at: second_cancel, membership_state_entered_at: second_cancel)
       reactivated_at = 1.hour.ago
 
       sync(subscription(user, created_at: 1.year.ago, updated_at: reactivated_at))
@@ -57,7 +58,26 @@ module Recharge
       assert_equal 'current_member', user.membership_state
       assert_equal 1, user.payment_events.where(event_type: 'subscription_resumed').count
       assert_equal reactivated_at.to_i, return_event(user, 'subscription_resumed').occurred_at.to_i
-      assert user.returned_after?(2.days.ago)
+      assert user.returned_after?(second_cancel)
+    end
+
+    test 'an edit of a subscription that already resumed does not undo a later cancellation' do
+      user = cancelled_member('sync-edit')
+      resumed_at = 20.days.ago
+      user.payment_events.create!(event_type: 'subscription_cancelled', source: 'recharge', amount: 40,
+                                  currency: 'USD', occurred_at: 30.days.ago,
+                                  external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_cancelled")
+      user.payment_events.create!(event_type: 'subscription_resumed', source: 'recharge', amount: 40,
+                                  currency: 'USD', occurred_at: resumed_at,
+                                  external_id: "recharge-sub-#{SUBSCRIPTION_ID}-subscription_resumed")
+      user.update_columns(membership_cancelled_at: 2.days.ago, membership_state_entered_at: 2.days.ago)
+
+      sync(subscription(user, created_at: 1.year.ago, updated_at: 1.hour.ago))
+
+      user.reload
+      assert_equal 'cancelled_member', user.membership_state
+      assert_equal resumed_at.to_i, return_event(user, 'subscription_resumed').occurred_at.to_i
+      assert_not user.returned_after?(user.membership_cancelled_at)
     end
 
     private

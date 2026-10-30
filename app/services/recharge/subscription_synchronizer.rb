@@ -97,20 +97,22 @@ module Recharge
       event_type == 'subscription_resumed' ? sub[:updated_at] : (sub[:created_at] || sub[:updated_at])
     end
 
-    # The cancel and return rows are one per subscription, so their stored times are the
-    # first cycle. A later reactivation is the subscription's own updated_at, once that is
-    # after the cancellation the member is on now.
+    # The last word on this subscription has to be its cancellation. A return already filed
+    # after that is the reactivation we counted; a later updated_at is a charge or an edit,
+    # and moving the resume row forward would revive someone who cancelled since.
     def resumed_subscription?(user, sub)
       id = sub[:recharge_subscription_id]
       updated_at = sub[:updated_at]
       return false if id.blank? || updated_at.blank?
-      return false if subscription_event_at(user, id, 'subscription_cancelled').blank?
 
-      cancellation = user.latest_cancellation_at
-      return false if cancellation.blank? || updated_at <= cancellation
+      cancelled_at = subscription_event_at(user, id, 'subscription_cancelled')
+      return false if cancelled_at.blank?
 
       returned_at = latest_return_at(user, id)
-      returned_at.blank? || returned_at < updated_at
+      return false if returned_at.present? && returned_at > cancelled_at
+
+      cancellation = user.latest_cancellation_at
+      cancellation.present? && updated_at > cancellation
     end
 
     def latest_return_at(user, id)
