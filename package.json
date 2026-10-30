@@ -22,7 +22,7 @@
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.13.2",
     "nodemon": "^3.1.14",
-    "postcss": "^8.5.31",
+    "postcss": "^8.5.32",
     "postcss-cli": "^12.0.0",
     "sass": "^1.106.1"
   },
