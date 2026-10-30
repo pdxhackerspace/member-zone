@@ -1,8 +1,7 @@
 module Recharge
   # Records that a Recharge subscription was cancelled: one payment event, one journal
-  # entry, and record_cancellation! on the member. WebhookHandler and
-  # SubscriptionSynchronizer both delegate here so the deferred-cancellation rule lives
-  # in one place.
+  # entry, and settle_cancellation! on the member, which owns what the notice does to their
+  # standing. WebhookHandler and SubscriptionSynchronizer both delegate here.
   class SubscriptionCancellation
     def self.call(user:, subscription:, source:, logger: Rails.logger)
       new(user, subscription, source, logger).call
@@ -36,11 +35,14 @@ module Recharge
 
     def apply_cancellation(event_is_new)
       old_state = @user.membership_state
-      return declined(old_state) unless @user.record_cancellation!(cancelled_at: cancelled_at)
-
-      create_journal_entry(old_state) if event_is_new
-      log_cancellation(old_state)
-      event_is_new ? :cancelled : :skipped
+      case @user.settle_cancellation!(cancelled_at)
+      when :locked then state_locked(old_state)
+      when :noted then noted(old_state)
+      else
+        create_journal_entry(old_state) if event_is_new
+        log_cancellation(old_state)
+        event_is_new ? :cancelled : :skipped
+      end
     end
 
     def log_cancellation(old_state)
@@ -48,19 +50,7 @@ module Recharge
                    "(#{old_state} -> #{@user.membership_state})")
     end
 
-    # Where record_cancellation! will not follow, which is two different situations wearing
-    # the same false. A member who lapsed before anyone processed the notice is already
-    # where it would have put them and needs only the date — without it they look exactly
-    # like someone who quietly stopped paying, and the lapse email chases them for a
-    # decision they told us about. A ban, a death, a sponsorship, or a guest pass was
-    # decided by a person and outranks the notice entirely.
-    #
-    # Membership::CancellationReconciler draws the line in the same place for the backlog;
-    # it reads from the same list so a webhook and a later reconcile cannot disagree.
-    def declined(old_state)
-      return state_locked(old_state) unless old_state.in?(Membership::CancellationReconciler::NOTE_ONLY_STATES)
-
-      @user.note_cancellation!(cancelled_at: cancelled_at)
+    def noted(old_state)
       @logger.info("[Recharge::SubscriptionCancellation] #{@source}: #{@user.display_name} " \
                    "cancelled at Recharge; recorded against #{old_state}")
       :noted
@@ -87,8 +77,8 @@ module Recharge
 
     def create_payment_event
       external_id = "recharge-sub-#{subscription_id}-subscription_cancelled"
-      return false if PaymentEvent.find_duplicate(source: 'recharge', external_id: external_id,
-                                                  event_type: 'subscription_cancelled')
+      return false if PaymentEvent.keep_latest!(occurred_at: cancelled_at, source: 'recharge',
+                                                external_id: external_id, event_type: 'subscription_cancelled')
 
       PaymentEvent.create!(
         user: @user,

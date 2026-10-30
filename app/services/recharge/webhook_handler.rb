@@ -36,13 +36,14 @@ module Recharge
       return user_not_found('subscription/created') unless user
 
       old_state = user.membership_state
-      user.record_payment! if user.cancelled?
+      started_at = subscription_time('created_at')
+      create_payment_event(user, 'subscription_started', started_at)
+      user.record_subscription_return!(started_at)
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
       details = { 'previous_membership_state' => old_state,
                   'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_created', details: details)
-      create_payment_event(user, 'subscription_started')
       log_and_respond('subscription/created', user, old_state, user.membership_state)
     end
 
@@ -63,13 +64,14 @@ module Recharge
       return user_not_found('subscription/activated') unless user
 
       old_state = user.membership_state
-      user.record_payment! if user.cancelled?
+      resumed_at = subscription_time('updated_at')
+      create_payment_event(user, 'subscription_resumed', resumed_at)
+      user.record_subscription_return!(resumed_at)
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
       details = { 'previous_membership_state' => old_state,
                   'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_resumed', details: details)
-      create_payment_event(user, 'subscription_resumed')
       log_and_respond('subscription/activated', user, old_state, user.membership_state)
     end
 
@@ -79,7 +81,7 @@ module Recharge
 
       details = { 'previous_membership_state' => user.membership_state }
       create_journal_entry(user: user, action: 'subscription_paused', details: details)
-      create_payment_event(user, 'subscription_paused')
+      create_payment_event(user, 'subscription_paused', subscription_time('updated_at'))
       log_and_respond('subscription/paused', user, user.membership_state, user.membership_state)
     end
 
@@ -129,10 +131,24 @@ module Recharge
       )
     end
 
-    def create_payment_event(user, event_type)
+    # When the subscription changed at Recharge, not when the webhook reached us. A notice
+    # that arrives late must not look newer than a cancellation the member made since.
+    def subscription_time(key)
+      value = @subscription[key]
+      return Time.current if value.blank?
+      return value.in_time_zone if value.respond_to?(:in_time_zone)
+
+      Time.zone.parse(value.to_s) || Time.current
+    rescue ArgumentError
+      Time.current
+    end
+
+    def create_payment_event(user, event_type, occurred_at)
       sub_id = @subscription['id']
       external_id = "recharge-sub-#{sub_id}-#{event_type}"
-      return if PaymentEvent.find_duplicate(source: 'recharge', external_id: external_id, event_type: event_type)
+      return if PaymentEvent.keep_latest!(
+        occurred_at: occurred_at, source: 'recharge', external_id: external_id, event_type: event_type
+      )
 
       PaymentEvent.create!(
         user: user,
@@ -140,7 +156,7 @@ module Recharge
         source: 'recharge',
         amount: @subscription['price'],
         currency: 'USD',
-        occurred_at: Time.current,
+        occurred_at: occurred_at,
         external_id: external_id,
         details: "Recharge #{event_type.humanize.downcase}: #{@subscription['product_title']}"
       )

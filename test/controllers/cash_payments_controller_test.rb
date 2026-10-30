@@ -260,15 +260,53 @@ class CashPaymentsControllerTest < ActionDispatch::IntegrationTest
 
   test 'destroying last cash payment clears dates for cancelled members' do
     @user.cash_payments.destroy_all
-    @user.update_columns(membership_state: 'cancelled_member', payment_type: 'cash')
-    post_cash_payment
+    payment = CashPayment.create!(user: @user, membership_plan: @plan, amount: 100, paid_on: 10.days.ago.to_date,
+                                  recorded_by: users(:one))
+    @user.update_columns(membership_state: 'cancelled_member', payment_type: 'cash',
+                         membership_cancelled_at: 5.days.ago)
 
-    delete cash_payment_path(CashPayment.last)
+    delete cash_payment_path(payment)
 
     @user.reload
     assert_nil @user.last_payment_date
     assert_nil @user.dues_due_at
     assert_equal 'cancelled_member', @user.membership_state
+  end
+
+  test 'a cash payment after a cancellation brings the member back' do
+    @user.cash_payments.destroy_all
+    @user.update_columns(membership_state: 'cancelled_member', membership_cancelled_at: 3.days.ago,
+                         membership_state_entered_at: 3.days.ago)
+
+    post_cash_payment
+
+    @user.reload
+    assert_equal 'current_member', @user.membership_state
+    assert_nil @user.membership_cancelled_at
+  end
+
+  # Cash carries only a date, so a payment on the day they cancelled is taken as coming back.
+  test 'a cash payment dated on the cancellation day brings the member back' do
+    @user.cash_payments.destroy_all
+    cancelled_at = Time.current.end_of_day - 1.hour
+    @user.update_columns(membership_state: 'cancelled_member', membership_cancelled_at: cancelled_at,
+                         membership_state_entered_at: cancelled_at)
+
+    post_cash_payment(paid_on: cancelled_at.to_date)
+
+    assert_equal 'current_member', @user.reload.membership_state
+  end
+
+  test 'a cash payment dated before the cancellation leaves the member cancelled' do
+    @user.cash_payments.destroy_all
+    @user.update_columns(membership_state: 'cancelled_member', membership_cancelled_at: Time.current,
+                         membership_state_entered_at: Time.current, dues_due_at: 20.days.from_now)
+
+    post_cash_payment(paid_on: 1.day.ago.to_date)
+
+    @user.reload
+    assert_equal 'cancelled_member', @user.membership_state
+    assert_equal 1.day.ago.to_date, @user.last_payment_date
   end
 
   test 'deletes cash payment and recalculates membership' do

@@ -500,10 +500,6 @@ class User < ApplicationRecord
     dues_due_at.present? && dues_due_at < Time.current
   end
 
-  # States a linked payment must not overwrite: each was set deliberately, and a payment
-  # discovered by a sync is not evidence that the decision has been reversed.
-  PAYMENT_IMMUNE_STATES = %w[cancelled_member banned_member deceased_member sponsored_member].freeze
-
   # How long after a payment the user is still considered current.
   # Based on the membership plan's billing cycle plus a small grace window.
   # Returns nil for one-time plans (payment never expires).
@@ -599,7 +595,7 @@ class User < ApplicationRecord
     updates[:payment_type] = 'paypal' if payment_type != 'paypal'
 
     # Update payment dates, membership status, and try to match plan
-    apply_payment_updates({ time: payment.transaction_time, amount: payment.amount }, updates)
+    apply_payment_updates({ time: payment.transaction_time, amount: payment.amount }, updates, first_seen: true)
 
     # Apply all updates at once
     update!(updates) if updates.any?
@@ -639,7 +635,7 @@ class User < ApplicationRecord
     end
 
     # Update payment dates, membership status, and try to match plan
-    apply_payment_updates({ time: payment.processed_at, amount: payment.amount }, updates)
+    apply_payment_updates({ time: payment.processed_at, amount: payment.amount }, updates, first_seen: true)
 
     # Apply all updates at once
     update!(updates) if updates.any?
@@ -651,52 +647,11 @@ class User < ApplicationRecord
     ensure_recharge_payment_events(payment.customer_id)
   end
 
-  # Shared method to update user from a payment.
-  # Used by payment linking callbacks and synchronizer reconciliation.
-  # Updates last_payment_date, membership status, and membership plan if needed.
-  # Can accept either a time or a hash with :time and :amount.
-  # billing_plan: plan that governs this payment's cycle (e.g. a personal plan on a cash payment)
-  def apply_payment_updates(payment_time_or_options, updates = {}, billing_plan: nil)
-    return updates if payment_time_or_options.blank?
-
-    # Support both simple time and options hash
-    if payment_time_or_options.is_a?(Hash)
-      payment_time = payment_time_or_options[:time]
-      payment_amount = payment_time_or_options[:amount]
-    else
-      payment_time = payment_time_or_options
-      payment_amount = nil
-    end
-
-    return updates if payment_time.blank?
-
-    payment_date = payment_time.to_date
-
-    # Update last_payment_date if this payment is more recent
-    updates[:last_payment_date] = payment_date if last_payment_date.nil? || payment_date > last_payment_date
-
-    # A payment inside the billing window makes them a current member only when it is
-    # new evidence. membership_status, dues_status, and active are projections of that
-    # and are rewritten on save. A charge the sync has seen before is bookkeeping.
-    window = payment_currency_window(billing_plan: billing_plan)
-    payment_is_current = window.nil? || payment_date >= window.ago.to_date
-    if payment_is_current && payment_revives?(payment_time)
-      updates[:membership_state] = 'current_member'
-      updates[:membership_ended_date] = nil if membership_ended_date.present?
-    end
-
-    maybe_match_plan_from_payment_amount!(updates, payment_amount)
-
-    merge_dues_due_at_after_payment!(updates, payment_date, billing_plan: billing_plan)
-
-    updates
-  end
-
-  def merge_dues_due_at_after_payment!(updates, payment_date, billing_plan: nil)
+  def merge_dues_due_at_after_payment!(updates, paid_on, billing_plan: nil)
     state = updates[:membership_state] || membership_state
     return if state.in?(%w[guest_member sponsored_member banned_member deceased_member])
 
-    anchor = [last_payment_date, payment_date, updates[:last_payment_date]].compact.max
+    anchor = [last_payment_date, paid_on, updates[:last_payment_date]].compact.max
     plan = billing_plan || MembershipPlan.find_by(id: updates[:membership_plan_id] || membership_plan_id)
     updates[:dues_due_at] = User.dues_due_at_from_payment_cycle(anchor, plan)
   end

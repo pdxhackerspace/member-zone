@@ -52,4 +52,15 @@ class PaymentEvent < ApplicationRecord
 
     where(source: source, external_id: external_id, event_type: event_type).first
   end
+
+  # One row per source and external id. A later cancellation or reactivation of the same
+  # subscription moves that row forward; a re-delivery of an older notice does not.
+  # Returns the existing row, or nil when the caller should create it.
+  def self.keep_latest!(occurred_at:, source:, external_id:, event_type:)
+    existing = find_duplicate(source: source, external_id: external_id, event_type: event_type)
+    return if existing.blank?
+
+    existing.update!(occurred_at: occurred_at) if occurred_at.present? && occurred_at > existing.occurred_at
+    existing
+  end
 end

@@ -11,13 +11,14 @@ a bug.
 
 ## Where the logic lives
 
-All of it is on `User`, split across four concerns so no single file outgrows RuboCop's
+All of it is on `User`, split across five concerns so no single file outgrows RuboCop's
 class-length limit:
 
 | File | Responsibility |
 | --- | --- |
 | `app/models/concerns/membership_state.rb` | The enum, the `TRANSITIONS` table, the guard that enforces it, and the scopes |
-| `app/models/concerns/membership_transitions.rb` | The transition methods (`approve_application!`, `record_payment!`, …) |
+| `app/models/concerns/membership_transitions.rb` | The transition methods (`approve_application!`, `ban!`, …) and the guard |
+| `app/models/concerns/membership_payments.rb` | Every rule about payments and cancellations: what revives a member, what a cancellation notice does, what counts as coming back |
 | `app/models/concerns/membership_state_resolution.rb` | Deadlines: what a state becomes when its clock runs out |
 | `app/models/concerns/membership_state_projection.rb` | Rewriting the cached columns (`active`, `membership_status`, `dues_status`) |
 
@@ -111,8 +112,9 @@ check the result; a refused move is an ordinary answer, not an exception.
 | --- | --- | --- |
 | `approve_application!` | An application is approved | `new_member` |
 | `grant_building_access!` | Building access training recorded | `provisional_member` |
-| `record_payment!(**attrs)` | A payment is linked | `current_member`, or unchanged when sponsored — the payment is still recorded |
-| `record_cancellation!` | A cancellation notice arrives | `cancelled_member` |
+| `record_payment!(paid_at:, **attrs)` | A payment is recorded | `current_member` when `payment_revives?`; otherwise only the bookkeeping is saved |
+| `record_subscription_return!(started_at)` | A subscription starts or resumes | `current_member` for a cancelled member still covered who resubscribed after cancelling |
+| `settle_cancellation!(cancelled_at)` | A cancellation notice arrives | `cancelled_member`, played forward to `inactive_member` if the paid-through date has passed |
 | `ban!` | Admin bans | `banned_member` |
 | `unban!` | Admin lifts a ban | Recomputed from payment history |
 | `mark_deceased!` | Admin marks deceased | `deceased_member`, `payment_type: inactive` |
@@ -127,42 +129,56 @@ happened to them, and a member with nothing paying for them is inactive.
 
 ## What a payment means
 
-A payment changes a member's state only when it is new evidence: its date is on or after
-`membership_state_entered_at` and after `latest_cancellation_at`. The entry day counts.
-Overdue entry is stamped at the dues date, and a renewal charge or cash payment usually
-carries that same date; treating it as already counted would refresh the paid-through
-date and leave them overdue until they lapsed. A charge dated before the stamp was
-already counted — still inside the billing window, re-read by the nightly sync — and
-cannot bring them back. A payment on the cancellation date does not count either: the
-payment is a date and the notice is a timestamp, so the two cannot be ordered, matching
-`returned_after?`. `PAYMENT_IMMUNE_STATES` (cancelled, banned, deceased, sponsored) are a
-hard stop on top of that test. `apply_payment_updates` asks `payment_revives?` before it
-will set `current_member` or clear `membership_ended_date`. Editing or deleting a cash
-payment uses the same test, so a note change on an old payment cannot restore standing
-either.
+Only a real payment makes someone current: a PayPal, Recharge, or Ko-fi charge, or a cash
+payment. There is no admin action that marks a member paid without one. "Mark Dues
+Received" on the manual payments page records a cash payment for the plan's price, the
+onboarding wizard records the cash collected at signup, and a paying member onboarded with
+no payment yet starts as `new_member`. The Reports page has no "Paying" bulk action.
+
+`payment_revives?(paid_at, first_seen:)` in `MembershipPayments` is the whole test, and
+every path asks it — the syncs, cash payments, the cleanup and link rake tasks:
+
+- `banned_member`, `deceased_member`, and `sponsored_member` (`PAYMENT_LOCKED_STATES`) are
+  never moved by a payment. The payment is still recorded.
+- The payment has to come after the most recent cancellation, from the stamp or the ledger.
+  A timed charge has to be later than the notice, so the renewal a member cancels straight
+  after does not undo the cancellation. A cash payment carries only a date, so one dated on
+  the cancellation day or later counts.
+- A payment the caller has never applied before (`first_seen: true` — a new charge, a newly
+  linked one, a new cash payment) is news. So is any payment after a recorded cancellation:
+  a return clears the stamp, so nothing since it has been acted on.
+- Anything else — a sync or cleanup re-reading a stored charge, an edit to an old cash
+  payment — counts only if it is dated on or after `membership_state_entered_at`. The entry
+  day counts: overdue entry is stamped at the dues date, and the renewal usually carries
+  that date.
+
+`apply_payment_updates` also requires the payment to be inside the plan's billing window
+before it sets `current_member`; `record_payment!` leaves coverage to the expiry resolution
+on save, which moves a member whose payment no longer covers them straight on.
+
+A cancelled member who resubscribes is back as soon as the subscription starts, while their
+last payment still covers them (`record_subscription_return!`). One who has already gone
+inactive comes back with the first charge on the new subscription; the subscription start
+is filed in the ledger either way, so the mail guards know they returned. A new subscription
+is dated from when it was created. Reactivating the one that was cancelled keeps that
+original start, so the nightly sync dates the return from when Recharge last updated it,
+which is the activation a missed webhook would have reported.
 
 `Recharge::PaymentSynchronizer` still refreshes `recharge_most_recent_payment_date` and the
-customer id for every member with a charge. It calls `apply_payment_updates` only for
-charges created or newly linked in that run. PayPal's synchronizer already applies a
-payment only when the row is first linked, so it does not re-apply stored charges.
+customer id for every member with a charge, and applies only the newest charge created or
+newly linked in that run. PayPal's synchronizer applies a payment when the row is first
+linked.
 
-A sponsored member's payments update the payment bookkeeping (`last_payment_date`, and
-whatever else the caller passed) and leave `sponsored_member` in place. `record_payment!`
-does this for every caller, so a manual payment, a bulk action, or onboarding cannot pull
-a sponsored member into paying. `sponsored_member → current_member` stays in `TRANSITIONS`
-because `unmark_sponsored!` lands there when their payments still cover them. The admin
-edit form refuses a state change into or out of `sponsored_member` and points at the
-Sponsor action, which is what keeps the flag and the state from splitting.
+`sponsored_member → current_member` stays in `TRANSITIONS` because `unmark_sponsored!` lands
+there when their payments still cover them. The admin edit form refuses a state change into
+or out of `sponsored_member` and points at the Sponsor action, which is what keeps the flag
+and the state from splitting.
 
 `Recharge::SubscriptionCancellation` files the payment event either way, then returns
 `:already_processed` when `membership_cancelled_at` is present and at least as new as the
-subscription's `cancelled_at`. The nightly tick moves a cancelled member to inactive once
-their paid-through date passes and leaves that stamp in place; a CANCELLED row still inside
-the lookback window is not a new cancellation. It returns `:superseded` when
-`returned_after?(cancelled_at)` — a later payment or a new subscription — so a stale
-CANCELLED row cannot undo someone who came back. An old charge re-synced after a
-cancellation does not enter a rejoined state, so it does not clear
-`membership_cancelled_at` or `membership_cancelled_email_sent_at`.
+subscription's `cancelled_at`, and `:superseded` when `returned_after?(cancelled_at)` — a
+later payment or a new subscription — so a stale CANCELLED row cannot undo someone who came
+back. Otherwise it hands the notice to `settle_cancellation!`.
 
 ### Illegal transitions are refused, not raised
 
@@ -284,8 +300,9 @@ returning what they always returned.
 **Do not assign them.** Anything you write is overwritten on the next save. Move the member
 instead, with a transition method.
 
-`membership_status` maps the state onto the old enum; note that members behind on dues stay
-`paying` and are distinguished by `dues_status`, matching pre-state-machine behaviour.
+`membership_status` maps the state onto the old enum. Members behind on dues but still on the
+rolls (`overdue_member`) stay `paying` and are distinguished by `dues_status`;
+`inactive_member` is `inactive`, whether they cancelled or stopped paying.
 `dues_status` maps onto `current` / `lapsed` / `inactive` / `unknown`.
 
 `payment_type` is mostly not a projection — it records a real payment channel we learned from
@@ -418,7 +435,9 @@ arrived.
 
 So the fact is kept separately from the state, on `users.membership_cancelled_at`:
 
-- `record_cancellation!(cancelled_at:)` stamps it alongside the transition.
+- `settle_cancellation!(cancelled_at)` is how a notice is applied, by the webhook, the
+  subscription sync, and the reconciler alike. It stamps it alongside the transition,
+  backdates the entry to the cancellation, and plays any passed deadline forward.
 - `note_cancellation!(cancelled_at:)` stamps it for a member whose standing has nowhere to
   go — already lapsed, banned, dead. Nothing moves.
 - `cancellation_recorded?` asks whether the stamp is set — the question for code deciding
@@ -449,14 +468,6 @@ So the fact is kept separately from the state, on `users.membership_cancelled_at
 - `overdue_member` does not clear it — that is the same membership falling behind, not a new
   one — and neither do `sponsored_member` or `guest_member`, which may end and leave the
   member exactly where the cancellation left them.
-
-The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
-the card's "Next payment" line with "Cancelled / Active until *date*", because there is no
-next payment coming and presenting the paid-through date as one — as a renewal, or once it
-passes, as an overdue bill — asks the member for money they told us they were done paying.
-The date is `dues_paid_through_at`, the day their last payment stops covering them. A
-sponsorship or guest pass granted after the cancellation supersedes it and the ordinary line
-returns.
 
 The membership card on the profile reads the stamp too. `member_cancellation_line` replaces
 the card's "Next payment" line with "Cancelled / Active until *date*", because there is no
@@ -509,19 +520,21 @@ two have different consequences for queued past-due mail. A member who came back
 their reminders — they may genuinely owe us again. Everyone else loses them: the
 cancellation stands, there is simply no state left to change.
 
-One case is deliberately not guessed at. `last_payment_on` is a date and the notice is a
-timestamp, so a payment on the same calendar day is either a same-day resubscribe or the
-renewal they cancelled straight afterwards, and the records cannot say which. Those members
-are listed in the report for an admin to sort out by hand. Nothing chases them in the
-meantime, because the mail guards read the payment event ledger directly.
+A payment on the cancellation day is judged by the same rule as everywhere else: a timed
+charge earlier that day is the renewal they cancelled after, and a cash payment that day is
+them coming back.
 
-The live path draws the same line, reading `NOTE_ONLY_STATES` from the reconciler so a
-webhook and a later reconcile cannot disagree. `Recharge::SubscriptionCancellation` files
-the payment event either way — the subscription really did end at Recharge — and then, when
-`record_cancellation!` declines:
+This is also the repair for members a payment wrongly brought back after they cancelled.
+They have no payment after the notice, so the reconciler moves them back to cancelled, or
+on to inactive if their paid-through date has passed. Run the preview first.
 
-- A member already in `inactive_member` gets `membership_cancelled_at` stamped and nothing
-  else, returning `:noted`. Skipping the stamp would leave the notice for a rake reconcile
+The live path goes through the same `settle_cancellation!`, so a webhook and a later
+reconcile cannot disagree. `Recharge::SubscriptionCancellation` files the payment event
+either way — the subscription really did end at Recharge — and then:
+
+- A member already in `cancelled_member` or `inactive_member`
+  (`CANCELLATION_SETTLED_STATES`) gets `membership_cancelled_at` stamped and nothing else,
+  returning `:noted`. Skipping the stamp would leave the notice for a rake reconcile
   to find, and the lapse email chasing them until it ran.
 - A `banned_member`, `deceased_member`, `sponsored_member`, or `guest_member` is left
   entirely alone, returning `:state_locked` with no journal entry, so a billing notice never

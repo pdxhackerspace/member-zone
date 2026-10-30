@@ -17,6 +17,7 @@ module ApplicationHelper
     'deceased' => 'dark',
     'sponsored' => 'primary',
     'cancelled' => 'secondary',
+    'inactive' => 'secondary',
     'unknown' => 'secondary'
   }.freeze
 
@@ -39,6 +40,7 @@ module ApplicationHelper
       'deceased' => 'text-bg-dark-subtle',
       'sponsored' => 'text-bg-info-subtle',
       'cancelled' => 'text-bg-secondary-subtle',
+      'inactive' => 'text-bg-secondary-subtle',
       'unknown' => 'text-bg-secondary-subtle'
     }.fetch(status.to_s, 'text-bg-secondary-subtle')
   end

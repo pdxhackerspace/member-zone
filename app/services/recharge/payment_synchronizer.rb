@@ -5,7 +5,7 @@ module Recharge
     def initialize(client: Client.new, logger: Rails.logger)
       @client = client
       @logger = logger
-      @apply_payment_user_ids = Set.new
+      @new_payments_by_user_id = {}
     end
 
     def call
@@ -174,11 +174,15 @@ module Recharge
       return if record.user_id.blank?
       return unless is_new || !previously_linked
 
-      @apply_payment_user_ids << record.user_id
+      newest = @new_payments_by_user_id[record.user_id]
+      return if newest&.processed_at.present? && record.processed_at.present? &&
+                newest.processed_at >= record.processed_at
+
+      @new_payments_by_user_id[record.user_id] = record
     end
 
     def apply_membership_update_from_payment(user, payment)
-      updates = user.apply_payment_updates({ time: payment.processed_at, amount: payment.amount })
+      updates = user.apply_payment_updates({ time: payment.processed_at, amount: payment.amount }, first_seen: true)
       user.update!(updates) if updates.any?
     end
 
@@ -205,9 +209,10 @@ module Recharge
 
         # A stored charge re-read on the next sync is not a payment that just arrived.
         # Only charges created or newly linked in this run may move standing.
-        next unless @apply_payment_user_ids.include?(user.id)
+        new_payment = @new_payments_by_user_id[user.id]
+        next unless new_payment
 
-        apply_membership_update_from_payment(user, most_recent_payment)
+        apply_membership_update_from_payment(user, new_payment)
       end
 
       # Also update users who have no Recharge payments (clear their fields)
