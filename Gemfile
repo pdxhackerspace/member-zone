@@ -33,7 +33,7 @@ gem 'faraday', '~> 2.15'
 gem 'google-apis-sheets_v4', '~> 0.50.0'
 gem 'googleauth', '~> 1.17'
 gem 'multi_json'
-gem 'omniauth', '~> 2.1'
+gem 'omniauth', '~> 2.3'
 gem 'omniauth_openid_connect', '~> 0.8.0'
 gem 'omniauth-rails_csrf_protection'
 
