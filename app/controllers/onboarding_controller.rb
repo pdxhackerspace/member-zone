@@ -155,13 +155,19 @@ class OnboardingController < AuthenticatedController
     end
   end
 
+  # The first cash payment is collected at signup, so it is recorded as one. Anyone paying
+  # some other way is a new member until their first charge arrives.
   def apply_paying_onboarding_payment!
-    if params[:cash_plan] == '1'
-      plan = create_onboarding_cash_plan!
-      @user.record_payment!(payment_type: 'cash', membership_plan: plan, last_payment_date: Date.current)
-    else
-      @user.record_payment!(payment_type: 'unknown', last_payment_date: Date.current)
-    end
+    @user.approve_application!
+    return @user.update!(payment_type: 'unknown') unless params[:cash_plan] == '1'
+
+    plan = create_onboarding_cash_plan!
+    @user.update!(payment_type: 'cash', membership_plan: plan)
+    return unless plan.cost.positive?
+
+    payment = CashPayment.create!(user: @user, membership_plan: plan, amount: plan.cost, paid_on: Date.current,
+                                  recorded_by: current_user, notes: 'Collected at signup')
+    CashPayments::Recorder.new(payment, actor: current_user).call
   end
 
   def apply_sponsored_onboarding_payment!

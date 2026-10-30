@@ -16,7 +16,7 @@ module MembershipState
   include MembershipStateEnteredAt
   include MembershipStateProjection
   include MembershipTransitions
-  include MembershipPaymentEvidence
+  include MembershipPayments
   include MembershipNotifications
 
   # No 'applicant': an application is not a member, and only an approved one produces a

@@ -302,11 +302,22 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     user = users(:one)
 
     post reports_update_user_path, params: {
-      user_id: user.id, action_type: 'paying', anchor: 'dues-status-lapsed'
+      user_id: user.id, action_type: 'ban', anchor: 'dues-status-lapsed'
     }
 
     assert_redirected_to report_path('dues-status-lapsed')
-    assert_equal 'current_member', user.reload.membership_state
+    assert_equal 'banned_member', user.reload.membership_state
+  end
+
+  # Only a payment makes someone current; there is no bulk action that says they paid.
+  test 'update_user has no action that marks a member paying' do
+    user = lapsed_member('reports-paying', 3.months.ago.to_date)
+
+    post reports_update_user_path, params: {
+      user_id: user.id, action_type: 'paying', anchor: 'dues-status-lapsed'
+    }
+
+    assert_equal 'inactive_member', user.reload.membership_state
   end
 
   private

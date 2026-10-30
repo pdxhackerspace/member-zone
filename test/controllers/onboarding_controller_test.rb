@@ -29,6 +29,33 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
     assert_select 'input[name=?][value=?]', 'rfid_code', '127,'
   end
 
+  test 'a paying member collected in cash at signup has the payment recorded' do
+    user = onboarding_member('onboard-cash')
+
+    assert_difference('CashPayment.count', 1) do
+      post onboard_save_payment_path(user), params: {
+        membership_type: 'paying', cash_plan: '1', plan_cost: '45', plan_billing_period_days: '30'
+      }
+    end
+
+    user.reload
+    assert_equal 'current_member', user.membership_state
+    assert_equal 'cash', user.payment_type
+    assert_equal 45, user.cash_payments.last.amount
+  end
+
+  test 'a paying member with no payment yet starts as a new member' do
+    user = onboarding_member('onboard-later')
+
+    assert_no_difference('CashPayment.count') do
+      post onboard_save_payment_path(user), params: { membership_type: 'paying' }
+    end
+
+    user.reload
+    assert_equal 'new_member', user.membership_state
+    assert_nil user.last_payment_date
+  end
+
   test 'create member requires an email address' do
     assert_no_difference 'User.count' do
       post onboard_create_path, params: {
@@ -60,6 +87,11 @@ class OnboardingControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def onboarding_member(username)
+    User.create!(authentik_id: username, full_name: username.titleize, username: username,
+                 email: "#{username}@example.com", membership_state: 'inactive_member')
+  end
 
   def sign_in_as_admin
     account = local_accounts(:active_admin)

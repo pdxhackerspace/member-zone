@@ -57,7 +57,6 @@ class ReportsController < AuthenticatedController
     when 'activate', 'deactivate' then toggle_active(user, action_type)
     when 'ban' then apply_transition(user, :ban!, 'banned')
     when 'deceased' then apply_transition(user, :mark_deceased!, 'deceased')
-    when 'paying' then apply_transition(user, :record_payment!, 'a current member')
     when 'sponsored', 'guest' then set_status_or_payment_type(user, action_type, key)
     when 'cash', 'paypal', 'recharge' then set_payment_type(user, action_type)
     when 'payment_guest' then set_payment_type(user, 'guest')

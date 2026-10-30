@@ -110,22 +110,21 @@ class MembershipCleanup
   end
 
   def record_latest_payment(user, latest, effective_plan, actions)
-    return if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
-
     attrs = {
       last_payment_date: latest[:time].to_date,
       dues_due_at: User.dues_due_at_from_payment_cycle(latest[:time].to_date, effective_plan)
     }
+    from_state = user.effective_membership_state
 
     if @dry_run
-      user.assign_attributes(attrs.merge(membership_state: 'current_member'))
-      return unless user.changed?
-
+      revives = user.payment_revives?(latest[:time])
+      user.assign_attributes(revives ? attrs.merge(membership_state: 'current_member') : attrs)
       target = user.effective_membership_state
     else
-      Membership::ActiveStatus.record_linked_payment!(user, **attrs)
+      user.record_payment!(paid_at: latest[:time], **attrs)
       target = user.membership_state
     end
+    return if target == from_state
 
     if target == 'current_member'
       actions << 'paying + current'

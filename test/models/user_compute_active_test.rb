@@ -122,7 +122,7 @@ class UserComputeActiveTest < ActiveSupport::TestCase
     user.save!
     assert_not user.active?
 
-    user.record_payment!(last_payment_date: Date.current)
+    user.record_payment!(paid_at: Time.current, last_payment_date: Date.current)
 
     assert user.active?
     assert_equal 'current_member', user.membership_state

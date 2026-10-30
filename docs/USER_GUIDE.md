@@ -312,6 +312,10 @@ A member's standing is a single state, shown on their profile and filterable on 
 
 Members move between states on their own as payments arrive, deadlines pass, and training is recorded. The nightly job at 4:00 AM applies anything that came due overnight.
 
+Only a payment makes someone Current. To mark a manually billed member as paid, use **Mark Dues Received** on the manual payments page or record a cash payment; both record a cash payment for them. A paying member you onboard without collecting cash starts as a New member until their first payment arrives.
+
+A member who cancels stays Cancelled until their paid-through date, then becomes Inactive. They come back only for a payment made after they cancelled. A card or PayPal charge has to come after the cancellation itself, so the renewal someone cancels straight after does not bring them back. A cash payment dated on the cancellation day or later does.
+
 People with an application in progress are not on this list at all — they have no member record until an Executive Director approves them, which creates the record as a New member. Pending applications live under Membership applications.
 
 ### Members we find rather than admit

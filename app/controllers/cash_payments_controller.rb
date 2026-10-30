@@ -50,8 +50,7 @@ class CashPaymentsController < AuthenticatedController
     @cash_payment.recorded_by = current_user
 
     if @cash_payment.save
-      sync_payment_event(@cash_payment)
-      update_user_dues_status(@cash_payment)
+      CashPayments::Recorder.new(@cash_payment, actor: current_user).call
       redirect_to cash_payment_path(@cash_payment),
                   notice: "Cash payment recorded for #{@cash_payment.user.display_name}."
     else
@@ -63,7 +62,7 @@ class CashPaymentsController < AuthenticatedController
     original_user = @cash_payment.user
 
     if @cash_payment.update(cash_payment_params)
-      sync_payment_event(@cash_payment)
+      CashPayments::Recorder.sync_payment_event!(@cash_payment)
       recalculate_user_cash_dues!(original_user) if original_user != @cash_payment.user
       recalculate_user_cash_dues!(@cash_payment.user)
       redirect_to cash_payment_path(@cash_payment), notice: 'Cash payment updated.'
@@ -105,48 +104,6 @@ class CashPaymentsController < AuthenticatedController
     params.expect(cash_payment: %i[user_id membership_plan_id amount paid_on notes])
   end
 
-  def update_user_dues_status(cash_payment)
-    user = cash_payment.user
-    old_dues_status = user.dues_status
-    current_dues_due_at = user.dues_due_at
-
-    updates = user.apply_payment_updates(
-      { time: cash_payment.paid_on.beginning_of_day, amount: cash_payment.amount },
-      { payment_type: 'cash', last_payment_date: cash_payment.paid_on },
-      billing_plan: cash_payment.membership_plan
-    )
-    keep_later_dues_due_at!(updates, current_dues_due_at)
-
-    user.update!(updates) if updates.present?
-
-    Journal.create!(
-      user: user,
-      actor_user: current_user,
-      action: 'membership_status_changed',
-      changed_at: Time.current,
-      changes_json: {
-        'dues_status' => { 'from' => old_dues_status, 'to' => 'current' },
-        'note' => "Cash payment of $#{format('%.2f', cash_payment.amount)} recorded"
-      }
-    )
-  end
-
-  def sync_payment_event(cash_payment)
-    event = cash_payment.payment_events.find_or_initialize_by(
-      source: 'cash',
-      external_id: cash_payment.identifier,
-      event_type: 'payment'
-    )
-    event.assign_attributes(
-      user: cash_payment.user,
-      amount: cash_payment.amount,
-      currency: 'USD',
-      occurred_at: cash_payment.paid_on&.beginning_of_day || Time.current,
-      details: "Cash payment - #{cash_payment.membership_plan&.name || 'Unknown plan'}"
-    )
-    event.save!
-  end
-
   def recalculate_user_cash_dues!(user)
     latest_payment = user.cash_payments.order(paid_on: :desc, created_at: :desc).first
     if latest_payment.blank?
@@ -154,13 +111,16 @@ class CashPaymentsController < AuthenticatedController
       return
     end
 
-    due_at = User.dues_due_at_from_payment_cycle(latest_payment.paid_on, latest_payment.membership_plan)
-    apply_cash_payment_membership_update!(user, paid_on: latest_payment.paid_on, due_at: due_at)
+    paid_on = latest_payment.paid_on
+    user.record_payment!(
+      paid_at: paid_on, payment_type: 'cash', last_payment_date: paid_on,
+      dues_due_at: User.dues_due_at_from_payment_cycle(paid_on, latest_payment.membership_plan)
+    )
   end
 
   def recalculate_user_without_cash_payments!(user)
     last_paid = latest_payment_date_from_sources(user)
-    immune = user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
+    immune = user.membership_state.in?(User::PAYMENT_LOCKED_STATES) || user.cancelled_member?
 
     if last_paid.blank?
       user.update!(last_payment_date: nil, dues_due_at: nil)
@@ -186,32 +146,5 @@ class CashPaymentsController < AuthenticatedController
       user.recharge_payments.maximum(:processed_at),
       user.cash_payments.maximum(:paid_on)
     ].compact.map(&:to_date).max
-  end
-
-  def apply_cash_payment_membership_update!(user, paid_on:, due_at:)
-    attrs = { payment_type: 'cash', last_payment_date: paid_on, dues_due_at: due_at }
-    return user.record_payment!(**attrs) if user.sponsored?
-
-    if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES) || !user.payment_revives?(paid_on)
-      user.update!(attrs)
-      return
-    end
-
-    user.record_payment!(**attrs, membership_ended_date: nil)
-  end
-
-  def keep_later_dues_due_at!(updates, current_dues_due_at)
-    return unless updates.key?(:dues_due_at)
-
-    new_dues_due_at = updates[:dues_due_at]
-    if new_dues_due_at.blank?
-      updates.delete(:dues_due_at)
-      return
-    end
-
-    return if current_dues_due_at.blank?
-    return if new_dues_due_at > current_dues_due_at
-
-    updates.delete(:dues_due_at)
   end
 end

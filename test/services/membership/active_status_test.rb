@@ -71,25 +71,6 @@ module Membership
       assert_equal 'unknown', user.reload.membership_state
     end
 
-    test 'record_linked_payment skips payment-immune states' do
-      user = build_user(membership_state: 'sponsored_member', is_sponsored: true, payment_type: 'sponsored')
-      user.save!
-
-      assert_not ActiveStatus.record_linked_payment!(user, last_payment_date: Date.current)
-
-      assert_equal 'sponsored_member', user.reload.membership_state
-    end
-
-    test 'record_linked_payment moves a lapsed member back when their payment still covers them' do
-      user = build_user(membership_state: 'inactive_member', last_payment_date: 1.year.ago.to_date)
-      user.save!
-
-      assert ActiveStatus.record_linked_payment!(user, last_payment_date: Date.current, payment_type: 'paypal')
-
-      assert_equal 'current_member', user.reload.membership_state
-      assert user.active?
-    end
-
     test 'service account active flag is not recomputed' do
       user = User.create!(
         authentik_id: 'service-active-status',

@@ -88,7 +88,8 @@ class KofiPaymentsController < AuthenticatedController
     if most_recent_payment&.timestamp
       updates = user.apply_payment_updates(
         { time: most_recent_payment.timestamp, amount: most_recent_payment.amount },
-        updates
+        updates,
+        first_seen: most_recent_payment == @payment
       )
     end
 

@@ -107,23 +107,32 @@ class MembershipPlansController < AuthenticatedController
     end
   end
 
+  # Dues received by hand are a cash payment for the plan's price, recorded the same way the
+  # cash payments page records one.
   def mark_dues_received
     user = User.find(params[:user_id])
-    old_dues_status = user.dues_status
-    dues_at = User.dues_due_at_from_payment_cycle(Date.current, user.membership_plan)
-    user.record_payment!(last_payment_date: Date.current, dues_due_at: dues_at)
-    Journal.create!(
-      user: user,
-      actor_user: current_user,
-      action: 'membership_status_changed',
-      changed_at: Time.current,
-      changes_json: { 'dues_status' => { 'from' => old_dues_status, 'to' => 'current' },
-                      'note' => 'Manual dues received' }
-    )
-    redirect_to manual_payments_membership_plans_path, notice: "Marked dues received for #{user.display_name}."
+    payment = CashPayment.new(user: user, membership_plan: manual_plan_for(user), paid_on: Date.current,
+                              recorded_by: current_user, notes: 'Marked dues received')
+    payment.amount = payment.membership_plan&.cost
+
+    unless payment.save
+      redirect_to manual_payments_membership_plans_path,
+                  alert: "Could not record dues for #{user.display_name}: #{payment.errors.full_messages.to_sentence}."
+      return
+    end
+
+    CashPayments::Recorder.new(payment, actor: current_user).call
+    redirect_to manual_payments_membership_plans_path,
+                notice: "Recorded a $#{format('%.2f', payment.amount)} cash payment for #{user.display_name}."
   end
 
   private
+
+  def manual_plan_for(user)
+    return MembershipPlan.manual.find_by(id: params[:plan_id]) if params[:plan_id].present?
+
+    user.membership_plan if user.membership_plan&.manual?
+  end
 
   def set_membership_plan
     @membership_plan = MembershipPlan.find(params[:id])

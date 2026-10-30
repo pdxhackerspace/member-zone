@@ -6,7 +6,7 @@ class CashPayment < ApplicationRecord
 
   validates :amount, presence: true, numericality: { greater_than: 0 }
   validates :paid_on, presence: true
-  validate :membership_plan_must_be_personal
+  validate :membership_plan_must_be_manual
 
   scope :ordered, -> { order(paid_on: :desc, created_at: :desc) }
   scope :for_user, ->(user) { where(user_id: user.id) }
@@ -44,9 +44,11 @@ class CashPayment < ApplicationRecord
 
   private
 
-  def membership_plan_must_be_personal
+  # Cash is paid against a plan nobody bills automatically: a member's personal plan, or a
+  # shared plan an admin collects by hand.
+  def membership_plan_must_be_manual
     return if membership_plan.blank?
 
-    errors.add(:membership_plan, 'must be a personal plan') unless membership_plan.personal?
+    errors.add(:membership_plan, 'must be a personal or manual plan') unless membership_plan.manual?
   end
 end

@@ -133,19 +133,33 @@ module Membership
       assert_predicate reminder.reload, :pending?
     end
 
-    # A date-only payment column against a timestamped notice cannot say which came first.
-    test 'a payment on the cancellation date is left for an admin rather than guessed at' do
-      cancelled_at = 3.months.ago
+    # The renewal they cancelled straight after is in the ledger with its time.
+    test 'a charge earlier on the cancellation day does not undo the cancellation' do
+      cancelled_at = 3.months.ago.change(hour: 15)
       user = member(dues_due_at: 2.months.from_now)
       file_cancellation(user, at: cancelled_at)
       user.update_columns(last_payment_date: cancelled_at.to_date)
+      user.payment_events.create!(event_type: 'payment', source: 'recharge', amount: 40, currency: 'USD',
+                                  occurred_at: cancelled_at - 2.hours, external_id: 'same-day-renewal')
+
+      result = reconcile_for(user.reload)
+
+      assert_predicate result, :applied?
+      assert_predicate user.reload, :cancellation_recorded?
+    end
+
+    test 'a cash payment on the cancellation day counts as coming back' do
+      cancelled_at = 3.months.ago.change(hour: 15)
+      user = member(dues_due_at: 2.months.from_now)
+      file_cancellation(user, at: cancelled_at)
+      user.update_columns(last_payment_date: cancelled_at.to_date)
+      user.payment_events.create!(event_type: 'payment', source: 'cash', amount: 40, currency: 'USD',
+                                  occurred_at: cancelled_at.beginning_of_day, external_id: 'CASH-same-day')
 
       result = reconcile_for(user.reload)
 
       assert_predicate result, :skipped?
-      assert_match(/check by hand/, result.reason)
       assert_equal 'current_member', user.reload.membership_state
-      assert_not_predicate user, :cancellation_recorded?
     end
 
     # Skipping them must not leave them exposed: the mail guards read the ledger directly.

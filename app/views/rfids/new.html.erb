@@ -64,7 +64,7 @@
             <strong>This key fob is currently assigned to
               <%= link_to @existing_owner.display_name, user_path(@existing_owner), class: "alert-link" %></strong>
             <div class="small mt-1">
-              Membership: <strong><%= membership_status_label(@existing_owner.membership_status) %></strong>
+              Membership: <strong><%= membership_state_label(@existing_owner.membership_state) %></strong>
               &middot; Dues: <strong><%= @existing_owner.dues_status.humanize %></strong>
               <% if @existing_owner.legacy? %>
                 &middot; <span class="badge text-bg-secondary">Legacy</span>

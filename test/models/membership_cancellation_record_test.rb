@@ -79,14 +79,14 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
     user = member(state: 'cancelled_member', email: 'came-back@example.com')
     user.update!(membership_cancelled_at: 1.month.ago)
 
-    assert user.record_payment!
+    assert user.record_payment!(paid_at: Time.current)
     assert_not_predicate user.reload, :cancellation_on_file?
   end
 
   test 'a member who came back and later lapses hears about that lapse' do
     user = member(state: 'cancelled_member', email: 'back-then-lapsed@example.com')
     user.update!(membership_cancelled_at: 1.month.ago)
-    user.record_payment!
+    user.record_payment!(paid_at: Time.current)
 
     assert_difference -> { lapsed_mail_count(user) }, 1 do
       user.reload.transition_to!('inactive_member')
@@ -100,7 +100,7 @@ class MembershipCancellationRecordTest < ActiveSupport::TestCase
     user.update!(membership_cancelled_at: 1.month.ago)
 
     Current.skip_membership_state_email = true
-    user.record_payment!
+    user.record_payment!(paid_at: Time.current)
     Current.skip_membership_state_email = nil
 
     assert_not_predicate user.reload, :cancellation_on_file?
