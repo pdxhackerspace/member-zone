@@ -36,13 +36,13 @@ module Recharge
       return user_not_found('subscription/created') unless user
 
       old_state = user.membership_state
-      user.record_payment! if user.cancelled?
+      create_payment_event(user, 'subscription_started')
+      user.record_subscription_return!(Time.current)
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
       details = { 'previous_membership_state' => old_state,
                   'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_created', details: details)
-      create_payment_event(user, 'subscription_started')
       log_and_respond('subscription/created', user, old_state, user.membership_state)
     end
 
@@ -63,13 +63,13 @@ module Recharge
       return user_not_found('subscription/activated') unless user
 
       old_state = user.membership_state
-      user.record_payment! if user.cancelled?
+      create_payment_event(user, 'subscription_resumed')
+      user.record_subscription_return!(Time.current)
       user.update!(recharge_customer_id: customer_id) if link_customer_id?(user)
 
       details = { 'previous_membership_state' => old_state,
                   'new_membership_state' => user.reload.membership_state }
       create_journal_entry(user: user, action: 'subscription_resumed', details: details)
-      create_payment_event(user, 'subscription_resumed')
       log_and_respond('subscription/activated', user, old_state, user.membership_state)
     end
 

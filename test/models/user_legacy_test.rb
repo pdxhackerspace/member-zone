@@ -73,7 +73,7 @@ class UserLegacyTest < ActiveSupport::TestCase
   test 'a payment clears the legacy flag' do
     user = create_user(legacy: true)
 
-    user.record_payment!(last_payment_date: Date.current)
+    user.record_payment!(paid_at: Time.current, last_payment_date: Date.current)
 
     assert_not user.legacy?, 'Legacy should be cleared when a payment lands'
   end

@@ -15,11 +15,26 @@ class MembershipPlansControllerTest < ActionDispatch::IntegrationTest
   test 'mark_dues_received sets dues_due_at from plan billing cycle' do
     @user.update_columns(dues_due_at: nil, membership_state: 'overdue_member', dues_status: 'lapsed',
                          last_payment_date: 2.months.ago.to_date)
-    post mark_dues_received_membership_plans_path, params: { user_id: @user.id }
+    assert_difference('CashPayment.count', 1) do
+      post mark_dues_received_membership_plans_path, params: { user_id: @user.id }
+    end
     assert_redirected_to manual_payments_membership_plans_path
     @user.reload
     assert_equal 'current', @user.dues_status
     assert_equal Date.current + @user.membership_plan.billing_period_days.days, @user.dues_due_at.to_date
+    payment = @user.cash_payments.order(:created_at).last
+    assert_equal @user.membership_plan.cost, payment.amount
+    assert payment.payment_events.exists?(event_type: 'payment')
+  end
+
+  # Marking dues received is a payment like any other, so it follows the same rule.
+  test 'mark_dues_received cannot undo a cancellation dated after the payment' do
+    @user.update_columns(membership_state: 'cancelled_member', membership_cancelled_at: 1.day.from_now,
+                         membership_state_entered_at: Time.current, dues_due_at: 20.days.from_now)
+
+    post mark_dues_received_membership_plans_path, params: { user_id: @user.id }
+
+    assert_equal 'cancelled_member', @user.reload.membership_state
   end
 
   test 'personal plan edit form uses billing period days field' do

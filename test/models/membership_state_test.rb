@@ -61,7 +61,8 @@ class MembershipStateTest < ActiveSupport::TestCase
        inactive_member guest_member].each do |state|
       user = create_member(state: state)
 
-      assert user.record_payment!(last_payment_date: Date.current), "#{state} should accept a payment"
+      assert user.record_payment!(paid_at: Time.current, last_payment_date: Date.current),
+             "#{state} should accept a payment"
       assert_equal 'current_member', user.membership_state
     end
   end
@@ -70,7 +71,7 @@ class MembershipStateTest < ActiveSupport::TestCase
     user = create_member(state: 'sponsored_member')
     paid = Date.new(2026, 10, 28)
 
-    assert user.record_payment!(last_payment_date: paid, dues_due_at: 1.month.from_now)
+    assert_not user.record_payment!(paid_at: paid, last_payment_date: paid, dues_due_at: 1.month.from_now)
 
     user.reload
     assert_equal 'sponsored_member', user.membership_state
@@ -83,7 +84,7 @@ class MembershipStateTest < ActiveSupport::TestCase
     %w[banned_member deceased_member].each do |state|
       user = create_member(state: state)
 
-      assert_not user.record_payment!(last_payment_date: Date.current)
+      assert_not user.record_payment!(paid_at: Time.current, last_payment_date: Date.current)
       assert_equal state, user.reload.membership_state
     end
   end
@@ -404,7 +405,7 @@ class MembershipStateTest < ActiveSupport::TestCase
 
     travel 1.minute do
       stamped_at = Time.current
-      user.record_payment!(last_payment_date: Date.current, dues_due_at: 1.month.from_now)
+      user.record_payment!(paid_at: Time.current, last_payment_date: Date.current, dues_due_at: 1.month.from_now)
 
       assert user.current_member?
       assert_operator user.membership_state_entered_at, :>=, stamped_at
@@ -417,7 +418,7 @@ class MembershipStateTest < ActiveSupport::TestCase
     original = user.membership_state_entered_at
 
     travel 1.day do
-      user.record_payment!(last_payment_date: Date.current)
+      user.record_payment!(paid_at: Time.current, last_payment_date: Date.current)
     end
 
     assert_operator user.membership_state_entered_at, :>, original
@@ -431,13 +432,17 @@ class MembershipStateTest < ActiveSupport::TestCase
   # Recharge cancellation for someone we buried. Every transition method has to answer
   # that the same way record_payment! does.
   test 'transitions out of deceased return false instead of raising' do
-    %i[ban! mark_sponsored! record_cancellation! record_payment! approve_application!
+    %i[ban! mark_sponsored! record_cancellation! approve_application!
        grant_building_access! unmark_sponsored!].each do |transition|
       user = create_member(state: 'deceased_member')
 
       assert_not user.public_send(transition), "#{transition} should decline a deceased member"
       assert_equal 'deceased_member', user.reload.membership_state
     end
+
+    user = create_member(state: 'deceased_member')
+    assert_not user.record_payment!(paid_at: Time.current)
+    assert_equal 'deceased_member', user.reload.membership_state
   end
 
   test 'marking a deceased member as a guest returns false instead of raising' do

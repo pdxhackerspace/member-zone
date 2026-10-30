@@ -67,13 +67,14 @@ module Recharge
         return created ? :created : :skipped
       end
 
-      return :skipped unless user.cancelled?
+      return :skipped if user.latest_cancellation_at.blank?
 
       old_state = user.membership_state
-      user.record_payment!
+      create_payment_event(user, sub, 'subscription_started')
+      return :skipped unless user.record_subscription_return!(sub[:created_at] || sub[:updated_at])
+
       link_customer_id(user, sub)
       create_journal_entry(user, 'subscription_created', sub, old_state, user.membership_state)
-      create_payment_event(user, sub, 'subscription_started')
 
       @logger.info("[Recharge::SubscriptionSynchronizer] Re-activated #{user.display_name} " \
                    "(#{old_state} -> #{user.membership_state})")

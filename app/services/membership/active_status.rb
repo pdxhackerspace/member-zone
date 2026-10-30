@@ -32,14 +32,6 @@ module Membership
       true
     end
 
-    # Record a linked payment and let User decide whether it still covers the member.
-    # Skips payment-immune states (cancelled, banned, deceased, sponsored).
-    def self.record_linked_payment!(user, **attrs)
-      return false if user.membership_state.in?(User::PAYMENT_IMMUNE_STATES)
-
-      user.record_payment!(**attrs)
-    end
-
     # Bulk tools and backfills. Non-state attributes save normally; a membership_state
     # assignment lifts the transition guard first so destructive rake tasks can reset rows.
     def self.assign_and_save!(user, attrs)

@@ -28,7 +28,6 @@
   <% end %>
 
   <% if %w[membership-status-unknown dues-status-unknown dues-status-lapsed].include?(anchor) %>
-    <%= action_button.call('paying', 'Paying', 'btn-outline-secondary') %>
     <%= action_button.call('sponsored', 'Sponsored', 'btn-outline-secondary') %>
     <%= action_button.call('guest', 'Guest', 'btn-outline-secondary') %>
   <% end %>

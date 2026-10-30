@@ -236,7 +236,8 @@ namespace :payments do
       payment_attrs[:last_payment_date] = most_recent.to_date if most_recent.present?
 
       if payment_attrs[:last_payment_date].present?
-        if Membership::ActiveStatus.record_linked_payment!(user, **payment_attrs)
+        user.record_payment!(paid_at: most_recent, **payment_attrs)
+        if user.saved_changes?
           users_updated += 1
           puts "  #{user.display_name}: #{payment_attrs.map { |k, v| "#{k}=#{v}" }.join(', ')}"
         end

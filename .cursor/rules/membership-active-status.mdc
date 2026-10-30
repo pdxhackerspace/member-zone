@@ -19,8 +19,13 @@ and decides nothing; do not add logic to it.
 ## Do
 
 - Move a member by calling the transition that names the event: `approve_application!`,
-  `grant_building_access!`, `record_payment!`, `record_cancellation!`, `ban!`, `unban!`,
-  `mark_deceased!`, `mark_sponsored!`, `unmark_sponsored!`, `mark_guest!`.
+  `grant_building_access!`, `record_payment!(paid_at:)`, `settle_cancellation!`,
+  `record_subscription_return!`, `ban!`, `unban!`, `mark_deceased!`, `mark_sponsored!`,
+  `unmark_sponsored!`, `mark_guest!`.
+- Ask `MembershipPayments` (`payment_revives?`, `returned_after?`, `cancellation_on_file?`)
+  anything about payments and cancellations. Do not add a state check beside a payment call.
+- Make someone current only with a real payment. To mark a member paid, record a
+  `CashPayment` through `CashPayments::Recorder`.
 - Read `membership_state`, or `effective_membership_state` when elapsed deadlines matter.
 - Query with the scopes: `User.access_granting`, `User.dues_lapsed`, `User.dues_current`,
   `User.membership_undetermined`, `User.in_membership_states(...)`.
@@ -45,7 +50,8 @@ and decides nothing; do not add logic to it.
 user.update!(membership_status: 'paying', dues_status: 'current')
 
 # ✅
-user.record_payment!(last_payment_date: Date.current, payment_type: 'paypal')
+user.record_payment!(paid_at: charge.transaction_time, last_payment_date: charge.transaction_time.to_date,
+                     payment_type: 'paypal')
 
 # ❌ silently reverted on the next save
 user.update!(active: false)

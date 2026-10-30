@@ -5,11 +5,6 @@
 module MembershipTransitions
   extend ActiveSupport::Concern
 
-  # Payment events that say a member came back. Recharge opens a fresh subscription rather
-  # than reviving the cancelled one, so a later start is a return rather than a duplicate of
-  # the notice.
-  RETURN_EVENT_TYPES = %w[payment subscription_started subscription_resumed].freeze
-
   # An approved application makes someone a member immediately, before any payment:
   # they are active while they arrange building access training. Approval is also where
   # the User record is first created, hence 'unknown'. Approving an application for
@@ -25,88 +20,6 @@ module MembershipTransitions
     return false unless new_member?
 
     transition_to!('provisional_member')
-  end
-
-  # A linked payment is the only thing that makes someone a current member.
-  # A sponsored member is the exception: the payment is recorded and their standing
-  # stays put. sponsored_member → current_member stays in TRANSITIONS for
-  # unmark_sponsored! and the admin form; a payment does not take that edge.
-  def record_payment!(**attrs)
-    return false if terminal_membership_state?
-    return record_sponsored_payment!(**attrs) if sponsored?
-
-    transition_to!('current_member', **attrs)
-  end
-
-  # A cancellation notice. The member keeps access until their paid-through date;
-  # Membership::TickJob moves them to inactive when it passes.
-  #
-  # The date is kept on its own column as well as in the state, because the fact outlives
-  # cancelled_member: once they expire into inactive_member they look exactly like someone
-  # who quietly stopped paying, and we would mail them a lapse notice for a decision they
-  # made deliberately and already told us about.
-  def record_cancellation!(cancelled_at: Time.current)
-    return false if terminal_membership_state? || cancelled_member?
-
-    transition_to!('cancelled_member', membership_cancelled_at: cancelled_at)
-  end
-
-  # The same fact for a member whose standing has nowhere to go — they lapsed months before
-  # anyone processed the notice, or a ban outranks it. Nothing moves; we just stop treating
-  # them as someone who forgot to pay.
-  def note_cancellation!(cancelled_at: Time.current)
-    return false if cancellation_recorded?
-
-    update!(membership_cancelled_at: cancelled_at)
-  end
-
-  # Have we processed a cancellation for this member? The stamp is what
-  # Membership::CancellationReconciler writes and what a payment clears, so this is the
-  # question to ask when deciding whether there is bookkeeping left to do.
-  def cancellation_recorded?
-    membership_cancelled_at.present?
-  end
-
-  # Did this member tell us they were leaving, and stay gone? The broader question, and the
-  # one anything about to mail them should ask. The stamp covers cancellations we have
-  # processed; the payment event ledger covers a notice nobody has reached yet, or a webhook
-  # that went missing after the subscription sync's lookback window closed. True through
-  # cancelled_member and onwards into the inactive state it expires to, and false again once
-  # anything says they came back.
-  def cancellation_on_file?
-    notice_at = latest_cancellation_at
-    return false if notice_at.blank?
-
-    !returned_after?(notice_at)
-  end
-
-  # The most recent word that this member cancelled, from either source.
-  def latest_cancellation_at
-    [membership_cancelled_at, filed_cancellation_at].compact.max
-  end
-
-  # The most recent cancellation notice in the payment event ledger, processed or not.
-  def filed_cancellation_at
-    payment_events.by_type('subscription_cancelled').maximum(:occurred_at)
-  end
-
-  # Evidence the member came back after a given moment. A payment recorded on the row is the
-  # obvious one, but the ledger carries returns the columns never hear about: a subscription
-  # started or resumed against a member whose last_payment_date nobody updated.
-  #
-  # Membership::CancellationReconciler asks the same question before deciding to leave a
-  # member's standing alone, and the two answers have to match. A return the reconciler
-  # honours but the mail guards ignore is a member in a deadlock: the reconciler will not
-  # touch their standing because they came back, and the reminders stay switched off because
-  # the notice still looks live.
-  def returned_after?(moment)
-    return false if moment.blank?
-
-    last_paid = last_payment_on
-    return true if last_paid.present? && last_paid > moment.to_date
-
-    payment_events.where(event_type: RETURN_EVENT_TYPES)
-                  .exists?(['payment_events.occurred_at > ?', moment])
   end
 
   def ban!
@@ -184,12 +97,6 @@ module MembershipTransitions
   end
 
   private
-
-  def record_sponsored_payment!(**attrs)
-    assign_attributes(attrs)
-    save!
-    true
-  end
 
   # Where a member belongs when a ban or sponsorship is lifted and only their payment
   # history is left to go on. Never 'unknown': we know perfectly well what happened to

@@ -7,8 +7,9 @@ module MembershipStateProjection
   extend ActiveSupport::Concern
 
   # Legacy `membership_status` values, kept as a projection so existing reports and views
-  # keep reading what they always read. Members behind on dues stay 'paying' and are
-  # distinguished by dues_status, matching the pre-state-machine behaviour.
+  # keep reading what they always read. Members behind on dues but still on the rolls stay
+  # 'paying' and are distinguished by dues_status. Once they expire to inactive_member they
+  # are not paying, whether they cancelled or stopped.
   MEMBERSHIP_STATUS_PROJECTION = {
     'unknown' => 'unknown',
     'new_member' => 'paying',
@@ -16,7 +17,7 @@ module MembershipStateProjection
     'current_member' => 'paying',
     'overdue_member' => 'paying',
     'cancelled_member' => 'cancelled',
-    'inactive_member' => 'paying',
+    'inactive_member' => 'inactive',
     'guest_member' => 'guest',
     'sponsored_member' => 'sponsored',
     'banned_member' => 'banned',
