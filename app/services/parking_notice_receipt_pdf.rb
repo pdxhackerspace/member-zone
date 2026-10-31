@@ -41,7 +41,7 @@ class ParkingNoticeReceiptPdf
 
     @document = Prawn::Document.new(document_options)
     generate
-    trim_thermal_page if thermal?
+    redraw_on_measured_thermal_page if thermal?
   end
 
   attr_reader :document
@@ -61,7 +61,7 @@ class ParkingNoticeReceiptPdf
   def document_options
     if thermal?
       {
-        page_size: [@thermal_width_pt, THERMAL_INITIAL_HEIGHT],
+        page_size: [@thermal_width_pt, thermal_page_height_pt],
         margin: [THERMAL_MARGIN_TOP, THERMAL_MARGIN, THERMAL_MARGIN, THERMAL_MARGIN]
       }
     else
@@ -186,7 +186,7 @@ class ParkingNoticeReceiptPdf
   end
 
   def embed_photo(photo)
-    photo_data = photo.download
+    photo_data = photo_bytes(photo)
     tmpfile = Tempfile.new(['receipt_photo', File.extname(photo.filename.to_s)])
     tmpfile.binmode
     tmpfile.write(photo_data)
@@ -202,6 +202,12 @@ class ParkingNoticeReceiptPdf
     document.font_size(theme[:section]) do
       document.text "(Photo: #{photo.filename})", color: '888888', align: :center
     end
+  end
+
+  # Held onto because the thermal layout draws the notice twice.
+  def photo_bytes(photo)
+    @photo_bytes ||= {}
+    @photo_bytes[photo.id] ||= photo.download
   end
 
   def qr_block
@@ -258,10 +264,17 @@ class ParkingNoticeReceiptPdf
     Rails.logger.error("ParkingNoticeReceiptPdf: QR code failed for #{url}: #{e.message}")
   end
 
-  def trim_thermal_page
-    used_height = THERMAL_INITIAL_HEIGHT - document.cursor + THERMAL_MARGIN
-    w = @thermal_width_pt
-    document.page.dictionary.data[:MediaBox] = [0, 0, w, used_height]
-    document.page.dictionary.data[:CropBox]  = [0, 0, w, used_height]
+  def thermal_page_height_pt
+    @thermal_height_pt || THERMAL_INITIAL_HEIGHT
+  end
+
+  # A roll has no page length, so the thermal layout is drawn twice: once on a deliberately over-tall
+  # page to find out how tall the notice is, then again on a page cut to that height. Shrinking the
+  # first page's MediaBox instead leaves the content outside it — PDF measures from the bottom left
+  # corner while Prawn draws downwards from the top — and the printer feeds a blank slip.
+  def redraw_on_measured_thermal_page
+    @thermal_height_pt = THERMAL_INITIAL_HEIGHT - document.cursor + THERMAL_MARGIN
+    @document = Prawn::Document.new(document_options)
+    generate
   end
 end
