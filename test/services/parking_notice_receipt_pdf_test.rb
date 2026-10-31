@@ -24,6 +24,20 @@ class ParkingNoticeReceiptPdfTest < ActiveSupport::TestCase
     assert pdf.render.bytesize.positive?
   end
 
+  test 'thermal layout fits the notice inside the page it declares' do
+    pdf = ParkingNoticeReceiptPdf.new(@notice, layout: :thermal, thermal_width_mm: 88)
+    media_box = pdf.document.page.dictionary.data[:MediaBox]
+
+    assert_equal 1, pdf.document.page_count
+    assert_in_delta ParkingNoticeReceiptPdf.mm_to_pt(88), media_box[2], 0.05
+    # Prawn draws downwards from the top of the page, so a page that stops short of where the
+    # content starts prints a blank slip of the right length.
+    assert_operator media_box[3], :>=, pdf.document.y
+    assert_operator pdf.document.y, :>=, media_box[1]
+    # And the page is cut to the notice rather than left at the height used to measure it.
+    assert_operator media_box[3], :<, ParkingNoticeReceiptPdf::THERMAL_INITIAL_HEIGHT
+  end
+
   test 'thermal layout requires width' do
     assert_raises(ArgumentError) { ParkingNoticeReceiptPdf.new(@notice, layout: :thermal) }
   end
