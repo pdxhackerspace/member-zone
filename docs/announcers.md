@@ -93,9 +93,10 @@ curl -sf -X POST https://slack.com/api/chat.postMessage \
 
 ## Entry signs
 
-The entry sign greeting is meant to become an announcer too: a program in `announcers/` that sends
-`member.name` to the sign. Until that program exists, signs keep getting `greeting_name` through
-the access controller sync as before.
+The entry sign greeting is an announcer like any other: a program in `announcers/` that publishes
+`member.name` to the signs (over MQTT, for example). Members opt in to it the same way as Slack.
+The access controller sync no longer sends `greeting_name`, so signs that read it from there stop
+greeting anyone until the sign announcer is set up.
 
 ## Member-facing text
 
