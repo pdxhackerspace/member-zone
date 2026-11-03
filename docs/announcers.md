@@ -31,7 +31,8 @@ apart can't both get through. Access logs imported by the rake task never announ
 
 Programs live in the `announcers/` subdirectory of `scripts/` in the app or of `ACCESS_SCRIPTS_DIR`
 (so `/opt/access/announcers/` when `ACCESS_SCRIPTS_DIR=/opt/access`). They need the executable bit
-and a shebang line; shell, Python and Ruby all work.
+and a shebang line; shell, Python and Ruby all work. The production image also ships `curl`, `jq`,
+and the Mosquitto clients (`mosquitto_pub`, `mosquitto_sub`) for posting to webhooks and MQTT brokers.
 
 The program is run as:
 
