@@ -1,0 +1,83 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0"><%= @announcer.name %></h1>
+    <div class="text-13 text-secondary mt-1">
+      <span class="text-body"><%= @subscriber_count %></span> <%= 'member'.pluralize(@subscriber_count) %> opted in ·
+      <%= @announcer.repeat_after_minutes.zero? ? 'announces every scan' : "at most once every #{@announcer.repeat_after_minutes} minutes" %>
+      <% unless @announcer.enabled? %>· Disabled<% end %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= button_to "Send test announcement", test_announcer_path(@announcer), method: :post,
+                  class: "btn btn-primary btn-sm" %>
+    <%= link_to "Edit", edit_announcer_path(@announcer), class: "btn btn-outline-secondary btn-sm" %>
+    <%= link_to "All announcers", announcers_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="h-section-label mb-2">Recent runs</div>
+    <div class="card shadow-sm border-0">
+      <% if @runs.any? %>
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead><tr><th>When</th><th>Member</th><th>Door</th><th>Status</th><th>Output</th></tr></thead>
+            <tbody>
+              <% @runs.each do |run| %>
+                <tr>
+                  <td class="text-nowrap"><%= l(run.created_at, format: :short) %></td>
+                  <td>
+                    <%= link_to run.user.display_name, user_path(run.user), class: "text-decoration-none" %>
+                    <% if run.test_run? %><span class="badge text-bg-secondary-subtle ms-1">Test</span><% end %>
+                  </td>
+                  <td class="text-secondary"><%= run.access_log&.location %></td>
+                  <td class="text-nowrap">
+                    <span class="status-dot status-<%= { 'success' => 'success', 'failed' => 'danger',
+                                                         'running' => 'warning' }.fetch(run.status, 'muted') %>"></span>
+                    <%= run.status.humanize %><% if run.exit_code && run.exit_code != 0 %> (exit <%= run.exit_code %>)<% end %>
+                  </td>
+                  <td class="text-secondary font-monospace text-12 cell-truncate" title="<%= run.output %>"><%= run.output.to_s.truncate(200) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="card-body text-secondary text-13">
+          This announcer has not run yet. Send a test announcement to try it with your own profile.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Configuration</div>
+        <dl class="mb-0 text-13">
+          <dt class="text-secondary fw-normal">Program</dt>
+          <dd><code class="text-break"><%= @announcer.command_arguments.join(' ') %></code></dd>
+          <dt class="text-secondary fw-normal">Environment variables</dt>
+          <dd><%= @announcer.parsed_environment_variables.keys.presence&.join(', ') || 'None' %></dd>
+          <% if @announcer.description.present? %>
+            <dt class="text-secondary fw-normal">Description for members</dt>
+            <dd><%= @announcer.description %></dd>
+          <% end %>
+        </dl>
+      </div>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Manage</div>
+        <div class="d-flex gap-2">
+          <%= button_to @announcer.enabled? ? "Disable" : "Enable", toggle_announcer_path(@announcer),
+                        method: :post, class: "btn btn-outline-secondary btn-sm" %>
+          <%= button_to "Delete", announcer_path(@announcer), method: :delete,
+                        class: "btn btn-outline-danger btn-sm",
+                        data: { turbo_confirm: "Delete '#{@announcer.name}'? Members' choices of it are forgotten." } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

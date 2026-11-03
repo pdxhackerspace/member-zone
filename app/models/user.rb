@@ -21,6 +21,9 @@ class User < ApplicationRecord
   has_many :payment_events, dependent: :destroy
   has_many :journals, dependent: :destroy
   has_many :access_logs, dependent: :nullify
+  has_many :announcer_subscriptions, dependent: :destroy
+  has_many :announcers, through: :announcer_subscriptions
+  has_many :announcer_runs, dependent: :delete_all
   has_many :rfids, dependent: :destroy
   has_many :trainer_capabilities, dependent: :destroy
   has_many :training_topics, through: :trainer_capabilities

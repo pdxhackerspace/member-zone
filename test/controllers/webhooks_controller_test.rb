@@ -199,6 +199,25 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
   end
 
+  test 'an arrival at an outside door by a member who opted in queues their announcements' do
+    DefaultSetting.instance.update!(arrival_locations: ['unit2 front door'])
+    users(:one).update!(announce_arrivals: true)
+
+    with_env('ACCESS_WEBHOOK_KEY' => 'access-key') do
+      assert_enqueued_with(job: Announcers::ArrivalJob) { post_access(key: 'access-key') }
+    end
+
+    assert_response :created
+  end
+
+  test 'an arrival by a member who has not opted in queues nothing' do
+    DefaultSetting.instance.update!(arrival_locations: ['unit2 front door'])
+
+    with_env('ACCESS_WEBHOOK_KEY' => 'access-key') do
+      assert_no_enqueued_jobs(only: Announcers::ArrivalJob) { post_access(key: 'access-key') }
+    end
+  end
+
   test 'an access log line with the wrong key is refused' do
     with_env('ACCESS_WEBHOOK_KEY' => 'access-key') do
       assert_no_difference -> { AccessLog.count } do

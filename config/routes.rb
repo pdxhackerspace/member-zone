@@ -478,6 +478,16 @@ Rails.application.routes.draw do
   end
 
 
+  resources :announcers, path: 'settings/announcers' do
+    member do
+      post :toggle
+      post :test
+    end
+    collection do
+      patch :update_arrival_locations
+    end
+  end
+
   resources :access_controller_types, only: [:index, :new, :create, :edit, :update, :destroy] do
     member do
       post :toggle
