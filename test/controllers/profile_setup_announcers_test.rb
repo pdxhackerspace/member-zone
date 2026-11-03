@@ -5,6 +5,7 @@ class ProfileSetupAnnouncersTest < ActionDispatch::IntegrationTest
     @original_local_auth_enabled = Rails.application.config.x.local_auth.enabled
     Rails.application.config.x.local_auth.enabled = true
     @member = sign_in_as_plain_member
+    @member.update!(profile_setup_completed_at: 1.day.ago)
     @slack = create_announcer(name: 'Post in Slack', description: 'Says hi in #space')
     @sign = create_announcer(name: 'Entry sign')
     @hidden = create_announcer(name: 'Retired', enabled: false)

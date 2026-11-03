@@ -1,0 +1,33 @@
+<%# Step indicator. Plain text on a first pass through the wizard; when the member is back to edit
+    their profile, every step is done and each one other than the current links to its page. %>
+<% steps = ProfileSetupController::STEPS.to_a %>
+<% current_index = steps.index { |action, _| action == current } %>
+<nav class="d-flex justify-content-center mb-4" aria-label="Profile setup steps">
+  <div class="d-flex align-items-center gap-2 flex-wrap justify-content-center">
+    <% steps.each_with_index do |(action, title), index| %>
+      <% if index.positive? %>
+        <i class="bi bi-chevron-right text-muted mx-1"></i>
+      <% end %>
+      <% if index == current_index %>
+        <span class="d-inline-flex align-items-center gap-2" aria-current="step">
+          <span class="badge rounded-pill text-bg-primary"><%= index + 1 %></span>
+          <span class="fw-semibold small"><%= title %></span>
+        </span>
+      <% elsif editing_profile? %>
+        <%= link_to url_for(action: action), class: "d-inline-flex align-items-center gap-2 text-decoration-none" do %>
+          <span class="badge rounded-pill text-bg-success"><i class="bi bi-check"></i></span>
+          <span class="small"><%= title %></span>
+        <% end %>
+      <% else %>
+        <span class="d-inline-flex align-items-center gap-2">
+          <% if index < current_index %>
+            <span class="badge rounded-pill text-bg-success"><i class="bi bi-check"></i></span>
+          <% else %>
+            <span class="badge rounded-pill text-bg-secondary"><%= index + 1 %></span>
+          <% end %>
+          <span class="text-muted small"><%= title %></span>
+        </span>
+      <% end %>
+    <% end %>
+  </div>
+</nav>

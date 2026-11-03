@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_02_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_03_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1449,6 +1449,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_120100) do
     t.string "payment_type", default: "unknown"
     t.string "paypal_account_id"
     t.string "phone_number"
+    t.datetime "profile_setup_completed_at"
     t.string "profile_visibility", default: "members", null: false
     t.string "pronouns"
     t.string "recharge_customer_id"
