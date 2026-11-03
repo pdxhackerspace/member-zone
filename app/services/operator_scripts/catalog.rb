@@ -1,7 +1,7 @@
 module OperatorScripts
-  # Executable programs mounted for access controllers, audit log sources and credential
-  # providers share one layout: each root directory contains subdirectories named +access+,
-  # +audit+ and +credential+.
+  # Executable programs mounted for access controllers, arrival announcers, audit log sources and
+  # credential providers share one layout: each root directory contains subdirectories named
+  # +access+, +announcers+, +audit+ and +credential+.
   #
   # Roots are, in order:
   #   - scripts/ in the app (in the image, /rails/scripts/)
@@ -11,7 +11,7 @@ module OperatorScripts
   # Paths are compared after resolving symlinks, so a link inside a directory pointing
   # outside it does not count.
   module Catalog
-    ROLES = %w[access audit credential].freeze
+    ROLES = %w[access announcers audit credential].freeze
     AUDIT_LEGACY_DIR = 'audit-log'.freeze
 
     module_function

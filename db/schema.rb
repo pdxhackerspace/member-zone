@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_02_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -150,6 +150,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.datetime "updated_at", null: false
     t.string "url", null: false
     t.index ["name"], name: "index_ai_providers_on_name", unique: true
+  end
+
+  create_table "announcer_runs", force: :cascade do |t|
+    t.bigint "announcer_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "access_log_id"
+    t.string "status", default: "queued", null: false
+    t.boolean "test_run", default: false, null: false
+    t.integer "exit_code"
+    t.text "output"
+    t.datetime "finished_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["access_log_id"], name: "index_announcer_runs_on_access_log_id"
+    t.index ["announcer_id", "created_at"], name: "index_announcer_runs_on_announcer_id_and_created_at"
+    t.index ["announcer_id", "user_id", "created_at"], name: "idx_on_announcer_id_user_id_created_at_901d00adf6"
+    t.index ["user_id"], name: "index_announcer_runs_on_user_id"
+  end
+
+  create_table "announcer_subscriptions", force: :cascade do |t|
+    t.bigint "announcer_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["announcer_id"], name: "index_announcer_subscriptions_on_announcer_id"
+    t.index ["user_id", "announcer_id"], name: "index_announcer_subscriptions_on_user_id_and_announcer_id", unique: true
+  end
+
+  create_table "announcers", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.string "script_path", null: false
+    t.string "script_arguments"
+    t.text "environment_variables"
+    t.boolean "enabled", default: false, null: false
+    t.integer "display_order", default: 0, null: false
+    t.integer "repeat_after_minutes", default: 120, null: false
+    t.datetime "last_run_at"
+    t.string "last_run_status", default: "unknown", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled", "display_order"], name: "index_announcers_on_enabled_and_display_order"
+    t.index ["name"], name: "index_announcers_on_name", unique: true
   end
 
   create_table "api_tokens", force: :cascade do |t|
@@ -477,6 +520,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.string "unbanned_members_group", null: false
     t.datetime "updated_at", null: false
     t.integer "api_token_max_lifetime_days", default: 365, null: false
+    t.string "arrival_locations", default: [], null: false, array: true
   end
 
   create_table "document_training_topics", force: :cascade do |t|
@@ -1419,6 +1463,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.boolean "use_full_name_for_greeting", default: true, null: false
     t.boolean "use_username_for_greeting", default: false, null: false
     t.string "username"
+    t.boolean "announce_arrivals", default: false, null: false
     t.index ["authentik_attributes"], name: "index_users_on_authentik_attributes", using: :gin
     t.index ["authentik_dirty"], name: "index_users_on_authentik_dirty"
     t.index ["authentik_id"], name: "index_users_on_authentik_id", unique: true
@@ -1449,6 +1494,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ai_ollama_profiles", "ai_providers", on_delete: :nullify
+  add_foreign_key "announcer_runs", "access_logs", on_delete: :nullify
+  add_foreign_key "announcer_runs", "announcers"
+  add_foreign_key "announcer_runs", "users"
+  add_foreign_key "announcer_subscriptions", "announcers"
+  add_foreign_key "announcer_subscriptions", "users"
   add_foreign_key "api_tokens", "users", column: "contact_user_id", on_delete: :nullify
   add_foreign_key "api_tokens", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "api_tokens", "users", column: "revoked_by_id", on_delete: :nullify

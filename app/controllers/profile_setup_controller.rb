@@ -72,7 +72,9 @@ class ProfileSetupController < AuthenticatedController
   end
 
   # Step 5: Visibility & Greeting (with preview)
-  def visibility; end
+  def visibility
+    load_announcers
+  end
 
   def save_visibility
     attrs = visibility_params.to_h
@@ -98,9 +100,17 @@ class ProfileSetupController < AuthenticatedController
       attrs[:greeting_name]              = ''
     end
 
-    if @user.update(attrs)
+    saved = User.transaction do
+      next false unless @user.update(attrs)
+
+      choose_announcers if @user.announce_arrivals?
+      true
+    end
+
+    if saved
       redirect_to user_path(@user), notice: 'Profile setup complete!', status: :see_other
     else
+      load_announcers
       render :visibility, status: :unprocessable_content
     end
   end
@@ -144,7 +154,23 @@ class ProfileSetupController < AuthenticatedController
   end
 
   def visibility_params
-    params.expect(user: %i[profile_visibility greeting_name])
+    params.expect(user: %i[profile_visibility greeting_name announce_arrivals])
+  end
+
+  def load_announcers
+    @announcers = Announcer.enabled.ordered
+  end
+
+  # Only the announcers a member can see are changed: a choice of one that is currently disabled
+  # is kept for when it comes back. While announce_arrivals is off the checkboxes are hidden and
+  # ignored, so switching it off and on again keeps what the member picked.
+  def choose_announcers
+    chosen = Announcer.enabled.where(id: Array(params.dig(:user, :announcer_ids))).pluck(:id)
+    @user.announcer_subscriptions.where(announcer_id: Announcer.enabled.select(:id))
+         .where.not(announcer_id: chosen).destroy_all
+    (chosen - @user.announcer_subscriptions.pluck(:announcer_id)).each do |id|
+      @user.announcer_subscriptions.create!(announcer_id: id)
+    end
   end
 
   def optional_info_params

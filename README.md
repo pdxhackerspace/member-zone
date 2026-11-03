@@ -62,7 +62,7 @@ Set these variables in your shell, `.env`, or Docker Compose environment:
 | `RECHARGE_API_KEY` | Recharge API access token |
 | `RECHARGE_API_BASE_URL` | Optional override (defaults to `https://api.rechargeapps.com`) |
 | `RECHARGE_TRANSACTIONS_LOOKBACK_DAYS` | Days of Recharge history to pull during sync (default 30) |
-| `ACCESS_SCRIPTS_DIR` | Root directory of operator-mounted programs; use subdirectories `access/`, `audit/` and `credential/` — see [docs/credentials.md](docs/credentials.md) and [docs/audit-logs.md](docs/audit-logs.md) |
+| `ACCESS_SCRIPTS_DIR` | Root directory of operator-mounted programs; use subdirectories `access/`, `announcers/`, `audit/` and `credential/` — see [docs/credentials.md](docs/credentials.md) and [docs/audit-logs.md](docs/audit-logs.md) |
 | `CREDENTIAL_SCRIPTS_DIR` | Legacy optional credential program directory (prefer `ACCESS_SCRIPTS_DIR/credential/`) |
 | `DATABASE_FIELD_ENCRYPTION_KEY` | Key for encrypting personal data and credentials at rest — see [docs/encrypted-fields.md](docs/encrypted-fields.md) |
 | `EMAIL_LOOKUP_HMAC_KEY` | Key for deriving the email lookup digests that make encrypted addresses searchable |
@@ -274,6 +274,10 @@ rails 'audit_logs:run[Door log]'       # run now and store
 ```
 
 `docs/audit-logs.md` describes the program contract, output format, alerts and the five `audit_logs.*` privileges. A new `Audit log administrator` role bundles the global ones; `Audit log reviewer` is meant to be attached to the topic whose logs its holders should read.
+
+## Arrival announcers
+
+Members can opt in to having their arrival announced (on Slack, on the entry sign, ...) from the Visibility step of their profile. Administrators configure announcers under **Settings → Announcers**: each names an executable in the `announcers/` subdirectory under `scripts/` or `ACCESS_SCRIPTS_DIR`, environment variables (encrypted at rest), and how long to wait before announcing the same member again. The same page picks which access log locations are outside doors. When the access webhook reports a member opening or unlocking an outside door, each announcer they chose runs with the arrival as JSON on stdin; departures are never announced. `docs/announcers.md` describes the rules and the program contract.
 
 ## Credentials
 

@@ -1,0 +1,101 @@
+<div class="d-flex align-items-end justify-content-between mb-3">
+  <div>
+    <h1 class="h-page-title mb-0">Announcers</h1>
+    <div class="text-13 text-secondary mt-1">
+      Programs that tell people a member has arrived. Members choose which ones announce them.
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <%= link_to "New announcer", new_announcer_path, class: "btn btn-primary btn-sm" %>
+    <%= link_to "Settings", settings_path, class: "btn btn-outline-secondary btn-sm" %>
+  </div>
+</div>
+
+<% if @arrival_locations.empty? %>
+  <div class="alert alert-warning text-13">
+    No outside doors are selected below, so nobody will be announced yet.
+  </div>
+<% end %>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <% if @announcers.any? %>
+      <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+          <table class="table table-compact mb-0 align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Program</th>
+                <th scope="col">Repeat after</th>
+                <th scope="col" class="num">Members</th>
+                <th scope="col">Last run</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @announcers.each do |announcer| %>
+                <% members = @subscriber_counts.fetch(announcer.id, 0) %>
+                <tr class="<%= 'text-secondary' unless announcer.enabled? %>">
+                  <td>
+                    <%= link_to announcer.name, announcer_path(announcer), class: "fw-medium text-decoration-none" %>
+                    <% unless announcer.enabled? %><span class="badge text-bg-secondary-subtle ms-1">Disabled</span><% end %>
+                    <% if announcer.description.present? %>
+                      <div class="text-12 text-secondary cell-truncate" title="<%= announcer.description %>"><%= announcer.description %></div>
+                    <% end %>
+                  </td>
+                  <td><code><%= File.basename(announcer.script_path) %></code></td>
+                  <td><%= announcer.repeat_after_minutes.zero? ? 'Every scan' : "#{announcer.repeat_after_minutes} min" %></td>
+                  <td class="num <%= 'text-secondary' if members.zero? %>"><%= members %></td>
+                  <td>
+                    <span class="status-dot status-<%= { 'success' => 'success', 'failed' => 'danger' }.fetch(announcer.last_run_status, 'muted') %>"></span>
+                    <%= announcer.last_run_at ? l(announcer.last_run_at, format: :short) : 'Never' %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% else %>
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center py-5 text-secondary">
+          No announcers yet. An announcer is an executable program in the <code>announcers</code> subdirectory under
+          <code>scripts/</code> or <code>ACCESS_SCRIPTS_DIR</code>.
+          <div class="mt-3"><%= link_to "Add an announcer", new_announcer_path, class: "btn btn-outline-secondary btn-sm" %></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Outside doors</div>
+        <p class="text-12 text-secondary">
+          Opening or unlocking one of these counts as arriving. Other locations, and locking any door, are never
+          announced.
+        </p>
+        <%= form_with url: update_arrival_locations_announcers_path, method: :patch do %>
+          <div class="vstack gap-1 mb-3">
+            <% @known_locations.each_with_index do |location, index| %>
+              <div class="form-check">
+                <%= check_box_tag 'arrival_locations[]', location, @arrival_locations.include?(location),
+                                  id: "arrival_location_#{index}", class: "form-check-input" %>
+                <%= label_tag "arrival_location_#{index}", location, class: "form-check-label text-13" %>
+              </div>
+            <% end %>
+            <% if @known_locations.empty? %>
+              <div class="text-12 text-secondary">No locations in the access logs yet. Add one by name below.</div>
+            <% end %>
+          </div>
+          <div class="mb-3">
+            <%= label_tag :new_location, "Add a location", class: "form-label text-12" %>
+            <%= text_field_tag :new_location, nil, class: "form-control form-control-sm",
+                               placeholder: "As it appears in the access log" %>
+          </div>
+          <%= submit_tag "Save outside doors", class: "btn btn-outline-secondary btn-sm" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

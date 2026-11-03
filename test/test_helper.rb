@@ -189,6 +189,7 @@ module ActiveSupport
     AUDIT_LOG_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('audit').freeze
     CREDENTIAL_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('credential').freeze
     ACCESS_SCRIPT_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('access').freeze
+    ANNOUNCER_FIXTURE_DIR = OPERATOR_SCRIPT_FIXTURE_ROOT.join('announcers').freeze
 
     def audit_log_script(name)
       AUDIT_LOG_FIXTURE_DIR.join(name).to_s
@@ -204,6 +205,11 @@ module ActiveSupport
 
     def access_script(name)
       ACCESS_SCRIPT_FIXTURE_DIR.join(name).to_s
+    end
+
+    def create_announcer(script: 'echo_payload.sh', **attributes)
+      Announcer.create!({ name: "Announcer #{SecureRandom.hex(4)}", enabled: true,
+                          script_path: ANNOUNCER_FIXTURE_DIR.join(script).to_s }.merge(attributes))
     end
 
     def create_audit_log_source(script: nil, script_path: nil, **attributes)
