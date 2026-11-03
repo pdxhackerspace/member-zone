@@ -229,6 +229,12 @@ The run history on the source's page shows each run's status, how many entries w
 
 Alert emails can be turned off under **Notifications** (the *Audit log alerts* row appears only for people who receive them). See `docs/audit-logs.md` for how programs are written.
 
+## Your profile
+
+The first time you set up your profile, the wizard walks you through its five steps in order (Basic Info, About You, Links, Interests, Visibility), starting with Basic Info. The step names across the top show where you are, but you can't click them yet.
+
+Once you've finished, **Update your profile** on your dashboard brings you back to the same wizard. Now each step name across the top is a link, so you can go straight to the part you want to change, such as your interests, without stepping through the rest.
+
 ## Arrival announcements
 
 ### Choosing your announcements (members)
