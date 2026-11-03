@@ -145,8 +145,7 @@ class AccessControllerPayloadBuilderTest < ActiveSupport::TestCase
 
   test 'payload converts user names to ASCII' do
     ensure_user_one_in_payload!
-    @user_one.update!(full_name: 'José García', username: 'josé', greeting_name: 'José',
-                      use_full_name_for_greeting: false, use_username_for_greeting: false)
+    @user_one.update!(full_name: 'José García', username: 'josé')
     Training.create!(trainee: @user_one, training_topic: @laser_topic, trained_at: 1.day.ago)
 
     payload = parse_payload
@@ -154,19 +153,18 @@ class AccessControllerPayloadBuilderTest < ActiveSupport::TestCase
 
     assert user_entry, 'Expected user_one in payload'
     assert_equal 'Jose Garcia', user_entry['name']
-    assert_equal 'Jose', user_entry['greeting_name']
   end
 
-  test 'payload omits greeting_name when it cannot be represented in ASCII' do
+  # Entry signs greet members through an announcer now, not through the access controller sync.
+  test 'payload does not include greeting_name' do
     ensure_user_one_in_payload!
-    @user_one.update!(full_name: 'Example User One', greeting_name: '用户', use_full_name_for_greeting: false,
-                      use_username_for_greeting: false)
+    @user_one.update!(greeting_name: 'Sparky', use_full_name_for_greeting: false, use_username_for_greeting: false)
 
     payload = parse_payload
     user_entry = payload.find { |u| u['uid'] == @user_one.authentik_id }
 
     assert user_entry, 'Expected user_one in payload'
-    assert_nil user_entry['greeting_name']
+    assert_not user_entry.key?('greeting_name')
   end
 
   # --- Model method tests ---

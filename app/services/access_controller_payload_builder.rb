@@ -45,7 +45,6 @@ class AccessControllerPayloadBuilder
     {
       name: normalize_text(user.full_name.presence || user.display_name),
       uid: user.authentik_id.presence || user.id,
-      greeting_name: normalize_text(user.greeting_name),
       rfids: user.rfids.map(&:rfid),
       permissions: user.trainings_as_trainee.filter_map { |t| normalize_text(t.training_topic&.name) }.uniq
     }
