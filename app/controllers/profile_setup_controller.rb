@@ -1,11 +1,24 @@
 class ProfileSetupController < AuthenticatedController
+  # The wizard's steps in order, action => title. On a first pass the step indicator is plain text
+  # and the member walks it with Next; once they have finished it, each step links to its page.
+  STEPS = {
+    'basic_info' => 'Basic Info',
+    'optional_info' => 'About You',
+    'links' => 'Links',
+    'interests' => 'Interests',
+    'visibility' => 'Visibility'
+  }.freeze
+
   before_action :set_user
+  before_action :require_basic_info_first, except: %i[basic_info save_basic_info]
+  helper_method :editing_profile?
 
   # Step 1: Basic Info
   def basic_info; end
 
   def save_basic_info
     if @user.update(basic_info_params)
+      session[:profile_setup_basic_info_saved_for] = @user.id
       redirect_to profile_setup_optional_path, status: :see_other
     else
       render :basic_info, status: :unprocessable_content
@@ -79,26 +92,9 @@ class ProfileSetupController < AuthenticatedController
   def save_visibility
     attrs = visibility_params.to_h
 
-    case params.dig(:user, :greeting_option)
-    when 'full_name'
-      attrs[:use_full_name_for_greeting] = true
-      attrs[:use_username_for_greeting]  = false
-      attrs[:do_not_greet]               = false
-    when 'username'
-      attrs[:use_full_name_for_greeting] = false
-      attrs[:use_username_for_greeting]  = true
-      attrs[:do_not_greet]               = false
-    when 'custom'
-      attrs[:use_full_name_for_greeting] = false
-      attrs[:use_username_for_greeting]  = false
-      attrs[:do_not_greet]               = false
-      attrs[:greeting_name]              = params.dig(:user, :greeting_name).to_s.strip
-    when 'do_not_greet'
-      attrs[:use_full_name_for_greeting] = false
-      attrs[:use_username_for_greeting]  = false
-      attrs[:do_not_greet]               = true
-      attrs[:greeting_name]              = ''
-    end
+    apply_greeting_option(attrs)
+
+    attrs[:profile_setup_completed_at] = Time.current unless editing_profile?
 
     saved = User.transaction do
       next false unless @user.update(attrs)
@@ -108,8 +104,10 @@ class ProfileSetupController < AuthenticatedController
     end
 
     if saved
+      session.delete(:profile_setup_basic_info_saved_for)
       redirect_to user_path(@user), notice: 'Profile setup complete!', status: :see_other
     else
+      @user.restore_attributes(%i[profile_setup_completed_at])
       load_announcers
       render :visibility, status: :unprocessable_content
     end
@@ -147,6 +145,43 @@ class ProfileSetupController < AuthenticatedController
 
   def set_user
     @user = current_user
+  end
+
+  # True once the member has finished the wizard: they are back to edit their profile, not setting it up.
+  def editing_profile?
+    @user.profile_setup_completed_at.present?
+  end
+
+  # On a first pass the later steps are only reachable once Basic Info has been saved, so their URLs
+  # can't be used to skip it. The mark lives in the session, for the member it was saved for.
+  def require_basic_info_first
+    return if editing_profile? || session[:profile_setup_basic_info_saved_for] == @user.id
+
+    redirect_to profile_setup_path, alert: 'Start with your basic info.', status: :see_other
+  end
+
+  # Turns the greeting radio buttons into the user's greeting columns.
+  def apply_greeting_option(attrs)
+    case params.dig(:user, :greeting_option)
+    when 'full_name'
+      attrs[:use_full_name_for_greeting] = true
+      attrs[:use_username_for_greeting]  = false
+      attrs[:do_not_greet]               = false
+    when 'username'
+      attrs[:use_full_name_for_greeting] = false
+      attrs[:use_username_for_greeting]  = true
+      attrs[:do_not_greet]               = false
+    when 'custom'
+      attrs[:use_full_name_for_greeting] = false
+      attrs[:use_username_for_greeting]  = false
+      attrs[:do_not_greet]               = false
+      attrs[:greeting_name]              = params.dig(:user, :greeting_name).to_s.strip
+    when 'do_not_greet'
+      attrs[:use_full_name_for_greeting] = false
+      attrs[:use_username_for_greeting]  = false
+      attrs[:do_not_greet]               = true
+      attrs[:greeting_name]              = ''
+    end
   end
 
   def basic_info_params

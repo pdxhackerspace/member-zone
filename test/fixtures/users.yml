@@ -11,6 +11,7 @@ one:
   username: exampleuserone
   active: true
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   profile_visibility: members
@@ -27,6 +28,7 @@ two:
   username: exampleusertwo
   active: true
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   profile_visibility: members
@@ -41,6 +43,7 @@ three:
   username: betauser
   active: true
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   profile_visibility: members
@@ -54,6 +57,7 @@ no_email:
   username: noemailuser
   active: true
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   profile_visibility: members
@@ -70,6 +74,7 @@ public_profile_user:
   profile_visibility: public
   bio: "I have a public profile"
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   payment_type: paypal
@@ -85,6 +90,7 @@ private_profile_user:
   profile_visibility: private
   bio: "This should be hidden"
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   payment_type: paypal
@@ -99,6 +105,7 @@ cash_payer:
   active: true
   profile_visibility: members
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   payment_type: cash
   dues_status: current
@@ -115,6 +122,7 @@ member_with_local_account:
   profile_visibility: members
   bio: "I am a regular member"
   membership_state: current_member
+  profile_setup_completed_at: 2025-11-01 12:00:00
   membership_status: paying
   dues_status: current
   payment_type: paypal
