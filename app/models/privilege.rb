@@ -51,6 +51,7 @@ class Privilege < ApplicationRecord
     { key: 'access.manage_controller_types', label: 'Manage access controller types', category: 'Key fobs & building access' },
     { key: 'access.manage_readers', label: 'Manage RFID readers', category: 'Key fobs & building access' },
     { key: 'access.export_users', label: 'Export users to controllers', category: 'Key fobs & building access' },
+    { key: 'announcers.manage', label: 'Configure arrival announcers', category: 'Key fobs & building access' },
     { key: 'applications.view', label: 'View application queue', category: 'Membership applications' },
     { key: 'applications.view_pii', label: 'View applicant contact details', category: 'Membership applications' },
     { key: 'applications.review', label: 'Review applications, vote, and record tours', category: 'Membership applications' },

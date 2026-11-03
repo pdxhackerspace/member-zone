@@ -93,8 +93,8 @@
 
             <% current_greeting_option = @user.greeting_option %>
             <div>
-              <label class="form-label fw-semibold">Greeting on entry signs</label>
-              <p class="text-muted small mb-2">When you enter the space, how should we greet you?</p>
+              <label class="form-label fw-semibold">Greeting on entry signs and announcements</label>
+              <p class="text-muted small mb-2">When you enter the space, what name should we use?</p>
 
               <div class="vstack gap-2 mb-3">
                 <div class="form-check">
@@ -127,6 +127,45 @@
                      class="form-control"
                      placeholder="Enter a custom greeting name"
                      value="<%= @user.greeting_name %>">
+            </div>
+
+            <hr>
+
+            <div>
+              <input type="hidden" name="user[announce_arrivals]" value="0">
+              <div class="form-check form-switch">
+                <input type="checkbox" name="user[announce_arrivals]" value="1" id="setup_announce_arrivals"
+                       class="form-check-input" role="switch" <%= 'checked' if @user.announce_arrivals? %>>
+                <label class="form-check-label fw-semibold" for="setup_announce_arrivals">Announce arrivals</label>
+              </div>
+              <div class="text-muted small mt-1">
+                <%= sanitize(TextFragment.content_for('announce_arrivals_help').presence ||
+                             '<p>When you badge in at an outside door, we can let people know you\'ve arrived. ' \
+                             'Choose where below. We never announce when you leave.</p>') %>
+              </div>
+
+              <div id="setup_announcer_choices" class="vstack gap-2 ms-4 <%= 'd-none' unless @user.announce_arrivals? %>">
+                <% chosen_ids = @user.announcer_subscriptions.pluck(:announcer_id) %>
+                <% @announcers.each do |announcer| %>
+                  <div class="form-check">
+                    <input type="checkbox" name="user[announcer_ids][]" value="<%= announcer.id %>"
+                           id="setup_announcer_<%= announcer.id %>" class="form-check-input"
+                           <%= 'checked' if chosen_ids.include?(announcer.id) %>>
+                    <label class="form-check-label" for="setup_announcer_<%= announcer.id %>">
+                      <%= announcer.name %>
+                      <% if announcer.description.present? %>
+                        <span class="d-block text-muted small"><%= announcer.description %></span>
+                      <% end %>
+                    </label>
+                  </div>
+                <% end %>
+                <% if @announcers.empty? %>
+                  <div class="text-muted small">There's nowhere to announce arrivals yet. Check back later.</div>
+                <% end %>
+                <div class="text-muted small">
+                  Announcements use the name you chose above. If you chose not to be greeted, nothing is announced.
+                </div>
+              </div>
             </div>
 
             <div class="d-flex justify-content-between">
@@ -245,6 +284,17 @@
       btn.classList.toggle('active', btn.dataset.view === currentView);
     });
   }
+})();
+
+// Announcer choices only matter while announcements are on
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var toggle  = document.getElementById('setup_announce_arrivals');
+    var choices = document.getElementById('setup_announcer_choices');
+    if (!toggle || !choices) return;
+
+    toggle.addEventListener('change', function() { choices.classList.toggle('d-none', !toggle.checked); });
+  });
 })();
 
 // Greeting option interactivity

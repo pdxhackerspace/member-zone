@@ -59,6 +59,17 @@
           <span class="profile-field-label">Profile visibility</span>
           <span class="profile-field-value"><%= visibility_label %></span>
         </div>
+
+        <div class="profile-field-row">
+          <span class="profile-field-label">Arrival announcements</span>
+          <% announcer_names = user.announce_arrivals? ? user.announcers.enabled.ordered.pluck(:name) : [] %>
+          <% if announcer_names.any? %>
+            <span class="profile-field-value"><%= announcer_names.to_sentence %></span>
+          <% else %>
+            <span class="profile-field-value empty">Let people know when you arrive</span>
+          <% end %>
+          <span></span>
+        </div>
       </div>
     </div>
 

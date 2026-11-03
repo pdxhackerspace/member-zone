@@ -170,6 +170,7 @@ class WebhooksController < ApplicationController
 
       # Parse and create the access log
       access_log = parser.create_access_log!
+      queue_arrival_announcements(access_log)
 
       Rails.logger.info(
         'Access webhook: created log entry - ' \
@@ -306,6 +307,15 @@ class WebhooksController < ApplicationController
   end
 
   private
+
+  # Announcing is a courtesy: a queue that's down must not cost the door its access log entry.
+  def queue_arrival_announcements(access_log)
+    return unless access_log.user&.announce_arrivals? && access_log.arrival?
+
+    Announcers::ArrivalJob.perform_later(access_log.id)
+  rescue StandardError => e
+    ErrorReporting.report(e, context: { webhook: 'access', stage: 'announce_arrival' }, severity: :warning)
+  end
 
   # Runs a handler's authentication check, and owns the decision about what an unset secret means.
   #

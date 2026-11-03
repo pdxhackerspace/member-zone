@@ -24,6 +24,18 @@ class DefaultSetting < ApplicationRecord
   validates :api_token_max_lifetime_days, numericality: { only_integer: true, greater_than: 0,
                                                           less_than_or_equal_to: 3650 }
 
+  # Locations (as the access logs name them) that are outside doors: scanning in at one of
+  # these is an arrival that announcers may tell people about. Matched without regard to case.
+  def self.arrival_location?(location)
+    return false if location.blank?
+
+    instance.arrival_locations.any? { |candidate| candidate.casecmp?(location.strip) }
+  end
+
+  def arrival_locations=(locations)
+    super(Array(locations).map { |location| location.to_s.strip }.compact_blank.uniq)
+  end
+
   def rfid_facility_prefix
     "#{rfid_facility_code},"
   end
