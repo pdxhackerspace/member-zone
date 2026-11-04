@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## Docker
 
-- **Base image:** `ruby:4.0.6-slim` with multi-stage build
+- **Base image:** `ruby:4.0.9-slim` with multi-stage build
 - **Node:** Installed via nodenv (Node 24.x) for asset compilation
 - **Yarn:** Use `yarn install --frozen-lockfile` — never modify `yarn.lock` in Docker builds
 - **Assets:** Precompiled with `SECRET_KEY_BASE_DUMMY=1`

@@ -13,7 +13,7 @@ MemberZone is a Rails application that keeps a local roster synchronized with an
 
 ## Requirements
 
-- Ruby 4.0.6 (see `.ruby-version`)
+- Ruby 4.0.9 (see `.ruby-version`)
 - Rails 8.1
 - PostgreSQL 16+
 - Redis 8+ (Sidekiq, Action Cable)
