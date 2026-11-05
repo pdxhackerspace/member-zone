@@ -14,6 +14,7 @@ class DefaultSetting < ApplicationRecord
   validates :can_train_prefix, presence: true
   validates :sync_inactive_members, inclusion: { in: [true, false] }
   validates :authentik_sync_inactive_as_active, inclusion: { in: [true, false] }
+  validates :announce_inactive_members, inclusion: { in: [true, false] }
   validates :rfid_facility_code, presence: true,
                                  numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :map_center_latitude, numericality: { greater_than_or_equal_to: -90, less_than_or_equal_to: 90 }
@@ -30,6 +31,12 @@ class DefaultSetting < ApplicationRecord
     return false if location.blank?
 
     instance.arrival_locations.any? { |candidate| candidate.casecmp?(location.strip) }
+  end
+
+  # Whether announcers announce members whose membership doesn't currently grant access. Banned
+  # and deceased members are never announced either way.
+  def self.announce_inactive_members?
+    instance.announce_inactive_members
   end
 
   def arrival_locations=(locations)

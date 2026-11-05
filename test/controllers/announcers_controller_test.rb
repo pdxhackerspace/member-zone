@@ -77,6 +77,17 @@ class AnnouncersControllerTest < ActionDispatch::IntegrationTest
     assert_equal ['unit2 front door', 'back gate'], DefaultSetting.instance.arrival_locations
   end
 
+  test 'switches announcing inactive members on and off' do
+    sign_in_manager
+
+    patch update_inactive_members_announcers_path, params: { announce_inactive_members: '1' }
+    assert_redirected_to announcers_path
+    assert DefaultSetting.announce_inactive_members?
+
+    patch update_inactive_members_announcers_path, params: { announce_inactive_members: '0' }
+    assert_not DefaultSetting.announce_inactive_members?
+  end
+
   test 'a test announcement announces the signed-in manager' do
     manager = sign_in_manager
 

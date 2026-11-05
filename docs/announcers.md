@@ -14,7 +14,10 @@ one `Announcers::RunJob` per announcer if **all** of these hold:
 - the member has **Announce arrivals** switched on and has ticked that announcer;
 - the announcer is enabled;
 - the member has access (`User#active?`), is not a service account, and has a greeting name (a
-  member who chose "Don't greet me" is never announced);
+  member who chose "Don't greet me" is never announced). **Announce members without active
+  access** on the Announcers page (`DefaultSetting#announce_inactive_members`, off by default)
+  drops the access requirement, for example while a member's state is wrong; banned and deceased
+  members are never announced either way;
 - the action is `opened` or `unlocked` (`AccessLog::ARRIVAL_ACTIONS`). Locking a door, or enabling
   and disabling a tool, is never announced, so departures never are;
 - the location is one of the **outside doors** chosen on the Announcers page
@@ -26,6 +29,17 @@ one `Announcers::RunJob` per announcer if **all** of these hold:
 
 The window check and the new run are made under a row lock on the member, so two scans a second
 apart can't both get through. Access logs imported by the rake task never announce anything.
+
+For members with **Announce arrivals** switched on, each decision is written to the Rails log
+(Sidekiq's, since it runs in `Announcers::ArrivalJob`) with an `Announcers:` prefix: every announcer
+queued, and the reason for anything skipped, such as an inside door, a disabled announcer, or a
+repeat window along with when it ends. To find out why an announcer stayed quiet, search for the
+access log id or the member's username:
+
+```
+Announcers: access log 105593 (romkey): queued "Entry sign"
+Announcers: access log 105593 (romkey): skipped "Slack": already announced at 2026-11-05T06:50:12-08:00 (success); repeat window of 120 minutes ends at 2026-11-05T08:50:12-08:00
+```
 
 ## Writing a program
 
