@@ -61,5 +61,52 @@ module Announcers
         assert_equal 1, ArrivalDispatcher.call(arrival).size
       end
     end
+
+    # What the dispatcher logs at info, the level production runs at.
+    def logged
+      io = StringIO.new
+      original = Rails.logger
+      Rails.logger = ActiveSupport::Logger.new(io, level: :info)
+      yield
+      io.string
+    ensure
+      Rails.logger = original
+    end
+
+    test 'logs each announcer it queues' do
+      output = logged { ArrivalDispatcher.call(arrival) }
+
+      assert_includes output, "queued #{@announcer.name.inspect}"
+    end
+
+    test 'logs when an announcer is skipped inside its repeat window and when the window ends' do
+      ArrivalDispatcher.call(arrival)
+      output = logged { ArrivalDispatcher.call(arrival) }
+
+      assert_includes output, "skipped #{@announcer.name.inspect}: already announced at"
+      assert_includes output, 'repeat window of 120 minutes ends at'
+    end
+
+    test 'logs when an announcer is skipped because it is disabled' do
+      @announcer.update!(enabled: false)
+
+      assert_includes logged { ArrivalDispatcher.call(arrival) }, 'announcer is disabled'
+    end
+
+    test 'logs why an entry is not announced at all' do
+      assert_includes logged { ArrivalDispatcher.call(arrival(location: 'unit2 shop door')) },
+                      '"unit2 shop door" is not one of the outside doors'
+      assert_includes logged { ArrivalDispatcher.call(arrival(action: 'locked')) }, '"locked" is not an arrival'
+      assert_includes logged { ArrivalDispatcher.call(arrival(logged_at: 1.hour.ago)) }, 'entry is older than'
+
+      @user.update!(greeting_name: nil, do_not_greet: true)
+      assert_includes logged { ArrivalDispatcher.call(arrival) }, 'member chose not to be greeted'
+    end
+
+    test 'stays quiet about members who never switched announcements on' do
+      @user.update!(announce_arrivals: false)
+
+      assert_not_includes logged { ArrivalDispatcher.call(arrival) }, 'Announcers:'
+    end
   end
 end

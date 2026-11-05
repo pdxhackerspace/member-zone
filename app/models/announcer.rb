@@ -37,10 +37,16 @@ class Announcer < ApplicationRecord
   # Whether the member was announced by this announcer recently enough that announcing them again
   # would be spam. Failed runs don't count, so a broken script doesn't swallow the next arrival.
   def announced_recently?(user, now: Time.current)
-    return false if repeat_after_minutes.zero?
+    recent_announcement(user, now: now).present?
+  end
+
+  # The run that keeps the member inside the repeat window, if any; the newest one, so callers can
+  # say when the window ends.
+  def recent_announcement(user, now: Time.current)
+    return nil if repeat_after_minutes.zero?
 
     announcer_runs.where(user: user, test_run: false, status: %w[queued running success])
-                  .exists?(['created_at > ?', now - repeat_after])
+                  .where('created_at > ?', now - repeat_after).order(created_at: :desc).first
   end
 
   def record_run_result!(status)
