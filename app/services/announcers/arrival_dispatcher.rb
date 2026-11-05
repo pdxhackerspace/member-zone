@@ -1,9 +1,10 @@
 module Announcers
   # Decides which announcers to run for one access log entry and queues a run for each.
   #
-  # An arrival is announced only when the member has switched announcements on, still has
-  # access, has a name to be announced by, came in through an outside door (AccessLog#arrival?)
-  # just now, and the announcer hasn't announced them within its repeat window. The window
+  # An arrival is announced only when the member has switched announcements on, has access (or
+  # DefaultSetting allows announcing inactive members; never banned or deceased ones), has a
+  # name to be announced by, came in through an outside door (AccessLog#arrival?) just now, and
+  # the announcer hasn't announced them within its repeat window. The window
   # check and the new run's row are made under a lock on the member, so two scans a second apart
   # (a double tap, two doors in a row) can't both get through.
   #
@@ -27,7 +28,10 @@ module Announcers
       return 'no member matched the entry' if user.nil?
       return 'member has announcements switched off' unless user.announce_arrivals?
       return 'member is a service account' if user.service_account?
-      return 'member does not have access' unless user.active?
+      return 'member is banned or deceased' if user.membership_state.in?(MembershipState::TERMINAL_STATES)
+      unless user.active? || DefaultSetting.announce_inactive_members?
+        return 'member does not have access (announcing inactive members is switched off)'
+      end
       return 'member chose not to be greeted' if user.greeting_name.blank?
 
       nil

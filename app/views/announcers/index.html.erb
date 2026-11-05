@@ -97,5 +97,26 @@
         <% end %>
       </div>
     </div>
+
+    <div class="card shadow-sm border-0 mt-3">
+      <div class="card-body">
+        <div class="h-section-label mb-2">Inactive members</div>
+        <%= form_with url: update_inactive_members_announcers_path, method: :patch do %>
+          <div class="form-check form-switch mb-2">
+            <%= hidden_field_tag :announce_inactive_members, '0', id: nil %>
+            <%= check_box_tag :announce_inactive_members, '1', DefaultSetting.announce_inactive_members?,
+                              class: "form-check-input", role: "switch" %>
+            <%= label_tag :announce_inactive_members, "Announce members without active access",
+                          class: "form-check-label text-13" %>
+          </div>
+          <p class="text-12 text-secondary">
+            Off: only members whose membership currently grants access are announced. On: members who opted in are
+            announced even if their membership is inactive, for example when it's wrong. Banned and deceased members
+            are never announced.
+          </p>
+          <%= submit_tag "Save", class: "btn btn-outline-secondary btn-sm" %>
+        <% end %>
+      </div>
+    </div>
   </div>
 </div>

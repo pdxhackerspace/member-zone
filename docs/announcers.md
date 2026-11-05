@@ -14,7 +14,10 @@ one `Announcers::RunJob` per announcer if **all** of these hold:
 - the member has **Announce arrivals** switched on and has ticked that announcer;
 - the announcer is enabled;
 - the member has access (`User#active?`), is not a service account, and has a greeting name (a
-  member who chose "Don't greet me" is never announced);
+  member who chose "Don't greet me" is never announced). **Announce members without active
+  access** on the Announcers page (`DefaultSetting#announce_inactive_members`, off by default)
+  drops the access requirement, for example while a member's state is wrong; banned and deceased
+  members are never announced either way;
 - the action is `opened` or `unlocked` (`AccessLog::ARRIVAL_ACTIONS`). Locking a door, or enabling
   and disabling a tool, is never announced, so departures never are;
 - the location is one of the **outside doors** chosen on the Announcers page
