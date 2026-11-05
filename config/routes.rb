@@ -485,6 +485,7 @@ Rails.application.routes.draw do
     end
     collection do
       patch :update_arrival_locations
+      patch :update_inactive_members
     end
   end
 

@@ -1,5 +1,6 @@
 # Configures arrival announcers: which program to run, with what secrets, how often it may
-# announce the same member, and which access log locations count as outside doors. Environment
+# announce the same member, which access log locations count as outside doors, and whether
+# members without active access are announced. Environment
 # variables hold secrets, so this stays behind announcers.manage.
 class AnnouncersController < AuthenticatedController
   RUNS_SHOWN = 25
@@ -72,6 +73,11 @@ class AnnouncersController < AuthenticatedController
     locations = Array(params[:arrival_locations]).grep(String) + [params[:new_location].to_s]
     DefaultSetting.instance.update!(arrival_locations: locations)
     redirect_to announcers_path, notice: 'Outside doors updated.'
+  end
+
+  def update_inactive_members
+    DefaultSetting.instance.update!(announce_inactive_members: params[:announce_inactive_members] == '1')
+    redirect_to announcers_path, notice: 'Inactive member setting updated.'
   end
 
   private
