@@ -47,6 +47,24 @@ module Announcers
       assert_empty ArrivalDispatcher.call(arrival(logged_at: 1.hour.ago))
     end
 
+    test 'announces members without access only when the setting allows it' do
+      @user.transition_to!('inactive_member')
+      assert_not @user.active?
+
+      assert_includes logged { assert_empty ArrivalDispatcher.call(arrival) },
+                      'announcing inactive members is switched off'
+
+      DefaultSetting.instance.update!(announce_inactive_members: true)
+      assert_equal 1, ArrivalDispatcher.call(arrival).size
+    end
+
+    test 'never announces banned members, even with inactive members allowed' do
+      DefaultSetting.instance.update!(announce_inactive_members: true)
+      @user.ban!
+
+      assert_includes logged { assert_empty ArrivalDispatcher.call(arrival) }, 'member is banned or deceased'
+    end
+
     test 'skips disabled announcers' do
       @announcer.update!(enabled: false)
 
