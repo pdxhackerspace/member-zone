@@ -33,6 +33,10 @@ one `Announcers::RunJob` per announcer if **all** of these hold:
 The window check and the new run are made under a row lock on the member, so two scans a second
 apart can't both get through. Access logs imported by the rake task never announce anything.
 
+The Announcers page lists every member with **Announce arrivals** switched on, including those who
+chose no announcer, with their announcers and the reason, if any, they can't be announced
+(`ArrivalDispatcher.ineligibility`, or no enabled announcer chosen).
+
 For members with **Announce arrivals** switched on, each decision is written to the Rails log
 (Sidekiq's, since it runs in `Announcers::ArrivalJob`) with an `Announcers:` prefix: every announcer
 queued, and the reason for anything skipped, such as an inside door, a disabled announcer, or a

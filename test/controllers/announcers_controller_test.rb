@@ -39,6 +39,33 @@ class AnnouncersControllerTest < ActionDispatch::IntegrationTest
     assert_no_match 'xoxb-secret', response.body
   end
 
+  test 'lists every member who opted in, including those with no announcer' do
+    chose = users(:one)
+    chose.update!(announce_arrivals: true)
+    chose.announcer_subscriptions.create!(announcer: @announcer)
+    chose_none = users(:two)
+    chose_none.update!(announce_arrivals: true)
+    chose_none.announcer_subscriptions.destroy_all
+    sign_in_manager
+
+    get announcers_path
+
+    assert_response :success
+    assert_select 'a[href=?]', user_path(chose)
+    assert_select 'a[href=?]', user_path(chose_none)
+    assert_match 'chose no announcers', response.body
+  end
+
+  test 'leaves out members who have announcements switched off' do
+    User.update_all(announce_arrivals: false)
+    sign_in_manager
+
+    get announcers_path
+
+    assert_response :success
+    assert_match 'No members have switched announcements on yet.', response.body
+  end
+
   test 'shows, edits and offers a new announcer without revealing secrets' do
     sign_in_manager
     @announcer.announcer_runs.create!(user: users(:one), status: 'failed', exit_code: 2, output: 'nope')
