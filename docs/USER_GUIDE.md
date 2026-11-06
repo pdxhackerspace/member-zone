@@ -239,7 +239,7 @@ Once you've finished, **Update your profile** on your dashboard brings you back 
 
 ### Choosing your announcements (members)
 
-On your profile's **Visibility** step, switch on **Announce arrivals** and tick where you'd like to be announced, for example a post in a Slack channel. When you badge in at an outside door we announce you using the name you chose to be greeted by. We never announce when you leave, and we won't announce you again for a while if you badge through more than one door. Switching **Announce arrivals** off pauses everything and remembers what you ticked. If you chose "Don't greet me", nothing is announced.
+On your profile's **Visibility** step, switch on **Announce arrivals** and tick where you'd like to be announced, for example a post in a Slack channel. Switching it on ticks every announcer for you if none are ticked yet; untick any you don't want. If you save with none ticked, every announcer announces you. When you badge in at an outside door we announce you using the name you chose to be greeted by. We never announce when you leave, and we won't announce you again for a while if you badge through more than one door. Switching **Announce arrivals** off pauses everything and remembers what you ticked. If you chose "Don't greet me", nothing is announced.
 
 ### Setting up announcers (administrators)
 

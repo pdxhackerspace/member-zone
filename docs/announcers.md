@@ -11,7 +11,10 @@ The access webhook (`POST /webhooks/:slug`, type `access`) records each log line
 After that, `Announcers::ArrivalJob` hands the entry to `Announcers::ArrivalDispatcher`, which queues
 one `Announcers::RunJob` per announcer if **all** of these hold:
 
-- the member has **Announce arrivals** switched on and has ticked that announcer;
+- the member has **Announce arrivals** switched on and has ticked that announcer. Switching it on
+  with nothing ticked ticks every enabled announcer, and saving with announcements on and nothing
+  ticked subscribes the member to every enabled announcer, since on with none would announce
+  nobody;
 - the announcer is enabled;
 - the member has access (`User#active?`), is not a service account, and has a greeting name (a
   member who chose "Don't greet me" is never announced). **Announce members without active
