@@ -145,7 +145,8 @@
                   <div class="text-muted small">There's nowhere to announce arrivals yet. Check back later.</div>
                 <% end %>
                 <div class="text-muted small">
-                  Announcements use the name you chose above. If you chose not to be greeted, nothing is announced.
+                  If you don't tick any, every one of these announces you. Announcements use the name you chose above.
+                  If you chose not to be greeted, nothing is announced.
                 </div>
               </div>
             </div>
@@ -268,14 +269,22 @@
   }
 })();
 
-// Announcer choices only matter while announcements are on
+// Announcer choices only matter while announcements are on. Switching announcements on with
+// nothing ticked ticks every announcer, so the member sees what they'll get.
 (function() {
   document.addEventListener('DOMContentLoaded', function() {
     var toggle  = document.getElementById('setup_announce_arrivals');
     var choices = document.getElementById('setup_announcer_choices');
     if (!toggle || !choices) return;
 
-    toggle.addEventListener('change', function() { choices.classList.toggle('d-none', !toggle.checked); });
+    toggle.addEventListener('change', function() {
+      choices.classList.toggle('d-none', !toggle.checked);
+      if (!toggle.checked) return;
+
+      var boxes = choices.querySelectorAll('input[name="user[announcer_ids][]"]');
+      var anyChecked = Array.prototype.some.call(boxes, function(box) { return box.checked; });
+      if (!anyChecked) boxes.forEach(function(box) { box.checked = true; });
+    });
   });
 })();
 
