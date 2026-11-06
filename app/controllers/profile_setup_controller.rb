@@ -198,9 +198,12 @@ class ProfileSetupController < AuthenticatedController
 
   # Only the announcers a member can see are changed: a choice of one that is currently disabled
   # is kept for when it comes back. While announce_arrivals is off the checkboxes are hidden and
-  # ignored, so switching it off and on again keeps what the member picked.
+  # ignored, so switching it off and on again keeps what the member picked. Announcements on with
+  # nothing ticked would announce nobody, and members kept doing that by forgetting the boxes, so
+  # it means every announcer instead.
   def choose_announcers
     chosen = Announcer.enabled.where(id: Array(params.dig(:user, :announcer_ids))).pluck(:id)
+    chosen = Announcer.enabled.pluck(:id) if chosen.empty?
     @user.announcer_subscriptions.where(announcer_id: Announcer.enabled.select(:id))
          .where.not(announcer_id: chosen).destroy_all
     (chosen - @user.announcer_subscriptions.pluck(:announcer_id)).each do |id|

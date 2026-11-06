@@ -64,8 +64,29 @@ class ProfileSetupAnnouncersTest < ActionDispatch::IntegrationTest
   end
 
   test 'an announcer id the member cannot see is ignored' do
+    save(announce: true, announcer_ids: [@hidden, @sign])
+
+    assert_equal [@sign], @member.reload.announcers.to_a
+  end
+
+  test 'switching announcements on without ticking any announcer chooses every enabled one' do
+    save(announce: true)
+
+    assert_equal [@slack, @sign].map(&:id).sort, @member.reload.announcer_ids.sort
+  end
+
+  test 'saving with announcements on and nothing ticked fills in every enabled announcer' do
+    @member.update!(announce_arrivals: true)
+    @member.announcer_subscriptions.create!(announcer: @hidden)
+
     save(announce: true, announcer_ids: [@hidden])
 
-    assert_empty @member.reload.announcers
+    assert_equal [@slack, @sign, @hidden].map(&:id).sort, @member.reload.announcer_ids.sort
+  end
+
+  test 'switching on ticks every announcer in the page when none are ticked' do
+    get profile_setup_visibility_path
+
+    assert_match 'if (!anyChecked) boxes.forEach', response.body
   end
 end

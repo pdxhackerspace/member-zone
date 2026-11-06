@@ -11,7 +11,10 @@ The access webhook (`POST /webhooks/:slug`, type `access`) records each log line
 After that, `Announcers::ArrivalJob` hands the entry to `Announcers::ArrivalDispatcher`, which queues
 one `Announcers::RunJob` per announcer if **all** of these hold:
 
-- the member has **Announce arrivals** switched on and has ticked that announcer;
+- the member has **Announce arrivals** switched on and has ticked that announcer. Switching it on
+  with nothing ticked ticks every enabled announcer, and saving with announcements on and nothing
+  ticked subscribes the member to every enabled announcer, since on with none would announce
+  nobody;
 - the announcer is enabled;
 - the member has access (`User#active?`), is not a service account, and has a greeting name (a
   member who chose "Don't greet me" is never announced). **Announce members without active
@@ -29,6 +32,10 @@ one `Announcers::RunJob` per announcer if **all** of these hold:
 
 The window check and the new run are made under a row lock on the member, so two scans a second
 apart can't both get through. Access logs imported by the rake task never announce anything.
+
+The Announcers page lists every member with **Announce arrivals** switched on, including those who
+chose no announcer, with their announcers and the reason, if any, they can't be announced
+(`ArrivalDispatcher.ineligibility`, or no enabled announcer chosen).
 
 For members with **Announce arrivals** switched on, each decision is written to the Rails log
 (Sidekiq's, since it runs in `Announcers::ArrivalJob`) with an `Announcers:` prefix: every announcer

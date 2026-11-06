@@ -239,7 +239,7 @@ Once you've finished, **Update your profile** on your dashboard brings you back 
 
 ### Choosing your announcements (members)
 
-On your profile's **Visibility** step, switch on **Announce arrivals** and tick where you'd like to be announced, for example a post in a Slack channel. When you badge in at an outside door we announce you using the name you chose to be greeted by. We never announce when you leave, and we won't announce you again for a while if you badge through more than one door. Switching **Announce arrivals** off pauses everything and remembers what you ticked. If you chose "Don't greet me", nothing is announced.
+On your profile's **Visibility** step, switch on **Announce arrivals** and tick where you'd like to be announced, for example a post in a Slack channel. Switching it on ticks every announcer for you if none are ticked yet; untick any you don't want. If you save with none ticked, every announcer announces you. When you badge in at an outside door we announce you using the name you chose to be greeted by. We never announce when you leave, and we won't announce you again for a while if you badge through more than one door. Switching **Announce arrivals** off pauses everything and remembers what you ticked. If you chose "Don't greet me", nothing is announced.
 
 ### Setting up announcers (administrators)
 
@@ -248,6 +248,7 @@ Administrators (and anyone with *Configure arrival announcers*) use **Settings â
 1. **Outside doors.** Tick the access log locations that are ways into the space. Nothing is announced until at least one is ticked.
 2. **New announcer.** Name it (members see the name and the description), choose the program, and add the environment variables it needs, such as a Slack bot token. These are stored encrypted. **Don't announce the same member again for** sets the quiet period after an announcement; it defaults to 120 minutes.
 3. **Send test announcement** runs the announcer for you, marked as a test, even while it's disabled. **Recent runs** shows each run's result and output.
+4. **Members who opted in**, below the list of announcers, shows everyone with **Announce arrivals** switched on, including members who ticked no announcer, with the announcers each chose and, if they won't be announced, why (no announcer chosen, inactive membership, "Don't greet me", and so on).
 
 The paragraph members see under **Announce arrivals** is the *Announce arrivals (profile help text)* text fragment. See `docs/announcers.md` for how programs are written.
 
