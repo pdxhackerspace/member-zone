@@ -14,6 +14,9 @@ class AnnouncersController < AuthenticatedController
                                               .group(:announcer_id).count
     @arrival_locations = DefaultSetting.instance.arrival_locations
     @known_locations = (AccessLog.known_locations + @arrival_locations).uniq.sort_by(&:downcase)
+    # Everyone with announcements switched on, including members who chose no announcer, so an
+    # admin can see who will and won't be announced, and why.
+    @opted_in_members = User.where(announce_arrivals: true).includes(:announcers).ordered_by_display_name
   end
 
   def show

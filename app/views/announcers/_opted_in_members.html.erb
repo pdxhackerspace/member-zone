@@ -1,0 +1,51 @@
+<div class="card shadow-sm border-0 mt-3">
+  <div class="card-body pb-2">
+    <div class="h-section-label mb-1">Members who opted in</div>
+    <p class="text-12 text-secondary mb-0">
+      Everyone with <strong>Announce arrivals</strong> switched on, with the announcers they chose and
+      anything that stops them being announced.
+    </p>
+  </div>
+  <% if members.any? %>
+    <div class="table-responsive">
+      <table class="table table-compact mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Member</th>
+            <th scope="col">Announcers</th>
+            <th scope="col">Announced?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% members.each do |member| %>
+            <% chosen = member.announcers.sort_by { |announcer| [announcer.display_order, announcer.name] } %>
+            <% reason = Announcers::ArrivalDispatcher.ineligibility(member) %>
+            <% reason ||= 'chose no announcers' if chosen.none?(&:enabled?) %>
+            <tr>
+              <td>
+                <%= link_to member.display_name, user_path(member), class: "fw-medium text-decoration-none" %>
+                <% if member.username.present? %><div class="text-12 text-secondary"><%= member.username %></div><% end %>
+              </td>
+              <td class="text-13">
+                <% if chosen.any? %>
+                  <% chosen.each_with_index do |announcer, index| %><%= ', ' unless index.zero? %><span class="<%= 'text-secondary' unless announcer.enabled? %>" title="<%= 'Disabled' unless announcer.enabled? %>"><%= announcer.name %></span><% end %>
+                <% else %>
+                  <span class="text-secondary">None</span>
+                <% end %>
+              </td>
+              <td class="text-13">
+                <% if reason %>
+                  <span class="status-dot status-warning"></span> No: <%= reason %>
+                <% else %>
+                  <span class="status-dot status-success"></span> Yes
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="card-body pt-0 text-13 text-secondary">No members have switched announcements on yet.</div>
+  <% end %>
+</div>

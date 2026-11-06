@@ -248,6 +248,7 @@ Administrators (and anyone with *Configure arrival announcers*) use **Settings â
 1. **Outside doors.** Tick the access log locations that are ways into the space. Nothing is announced until at least one is ticked.
 2. **New announcer.** Name it (members see the name and the description), choose the program, and add the environment variables it needs, such as a Slack bot token. These are stored encrypted. **Don't announce the same member again for** sets the quiet period after an announcement; it defaults to 120 minutes.
 3. **Send test announcement** runs the announcer for you, marked as a test, even while it's disabled. **Recent runs** shows each run's result and output.
+4. **Members who opted in**, below the list of announcers, shows everyone with **Announce arrivals** switched on, including members who ticked no announcer, with the announcers each chose and, if they won't be announced, why (no announcer chosen, inactive membership, "Don't greet me", and so on).
 
 The paragraph members see under **Announce arrivals** is the *Announce arrivals (profile help text)* text fragment. See `docs/announcers.md` for how programs are written.
 
