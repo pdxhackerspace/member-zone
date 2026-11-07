@@ -80,10 +80,6 @@ class ParkingNoticeReceiptPdf
     end
   end
 
-  def photo_fit_height
-    thermal? ? 300 : 480
-  end
-
   def thermal_font_scale
     (@thermal_width_mm.to_f / 80.0).clamp(0.9, 1.35)
   end
@@ -114,7 +110,6 @@ class ParkingNoticeReceiptPdf
     description_block if @notice.description.present?
     location_block
     separator
-    photos_block if @notice.photos.attached?
     qr_block
   end
 
@@ -170,44 +165,6 @@ class ParkingNoticeReceiptPdf
     document.move_down t[:block_gap]
     document.font_size(t[:body]) { document.text @notice.location_display, leading: thermal? ? 2 : 5 }
     document.move_down thermal? ? 4 : 12
-  end
-
-  def photos_block
-    t = theme
-    document.move_down t[:block_gap]
-    document.font_size(t[:section]) { document.text 'PHOTOS', style: :bold, color: '444444' }
-    document.move_down thermal? ? 4 : 12
-
-    photos = @notice.photos.select { |p| p.content_type.start_with?('image/') }
-    photos.each do |photo|
-      embed_photo(photo)
-      document.move_down thermal? ? 6 : 16
-    end
-  end
-
-  def embed_photo(photo)
-    photo_data = photo_bytes(photo)
-    tmpfile = Tempfile.new(['receipt_photo', File.extname(photo.filename.to_s)])
-    tmpfile.binmode
-    tmpfile.write(photo_data)
-    tmpfile.rewind
-
-    w = document.bounds.width
-    document.image tmpfile.path, fit: [w, photo_fit_height], position: :center
-
-    tmpfile.close
-    tmpfile.unlink
-  rescue StandardError => e
-    Rails.logger.error("ParkingNoticeReceiptPdf: Failed to embed photo #{photo.filename}: #{e.message}")
-    document.font_size(theme[:section]) do
-      document.text "(Photo: #{photo.filename})", color: '888888', align: :center
-    end
-  end
-
-  # Held onto because the thermal layout draws the notice twice.
-  def photo_bytes(photo)
-    @photo_bytes ||= {}
-    @photo_bytes[photo.id] ||= photo.download
   end
 
   def qr_block
