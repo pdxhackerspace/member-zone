@@ -50,4 +50,23 @@ class ParkingNoticeReceiptPdfTest < ActiveSupport::TestCase
     pt = ParkingNoticeReceiptPdf.mm_to_pt(88)
     assert_in_delta 249.45, pt, 0.05
   end
+
+  test 'leaves notice photos off the printed slip' do
+    attach_photo
+
+    full_page = ParkingNoticeReceiptPdf.new(@notice, layout: :full_page).render
+    thermal = ParkingNoticeReceiptPdf.new(@notice, layout: :thermal, thermal_width_mm: 88).render
+
+    assert_not_includes full_page, '/Subtype /Image'
+    assert_not_includes full_page, '(PHOTOS)'
+    assert_not_includes thermal, '/Subtype /Image'
+    assert_not_includes thermal, '(PHOTOS)'
+  end
+
+  private
+
+  def attach_photo
+    @notice.photos.attach(io: file_fixture('parking_photo.png').open, filename: 'parking_photo.png',
+                          content_type: 'image/png')
+  end
 end

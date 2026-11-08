@@ -25,8 +25,6 @@ class ParkingNoticePdf
     description_section if @notice.description.present?
     move_down 20
     notes_section if @notice.notes.present?
-    move_down 20
-    photos_section if @notice.photos.attached?
     footer
   end
 
@@ -86,48 +84,6 @@ class ParkingNoticePdf
       end
     end
     move_down 10
-  end
-
-  def photos_section
-    section_header('Photos')
-    move_down 8
-
-    layout = { max_width: (bounds.width - 20) / 2, max_height: 200 }
-    photos = @notice.photos.select { |p| p.content_type.start_with?('image/') }
-
-    photos.each_slice(2) do |photo_pair|
-      row_height = photo_pair_row_height(photo_pair, layout)
-      move_down row_height + 15
-    end
-  end
-
-  def photo_pair_row_height(photo_pair, layout)
-    row_height = 0
-    photo_pair.each_with_index do |photo, index|
-      x_position = index * (layout[:max_width] + 20)
-      row_height = [row_height, embed_notice_photo_height(photo, x_position, layout)].max
-    end
-    row_height
-  end
-
-  def embed_notice_photo_height(photo, x_position, layout)
-    max_width = layout[:max_width]
-    max_height = layout[:max_height]
-
-    photo_data = photo.download
-    tempfile = Tempfile.new(['photo', File.extname(photo.filename.to_s)])
-    tempfile.binmode
-    tempfile.write(photo_data)
-    tempfile.rewind
-
-    img = image tempfile.path, at: [x_position, cursor], fit: [max_width, max_height]
-    tempfile.close
-    tempfile.unlink
-    img.scaled_height
-  rescue StandardError => e
-    Rails.logger.error("Failed to embed photo #{photo.filename}: #{e.message}")
-    text_box "Photo: #{photo.filename}", at: [x_position, cursor], width: max_width, size: 9, color: '888888'
-    20
   end
 
   def section_header(title)
