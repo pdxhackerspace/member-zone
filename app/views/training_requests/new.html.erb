@@ -11,7 +11,9 @@
           <div class="col-md-6">
             <%= f.label :training_topic_id, 'Training topic', class: 'form-label' %>
             <%= f.select :training_topic_id,
-                         options_from_collection_for_select(@member_requestable_topics, :id, :name),
+                         options_from_collection_for_select(
+                           @member_requestable_topics, :id, :name, @selected_topic&.id
+                         ),
                          { include_blank: 'Choose a topic' },
                          { class: 'form-select', required: true } %>
           </div>

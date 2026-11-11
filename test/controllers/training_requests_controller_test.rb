@@ -124,6 +124,25 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Request Training/i, response.body)
     assert_match 'name="training_request[training_topic_id]"', response.body
     assert_match 'name="training_request[share_contact_info]"', response.body
+    assert_select 'select[name="training_request[training_topic_id]"] option[selected]', count: 0
+  end
+
+  test 'new training request preselects the topic opened from the catalog' do
+    sign_in_as_member
+
+    get new_training_request_path(training_topic_id: @topic.id)
+
+    assert_response :success
+    assert_select 'select[name="training_request[training_topic_id]"] option[selected][value=?]', @topic.id.to_s
+  end
+
+  test 'new training request ignores a topic that is not requestable' do
+    sign_in_as_member
+
+    get new_training_request_path(training_topic_id: training_topics(:electronics).id)
+
+    assert_response :success
+    assert_select 'select[name="training_request[training_topic_id]"] option[selected]', count: 0
   end
 
   test 'trainer can open response form for request in their topic' do
