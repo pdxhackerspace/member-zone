@@ -27,7 +27,7 @@
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body d-flex flex-wrap gap-2 align-items-center">
     <% if @requestable %>
-      <%= link_to new_training_request_path, class: 'btn btn-primary' do %>
+      <%= link_to new_training_request_path(training_topic_id: @training_topic.id), class: 'btn btn-primary' do %>
         <i class="bi bi-mortarboard me-1"></i> Request Training
       <% end %>
       <span class="text-muted small">This topic is open for member training requests.</span>
