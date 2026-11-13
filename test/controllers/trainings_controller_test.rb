@@ -83,6 +83,47 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert Training.exists?(trainee: new_trainee, trainer: trainer, training_topic: @laser_topic)
   end
 
+  test 'trainer cannot attribute a recorded training to someone else' do
+    trainer = sign_in_as_trainer
+    other = users(:one)
+    trainee = users(:no_email)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+    TrainerCapability.create!(user: other, training_topic: @laser_topic)
+
+    assert_difference 'Training.count', 1 do
+      post record_training_path, params: {
+        training_topic_id: @laser_topic.id,
+        trainer_id: other.id,
+        trained_at: Date.current.iso8601,
+        trainee_ids: [trainee.id]
+      }
+    end
+
+    assert_equal trainer, Training.find_by!(trainee: trainee, training_topic: @laser_topic).trainer
+  end
+
+  test 'admin record page lists trainers to attribute the session to' do
+    sign_in_as_admin
+    trainer = users(:one)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    get record_training_path
+
+    assert_response :success
+    assert_select '#record-trainer-id option', text: trainer.display_name
+  end
+
+  test 'trainer record page does not offer a trainer picker' do
+    trainer = sign_in_as_trainer
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    get record_training_path
+
+    assert_response :success
+    assert_select '#record-trainer-id', count: 0
+    assert_no_match 'profile-add-training-trainer', response.body
+  end
+
   test 'admin can backdate training and attribute it to an authorized trainer' do
     sign_in_as_admin
     trainer = users(:one)
@@ -235,6 +276,79 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'can now train others', flash[:notice]
   end
 
+  test 'admin add_training attributes the chosen trainer and journals them' do
+    admin = sign_in_as_admin
+    trainer = users(:one)
+    trainee = users(:no_email)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    assert_difference 'Training.count', 1 do
+      post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile'),
+           params: { trainer_id: trainer.id }
+    end
+
+    training = Training.find_by!(trainee: trainee, training_topic: @laser_topic)
+    assert_equal trainer, training.trainer
+    journal = Journal.where(user: trainee, action: 'training_added').order(:created_at).last
+    assert_equal trainer.display_name, journal.changes_json.dig('training', 'trainer')
+    assert_equal admin, journal.actor_user
+    assert_redirected_to user_path(trainee.id, anchor: 'training-access-section')
+  end
+
+  test 'admin add_training ignores a member who is not a trainer' do
+    admin = sign_in_as_admin
+    bystander = users(:two)
+    trainee = users(:no_email)
+
+    post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile'),
+         params: { trainer_id: bystander.id }
+
+    training = Training.find_by!(trainee: trainee, training_topic: @laser_topic)
+    assert_equal admin, training.trainer
+    journal = Journal.where(user: trainee, action: 'training_added').order(:created_at).last
+    assert_equal admin.display_name, journal.changes_json.dig('training', 'trainer')
+  end
+
+  test 'trainer add_training ignores a trainer_id and records themselves' do
+    trainer = sign_in_as_trainer
+    other = users(:one)
+    trainee = users(:no_email)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+    TrainerCapability.create!(user: other, training_topic: @laser_topic)
+
+    post add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile'),
+         params: { trainer_id: other.id }
+
+    assert_equal trainer, Training.find_by!(trainee: trainee, training_topic: @laser_topic).trainer
+  end
+
+  test 'admin member profile add training offers a trainer picker' do
+    sign_in_as_admin
+    trainer = users(:one)
+    trainee = users(:no_email)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    get user_path(trainee)
+
+    assert_response :success
+    assert_select '#profile-add-training-trainer option', text: trainer.display_name
+    assert_select 'form[action=?] input[name=trainer_id]',
+                  add_training_path(user_id: trainee.id, topic_id: @laser_topic.id, return_to: 'profile')
+  end
+
+  test 'trainer with profile access does not get a trainer picker when adding training' do
+    trainer = sign_in_as_trainer
+    grant_privileges(trainer, :'members.view_profile', :'training.record', topic: @laser_topic)
+    trainee = users(:no_email)
+
+    get user_path(trainee)
+
+    assert_response :success
+    assert_select 'button', text: '+ Add training'
+    assert_select '#profile-add-training-trainer', count: 0
+    assert_select 'input[name=trainer_id]', count: 0
+  end
+
   test 'add_training with return_to profile redirects to the member profile training section' do
     sign_in_as_admin
     trainee = users(:no_email)
@@ -375,6 +489,7 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
         password: 'localpassword123'
       }
     }
+    User.find_by!(authentik_id: "local:#{account.id}")
   end
 
   def sign_in_as_trainer

@@ -206,16 +206,32 @@
               <span class="profile-field-value empty">None recorded</span>
             <% end %>
             <% if can_record_training && untrained_topics.any? %>
-              <div class="dropdown d-inline-block ms-auto">
-                <button class="btn-link-add" type="button" data-bs-toggle="dropdown" aria-expanded="false">+ Add training</button>
+              <% admin_picks_trainer = current_user_admin? %>
+              <div class="dropdown d-inline-block ms-auto" <% if admin_picks_trainer %>data-controller="admin-add-training"<% end %>>
+                <button class="btn-link-add" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                        <% if admin_picks_trainer %>data-bs-auto-close="outside"<% end %>>+ Add training</button>
                 <ul class="dropdown-menu dropdown-menu-end" style="max-height: 320px; overflow-y: auto;">
+                  <% if admin_picks_trainer %>
+                    <li class="px-3 py-2">
+                      <label for="profile-add-training-trainer" class="form-label text-12 text-secondary mb-1">Trainer</label>
+                      <%= select_tag :profile_add_training_trainer,
+                            options_from_collection_for_select(
+                              TrainerCapability.attributable_trainers(including: true_user), :id, :display_name, true_user.id
+                            ),
+                            class: "form-select form-select-sm",
+                            id: "profile-add-training-trainer",
+                            data: { admin_add_training_target: "trainer" } %>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                  <% end %>
                   <% untrained_topics.each do |topic| %>
                     <li>
                       <%= button_to topic.name,
                           add_training_path(user_id: user.id, topic_id: topic.id, return_to: 'profile'),
                           method: :post,
                           class: "dropdown-item text-13",
-                          form: { data: { turbo: false }.merge(inactive_training_notice_data(user)) } %>
+                          params: (admin_picks_trainer ? { trainer_id: true_user.id } : {}),
+                          form: { data: profile_add_training_form_data(user) } %>
                     </li>
                   <% end %>
                 </ul>

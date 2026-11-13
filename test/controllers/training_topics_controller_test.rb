@@ -67,6 +67,19 @@ class TrainingTopicsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test 'topic page train action does not ask which trainer' do
+    sign_in_as_admin
+
+    get edit_training_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select '#profile-add-training-trainer', count: 0
+    assert_select '#record-trainer-id', count: 0
+    assert_select 'input[name=trainer_id]', count: 0
+    train_path = add_training_path(user_id: users(:no_email).id, topic_id: @laser_topic.id, return_to: 'topic')
+    assert_select 'form[action=?]', train_path
+  end
+
   test 'admin can create a training topic' do
     sign_in_as_admin
     assert_difference 'TrainingTopic.count', 1 do
