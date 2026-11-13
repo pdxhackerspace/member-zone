@@ -301,9 +301,11 @@ Tokens cannot be created or changed while viewing as a member.
 
 1. **Topics.** Pick one or more. Only topics you may train in, or appoint trainers for, are listed.
 2. **Members.** Search by name, email, or username, or use **Paste list** for a whole class. Each member's row shows what will happen in every selected topic: *train*, *make trainer*, or a greyed-out *already trained* / *already a trainer* that will be skipped.
-3. **Record as.** **Trained** records a training in each topic. **Trainer** lets the members train others in those topics, and records their own training first if it is missing. Trainer is shown only to people who can appoint trainers (admins, directors, and stewards for their subtopics); topics you can't appoint trainers for are greyed out while it is selected. Set the date and, for admins, who ran the session.
+3. **Record as.** **Trained** records a training in each topic. **Trainer** lets the members train others in those topics, and records their own training first if it is missing. Trainer is shown only to people who can appoint trainers (admins, directors, and stewards for their subtopics); topics you can't appoint trainers for are greyed out while it is selected. Set the date. Administrators also set **Trainer** — the person who ran the session. That field is not shown to anyone else, and a trainer recording a class is always recorded as themselves.
 
 The bar at the bottom totals it (for example, *4 members × 2 topics → 6 trainings, 2 skipped*) before you submit. Inactive members can be included; you'll be asked whether to email them. Banned members are always skipped.
+
+**Add training** on a member's profile (Training & access) records one topic for that member. Administrators pick the trainer in that menu before choosing the topic. The training record and the journal line both name that trainer; the journal's "by" column stays the administrator who entered it. Anyone else using Add training is recorded as themselves. The Train button on a topic page does not ask for a trainer.
 
 To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
 

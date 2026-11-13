@@ -111,13 +111,15 @@
               Over 30 days ago. Make sure this is right.
             </div>
           </div>
-          <div class="col-6 col-md-3">
-            <label for="record-trainer-id" class="text-12 text-secondary mb-1">Trainer</label>
-            <%= select_tag :trainer_id,
-                           options_from_collection_for_select(@trainer_options, :id, :display_name, true_user.id),
-                           class: "form-select form-select-sm",
-                           id: "record-trainer-id" %>
-          </div>
+          <% if current_user_admin? %>
+            <div class="col-6 col-md-3">
+              <label for="record-trainer-id" class="text-12 text-secondary mb-1">Trainer</label>
+              <%= select_tag :trainer_id,
+                             options_from_collection_for_select(@trainer_options, :id, :display_name, true_user.id),
+                             class: "form-select form-select-sm",
+                             id: "record-trainer-id" %>
+            </div>
+          <% end %>
         </div>
       </div>
 
