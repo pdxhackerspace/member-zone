@@ -37,12 +37,15 @@
           <option value="admin_members" <%= 'selected' if @application_group.member_source == 'admin_members' %>>Admin Members</option>
           <option value="unbanned_members" <%= 'selected' if @application_group.member_source == 'unbanned_members' %>>Unbanned Members</option>
           <option value="all_members" <%= 'selected' if @application_group.member_source == 'all_members' %>>All Members</option>
-          <option disabled>──────────</option>
-          <% @syncable_groups.each do |group| %>
-            <option value="sync_group:<%= group.id %>"
-                    <%= 'selected' if @application_group.member_source == 'sync_group' && @application_group.sync_with_group_id == group.id %>>
-              <%= group.name %> (<%= group.application.name %>)
-            </option>
+          <% syncable_group_sections(@syncable_groups).each do |label, groups| %>
+            <optgroup label="<%= label %>">
+              <% groups.each do |group| %>
+                <option value="sync_group:<%= group.id %>"
+                        <%= 'selected' if @application_group.member_source == 'sync_group' && @application_group.sync_with_group_id == group.id %>>
+                  <%= syncable_group_option_label(group) %>
+                </option>
+              <% end %>
+            </optgroup>
           <% end %>
         </select>
       </div>

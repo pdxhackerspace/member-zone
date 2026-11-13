@@ -1,53 +1,131 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h1 class="h3 mb-1">Application Group Defaults</h1>
-    <p class="text-muted mb-0">Configure default prefixes and group names used for applications and core member groups.</p>
+<% summary = capture do %>
+  <%= counted_value(@builtin_core_groups.size) %> built-in
+  · <%= counted_value(@custom_core_groups.size) %> custom
+  <% if @never_synced_count.positive? %>
+    · <span class="text-warning"><%= @never_synced_count %></span> never synced
+  <% end %>
+<% end %>
+<%= render layout: 'shared/list_page_header',
+           locals: { title: 'Core groups and Authentik naming', summary: summary } do %>
+  <%= link_to 'New core group', new_default_settings_core_group_path, class: 'btn btn-primary btn-sm' %>
+  <div class="dropdown">
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+            aria-expanded="false" aria-label="More actions">&hellip;</button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><%= link_to 'Edit naming', edit_default_settings_path, class: 'dropdown-item' %></li>
+      <li><%= link_to 'Login branding', branding_default_settings_path, class: 'dropdown-item' %></li>
+      <li>
+        <%= button_to 'Provision core groups', provision_core_groups_default_settings_path, method: :post,
+                      class: 'dropdown-item',
+                      form: { class: 'd-block' },
+                      data: { turbo: false,
+                              turbo_confirm: 'This will create any missing core Authentik groups (active, admins, unbanned, all, trained-on, can-train) and sync them. Continue?' } %>
+      </li>
+    </ul>
   </div>
-  <div>
-    <%= link_to "&larr; Back to Settings".html_safe, settings_path, class: "text-decoration-none" %>
-  </div>
-</div>
+<% end %>
 
-<div class="card shadow-sm border-0 mb-4">
-  <div class="card-body">
+<h2 class="h-section-label mb-2">Custom</h2>
+<% if @custom_core_groups.any? %>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="table-responsive">
+      <table class="table table-compact table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Authentik name</th>
+            <th scope="col" class="num">Members</th>
+            <th scope="col" class="num">Used by</th>
+            <th scope="col">Sync</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @custom_core_groups.each do |group| %>
+            <tr class="<%= 'row-attention' if group_needs_sync_attention?(group) %>"
+                data-href="<%= default_settings_core_group_path(group) %>"
+                onclick="if (!event.target.closest('a, button, form')) window.location = this.dataset.href">
+              <td class="fw-medium"><%= link_to group.name, default_settings_core_group_path(group), class: 'text-decoration-none' %></td>
+              <td><code class="text-secondary"><%= group.authentik_name %></code></td>
+              <td class="num<%= ' text-secondary' if group.users.empty? %>"><%= group.users.size %></td>
+              <td class="num<%= ' text-secondary' if group.sync_dependents.empty? %>"><%= group.sync_dependents.size %></td>
+              <td><%= group_sync_status(group) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <div class="mb-4">
+    <%= render 'shared/list_empty', message: 'No custom core groups yet' %>
+  </div>
+<% end %>
+
+<h2 class="h-section-label mb-2">Built-in</h2>
+<% if @builtin_core_groups.any? %>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="table-responsive">
+      <table class="table table-compact table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Authentik name</th>
+            <th scope="col">Members</th>
+            <th scope="col" class="num">Used by</th>
+            <th scope="col">Sync</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @builtin_core_groups.each do |group| %>
+            <% group_path = application_application_group_path(group.application, group) %>
+            <tr class="<%= 'row-attention' if group_needs_sync_attention?(group) %>"
+                data-href="<%= group_path %>"
+                onclick="if (!event.target.closest('a, button, form')) window.location = this.dataset.href">
+              <td class="fw-medium"><%= link_to group.name, group_path, class: 'text-decoration-none' %></td>
+              <td><code class="text-secondary"><%= group.authentik_name %></code></td>
+              <td class="text-secondary">Automatic</td>
+              <td class="num<%= ' text-secondary' if group.sync_dependents.empty? %>"><%= group.sync_dependents.size %></td>
+              <td><%= group_sync_status(group) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <p class="text-secondary text-13 mb-4">None yet. Provision core groups from the menu.</p>
+<% end %>
+
+<h2 class="h-section-label mb-2">Authentik naming</h2>
+<div class="card shadow-sm border-0">
+  <div class="card-body text-13">
     <dl class="row mb-0">
-      <dt class="col-sm-4 text-secondary">Site Prefix</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Site prefix</dt>
       <dd class="col-sm-8"><code><%= @default_setting.site_prefix %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">App Prefix</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">App prefix</dt>
       <dd class="col-sm-8"><code><%= @default_setting.app_prefix %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Members Prefix</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Members prefix</dt>
       <dd class="col-sm-8"><code><%= @default_setting.members_prefix %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Active Members Group</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Active members group</dt>
       <dd class="col-sm-8"><code><%= @default_setting.active_members_group %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Admins Group</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Admins group</dt>
       <dd class="col-sm-8"><code><%= @default_setting.admins_group %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Unbanned Members Group</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Unbanned members group</dt>
       <dd class="col-sm-8"><code><%= @default_setting.unbanned_members_group %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">All Members Group</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">All members group</dt>
       <dd class="col-sm-8"><code><%= @default_setting.all_members_group %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Trained On Prefix</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Trained on prefix</dt>
       <dd class="col-sm-8"><code><%= @default_setting.trained_on_prefix %></code></dd>
 
-      <dt class="col-sm-4 text-secondary">Can Train Prefix</dt>
+      <dt class="col-sm-4 text-secondary fw-normal">Can train prefix</dt>
       <dd class="col-sm-8"><code><%= @default_setting.can_train_prefix %></code></dd>
-
     </dl>
   </div>
 </div>
-
-<div class="d-flex gap-2">
-  <%= link_to "Edit", edit_default_settings_path, class: "btn btn-primary" %>
-  <%= link_to "Login Branding", branding_default_settings_path, class: "btn btn-outline-secondary" %>
-  <%= button_to "Provision Core Groups", provision_core_groups_default_settings_path, method: :post,
-      class: "btn btn-outline-primary", data: { turbo: false,
-      turbo_confirm: "This will create any missing core Authentik groups (active, admins, unbanned, all, trained-on, can-train) and sync them. Continue?" } %>
-  <%= link_to "Back to Settings", settings_path, class: "btn btn-outline-secondary" %>
-</div>
-

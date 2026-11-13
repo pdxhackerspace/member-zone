@@ -165,6 +165,44 @@ class ApplicationGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'Member Zone source is disabled.', flash[:alert]
   end
 
+  test 'sync picker splits core groups into sections' do
+    system_app = Authentik::CoreGroupProvisioner.system_application
+    system_app.application_groups.create!(
+      name: 'Trusted admins', authentik_name: 'ctrlh:org:members:trusted-admins', member_source: 'manual'
+    )
+    system_app.application_groups.create!(
+      name: 'Active Members', authentik_name: 'ctrlh:org:members:active', member_source: 'active_members'
+    )
+
+    get new_application_application_group_url(@application)
+
+    assert_response :success
+    assert_select 'optgroup[label=?]', 'Built-in core groups' do
+      assert_select 'option', text: 'Active Members'
+    end
+    assert_select 'optgroup[label=?]', 'Custom core groups' do
+      assert_select 'option', text: 'Trusted admins'
+    end
+    assert_select 'optgroup[label=?]', 'Other groups' do
+      assert_select 'option', text: 'Sample Group (Sample Application)'
+    end
+  end
+
+  test 'should not destroy a group other groups copy' do
+    @application.application_groups.create!(
+      name: 'Copy of sample',
+      authentik_name: 'sample:copy',
+      member_source: 'sync_group',
+      sync_with_group: @application_group
+    )
+
+    assert_no_difference('ApplicationGroup.count') do
+      delete application_application_group_url(@application, @application_group)
+    end
+    assert_redirected_to application_application_group_url(@application, @application_group)
+    assert_match(/Used by Copy of sample \(Sample Application\)/, flash[:alert])
+  end
+
   test 'should destroy application group' do
     assert_difference('ApplicationGroup.count', -1) do
       delete application_application_group_url(@application, @application_group)
