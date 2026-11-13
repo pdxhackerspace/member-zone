@@ -128,4 +128,34 @@ class ApplicationGroupTest < ActiveSupport::TestCase
     group.save!
     assert_nil group.sync_with_group_id
   end
+
+  test 'core scopes separate hand-managed groups from built-in ones' do
+    application = Authentik::CoreGroupProvisioner.system_application
+    custom = application.application_groups.create!(
+      name: 'Trusted admins', authentik_name: 'ctrlh:org:members:trusted-admins', member_source: 'manual'
+    )
+    builtin = application.application_groups.create!(
+      name: 'Active Members', authentik_name: 'ctrlh:org:members:active', member_source: 'active_members'
+    )
+
+    assert_includes ApplicationGroup.core, custom
+    assert_includes ApplicationGroup.core, builtin
+    assert_not_includes ApplicationGroup.core, @group
+    assert_equal [custom], ApplicationGroup.custom_core.to_a
+    assert_includes ApplicationGroup.builtin_core, builtin
+    assert_not_includes ApplicationGroup.builtin_core, custom
+  end
+
+  test 'refuses to delete a group that other groups copy' do
+    dependent = @group.application.application_groups.create!(
+      name: 'Copy of sample',
+      authentik_name: 'sample:copy',
+      member_source: 'sync_group',
+      sync_with_group: @group
+    )
+
+    assert_equal 'Used by Copy of sample (Sample Application).', @group.deletion_blocked_message
+    assert_no_difference('ApplicationGroup.count') { assert_not @group.destroy }
+    assert dependent.reload.persisted?
+  end
 end

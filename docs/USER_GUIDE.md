@@ -183,6 +183,16 @@ The device gets back JSON with the member's name and, for a blank permit, its id
 
 Permits issued this way show up on the member's profile like any other, and record which device issued them.
 
+## Core groups
+
+Core groups are lists of members that applications can share, instead of each application keeping its own copy of the same people. The built-in ones — active members, admins, unbanned members, all members, and a trained / can-train group for each topic — fill themselves. A custom one, such as a trusted-admins list, is people you add by hand.
+
+Open **Settings → Core groups and Authentik naming**. **New core group** asks for a name. The Authentik name is filled in from that name under the members prefix, for example `ctrlh:org:members:trusted-admins`. Add and remove members on the group's own page.
+
+To use a core group from an application, edit that application's group, choose **Sync with group**, and pick the core group. The application group copies the core group's members into its own Authentik group, the same way it already copies another application group. A core group that an application still uses cannot be deleted; the page names the groups that use it.
+
+The same settings page lists the built-in groups and the Authentik prefixes. **Edit naming**, **Login branding**, and **Provision core groups** are in the **⋯** menu. Provision creates any missing built-in groups and syncs them to Authentik.
+
 ## List pages
 
 The pages that list things — members, Authentik and Slack accounts, membership applications, incident reports, access logs, parking notices and each of the payment sources — are all built the same way, so learning one teaches the rest.

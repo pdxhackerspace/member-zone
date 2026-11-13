@@ -7,7 +7,7 @@ module MainNavigationItemsHelper
     settings applications application_groups text_fragments documents incoming_webhooks
     rooms printers application_form_pages application_form_questions ai_ollama_profiles
     ai_providers interests member_sources rfid_readers access_controllers
-    access_controller_types authentik_webhooks default_settings membership_settings
+    access_controller_types authentik_webhooks default_settings core_groups membership_settings
     payment_processors reminder_settings roles training_topics audit_log_sources
     audit_log_alert_rules credential_providers
   ].freeze

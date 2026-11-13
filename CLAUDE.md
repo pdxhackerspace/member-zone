@@ -89,6 +89,8 @@ Several states expire on a clock rather than an event. `effective_membership_sta
 
 `DefaultSetting` and `MembershipSetting` are singleton rows accessed via `.instance` with class-level convenience readers. `DefaultSetting` holds the Authentik group-naming scheme (`ctrlh:org:members:*` prefixes) that the group provisioner builds paths from. Editable copy lives in `TextFragment` records keyed by string, not in views.
 
+Custom core groups — a trusted-admins list, for example — are manual `ApplicationGroup` rows on the system application (`Authentik::CoreGroupProvisioner.system_application`, named "Member Zone"). They are managed at Settings → Core groups and Authentik naming. An application's group copies one by syncing with it, which mirrors the members into that application group's own Authentik group.
+
 ### Background jobs
 
 Sidekiq with sidekiq-cron; recurring jobs are declared inline in `config/initializers/sidekiq.rb`. **Never add `config.active_job.queue_name_prefix`** — it double-prefixes with sidekiq-cron's `active_job: true` and creates ghost queues. Queues are plain (`default`, `mailers`); cron entries use `active_job: true` and no explicit `queue:`.

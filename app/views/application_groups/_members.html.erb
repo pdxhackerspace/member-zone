@@ -1,0 +1,235 @@
+<% if unsyncable_members.any? %>
+  <div class="alert alert-warning mb-4">
+    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Members Without Authentik IDs</h6>
+    <p class="mb-2">
+      The following <%= unsyncable_members.count %> member(s) do not have Authentik IDs and cannot be synced to the Authentik group:
+    </p>
+    <ul class="mb-0">
+      <% unsyncable_members.limit(10).each do |user| %>
+        <li><%= link_to user.display_name, user_path(user), class: "alert-link" %></li>
+      <% end %>
+      <% if unsyncable_members.count > 10 %>
+        <li class="text-muted">... and <%= unsyncable_members.count - 10 %> more</li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<% if group.uses_default_group? %>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <div class="alert alert-info mb-3">
+        <% case group.member_source %>
+        <% when 'active_members' %>
+          <strong>This group uses the default active members group.</strong> It automatically includes all active members and cannot have individual members added or removed.
+        <% when 'admin_members' %>
+          <strong>This group uses the default admin members group.</strong> It automatically includes all admin members and cannot have individual members added or removed.
+        <% when 'unbanned_members' %>
+          <strong>This group uses the unbanned members group.</strong> It automatically includes all non-banned members and cannot have individual members added or removed.
+        <% when 'all_members' %>
+          <strong>This group uses the all members group.</strong> It automatically includes all members and cannot have individual members added or removed.
+        <% when 'sync_group' %>
+          <strong>This group syncs with <%= group.sync_with_group&.name || 'another group' %>.</strong> Its membership mirrors the synced group and cannot have individual members added or removed.
+        <% when 'can_train' %>
+          <strong>This group uses members who can train in <%= group.training_topic&.name %>.</strong> It automatically includes all members who can train others in this topic.
+        <% when 'trained_in' %>
+          <strong>This group uses members who are trained in <%= group.training_topic&.name %>.</strong> It automatically includes all members who have been trained in this topic.
+        <% end %>
+      </div>
+
+      <h6 class="text-muted mb-3">Current Members (<%= users.count %>)</h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead class="bg-body-tertiary">
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Status</th>
+            <th scope="col">Authentik</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if users.any? %>
+            <% users.each do |user| %>
+              <tr>
+                <td class="fw-semibold">
+                  <%= link_to user.display_name, user_path(user), class: "text-decoration-none" %>
+                </td>
+                <td>
+                  <% if user.email.present? %>
+                    <%= mail_to user.email %>
+                  <% else %>
+                    <span class="text-muted fst-italic">Not provided</span>
+                  <% end %>
+                </td>
+                <td>
+                  <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+                    <%= membership_state_label(user.membership_state) %>
+                  </span>
+                  <% if user.active? %>
+                    <span class="badge text-bg-success ms-1">Active</span>
+                  <% end %>
+                </td>
+                <td>
+                  <% if user.authentik_id.present? %>
+                    <span class="badge text-bg-success" title="<%= user.authentik_id %>">
+                      <i class="bi bi-check-lg"></i> Linked
+                    </span>
+                  <% else %>
+                    <span class="badge text-bg-warning" title="Cannot sync to Authentik">
+                      <i class="bi bi-x-lg"></i> No ID
+                    </span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          <% else %>
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">
+                No members match the criteria for this group.
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Members in Group</h2>
+    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      Add Member
+    </button>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead class="bg-body-tertiary">
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Status</th>
+            <th scope="col">Authentik</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if users.any? %>
+            <% users.each do |user| %>
+              <tr>
+                <td class="fw-semibold">
+                  <%= link_to user.display_name, user_path(user), class: "text-decoration-none" %>
+                </td>
+                <td>
+                  <% if user.email.present? %>
+                    <%= mail_to user.email %>
+                  <% else %>
+                    <span class="text-muted fst-italic">Not provided</span>
+                  <% end %>
+                </td>
+                <td>
+                  <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+                    <%= membership_state_label(user.membership_state) %>
+                  </span>
+                  <% if user.active? %>
+                    <span class="badge text-bg-success ms-1">Active</span>
+                  <% end %>
+                </td>
+                <td>
+                  <% if user.authentik_id.present? %>
+                    <span class="badge text-bg-success" title="<%= user.authentik_id %>">
+                      <i class="bi bi-check-lg"></i> Linked
+                    </span>
+                  <% else %>
+                    <span class="badge text-bg-warning" title="Cannot sync to Authentik">
+                      <i class="bi bi-x-lg"></i> No ID
+                    </span>
+                  <% end %>
+                </td>
+                <td>
+                  <%= button_to "Remove", remove_group_member_path(group, user),
+                      method: :delete,
+                      class: "btn btn-sm btn-outline-danger",
+                      data: { turbo: false, confirm: "Are you sure you want to remove #{user.display_name} from this group?" } %>
+                </td>
+              </tr>
+            <% end %>
+          <% else %>
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">
+                No members in this group yet. Click "Add Member" to add some.
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true"
+     data-controller="live-filter" data-action="hidden.bs.modal->live-filter#clear">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addUserModalLabel">Add Member to Group</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <input type="search" id="userSearchInput" class="form-control"
+                 placeholder="Search by name, email, username, or Authentik ID..."
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                 data-live-filter-target="input" data-action="input->live-filter#filter">
+        </div>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+          <table class="table table-sm mb-0" id="usersTable">
+            <thead class="bg-body-tertiary sticky-top">
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Status</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% member_ids = users.load.map(&:id).to_set %>
+              <% all_users.each do |user| %>
+                <% next if member_ids.include?(user.id) %>
+                <tr data-live-filter-target="item" data-search-text="<%= user_live_search_text(user) %>">
+                  <td class="fw-semibold"><%= user.display_name %></td>
+                  <td>
+                    <% if user.email.present? %>
+                      <%= mail_to user.email %>
+                    <% else %>
+                      <span class="text-muted fst-italic">Not provided</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <span class="badge <%= membership_state_badge_subtle_class(user.membership_state) %>">
+                      <%= membership_state_label(user.membership_state) %>
+                    </span>
+                    <% if user.active? %>
+                      <span class="badge text-bg-success ms-1">Active</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <%= button_to "Add", add_group_member_path(group, user),
+                        method: :post,
+                        class: "btn btn-sm btn-primary",
+                        data: { turbo: false } %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
