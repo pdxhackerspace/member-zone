@@ -33,7 +33,7 @@ class TrainingsController < AuthenticatedController
       current_user: true_user,
       training_topic: @training_topic,
       trainee_ids: [@trainee.id.to_s],
-      trainer: true_user,
+      trainer: selected_trainer_for_recording,
       trained_at: Time.current,
       notify_inactive: notify_inactive?
     ).call
@@ -176,14 +176,12 @@ class TrainingsController < AuthenticatedController
   end
 
   def trainer_options_for_recording
-    # Which trainers may be picked follows the account being viewed as; who is recorded as
-    # the trainer stays the real account, so a training is always named after whoever was
-    # actually at the keyboard.
+    # Which trainers may be picked follows the account being viewed as. A non-admin is
+    # always the trainer. An admin may name someone else; the journal still records the
+    # admin as the actor who entered it.
     return [true_user] unless current_user_admin?
 
-    trainer_ids = TrainerCapability.distinct.pluck(:user_id)
-    trainer_ids << true_user.id
-    User.where(id: trainer_ids.uniq).ordered_by_display_name
+    TrainerCapability.attributable_trainers(including: true_user)
   end
 
   def recording_user_options
