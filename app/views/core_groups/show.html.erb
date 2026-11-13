@@ -1,0 +1,90 @@
+<% summary = capture do %>
+  <%= counted_value(@users.count) %> <%= 'member'.pluralize(@users.count) %>
+  · used by <%= counted_value(@dependents.size) %> <%= 'group'.pluralize(@dependents.size) %>
+<% end %>
+<%= render layout: 'shared/list_page_header', locals: { title: @core_group.name, summary: summary } do %>
+  <% if MemberSource.enabled?('member_zone') %>
+    <%= button_to 'Sync to Authentik', sync_to_authentik_default_settings_core_group_path(@core_group),
+                  method: :post, class: 'btn btn-outline-secondary btn-sm',
+                  data: { turbo_confirm: 'Sync this group to Authentik?' } %>
+  <% else %>
+    <button class="btn btn-outline-secondary btn-sm" disabled title="Member Zone source is disabled">Sync to Authentik</button>
+  <% end %>
+  <%= link_to 'Edit', edit_default_settings_core_group_path(@core_group), class: 'btn btn-outline-secondary btn-sm' %>
+  <div class="dropdown">
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+            aria-expanded="false" aria-label="More actions">&hellip;</button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><%= link_to 'All core groups', default_settings_path, class: 'dropdown-item' %></li>
+      <li><hr class="dropdown-divider"></li>
+      <% if @dependents.any? %>
+        <li><span class="dropdown-item text-secondary" title="<%= @core_group.deletion_blocked_message %>">Delete</span></li>
+      <% else %>
+        <li>
+          <%= button_to 'Delete', default_settings_core_group_path(@core_group), method: :delete,
+                        class: 'dropdown-item text-danger',
+                        form: { class: 'd-block' },
+                        data: { turbo: false,
+                                turbo_confirm: 'Delete this core group? It will also be removed from Authentik.' } %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body text-13">
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-secondary fw-normal">Authentik name</dt>
+      <dd class="col-sm-9"><code><%= @core_group.authentik_name %></code></dd>
+
+      <dt class="col-sm-3 text-secondary fw-normal">Note</dt>
+      <dd class="col-sm-9">
+        <%= @core_group.note.presence || tag.span('No note', class: 'text-secondary') %>
+      </dd>
+    </dl>
+  </div>
+</div>
+
+<% if @dependents.any? %>
+  <h2 class="h-section-label mb-2">Used by</h2>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="table-responsive">
+      <table class="table table-compact table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Application group</th>
+            <th scope="col">Application</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @dependents.each do |group| %>
+            <% group_path = application_application_group_path(group.application, group) %>
+            <tr data-href="<%= group_path %>"
+                onclick="if (!event.target.closest('a, button, form')) window.location = this.dataset.href">
+              <td class="fw-medium"><%= link_to group.name, group_path, class: 'text-decoration-none' %></td>
+              <td class="text-secondary"><%= group.application.name %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%= render 'application_groups/members',
+           group: @core_group,
+           users: @users,
+           all_users: @all_users,
+           unsyncable_members: @unsyncable_members %>
+
+<div class="text-12 text-secondary mt-4">
+  <% if @core_group.authentik_group_id.present? %>
+    Authentik group <code><%= @core_group.authentik_group_id %></code>
+    <% if @core_group.authentik_policy_id.present? %>
+      · policy <code><%= @core_group.authentik_policy_id %></code>
+    <% end %>
+  <% else %>
+    Not synced to Authentik yet.
+  <% end %>
+</div>

@@ -251,6 +251,8 @@
 .table-compact .cell-truncate,
 .table-list .cell-truncate { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 /* A row the admin still has to deal with (an unlinked payment, say). */
+.table-compact tbody tr[data-href],
+.table-list tbody tr[data-href] { cursor: pointer; }
 .table-compact tbody tr.row-attention td,
 .table-list tbody tr.row-attention td { background: rgba(255, 193, 7, 0.04); }
 .table-compact tbody tr.row-attention:hover td,

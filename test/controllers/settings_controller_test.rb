@@ -27,7 +27,7 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     get settings_url
 
     assert_response :success
-    assert_select 'a[href=?]', default_settings_path, text: /Application group defaults/
+    assert_select 'a[href=?]', default_settings_path, text: /Core groups and Authentik naming/
     assert_select 'a[href=?]', map_default_settings_path, text: /Map defaults/
   end
 

@@ -6,7 +6,9 @@ class ApplicationGroup < ApplicationRecord
 
   belongs_to :application
   belongs_to :training_topic, optional: true
-  belongs_to :sync_with_group, class_name: 'ApplicationGroup', optional: true
+  belongs_to :sync_with_group, class_name: 'ApplicationGroup', optional: true, inverse_of: :sync_dependents
+  has_many :sync_dependents, class_name: 'ApplicationGroup', foreign_key: :sync_with_group_id,
+                             dependent: :restrict_with_error, inverse_of: :sync_with_group
   has_and_belongs_to_many :users,
                           after_add: :queue_authentik_membership_sync,
                           after_remove: :queue_authentik_membership_sync
@@ -26,6 +28,23 @@ class ApplicationGroup < ApplicationRecord
   scope :with_authentik_group_id, -> { where.not(authentik_group_id: [nil, '']) }
   scope :ordered_by_name, -> { order(:name) }
   scope :with_member_sources, ->(*sources) { where(member_source: sources.flatten) }
+
+  # Groups that hang off the built-in Member Zone application: the provisioned ones
+  # (active members, training, and so on) and the hand-managed custom core groups.
+  def self.core
+    application = Authentik::CoreGroupProvisioner.existing_system_application
+    return none if application.nil?
+
+    where(application_id: application.id)
+  end
+
+  def self.custom_core
+    core.with_member_sources('manual')
+  end
+
+  def self.builtin_core
+    core.where.not(member_source: 'manual')
+  end
 
   def self.synced_authentik_group_ids
     with_authentik_group_id.pluck(:authentik_group_id).compact.uniq
@@ -90,6 +109,17 @@ class ApplicationGroup < ApplicationRecord
 
   def policy_only?
     %w[sync_group can_train trained_in].include?(member_source)
+  end
+
+  # Named for the destroy screens. restrict_with_error is the backstop for any caller
+  # that skips the message; the database foreign key refuses the delete either way.
+  def deletion_blocked_message
+    labels = sync_dependents.includes(:application).ordered_by_name.map do |group|
+      "#{group.name} (#{group.application.name})"
+    end
+    return if labels.empty?
+
+    "Used by #{labels.to_sentence}."
   end
 
   private

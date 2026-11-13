@@ -332,6 +332,13 @@ Rails.application.routes.draw do
     get :edit_branding, on: :member
     patch :update_branding, on: :member
     post :provision_core_groups, on: :member
+    resources :core_groups, except: [:index] do
+      member do
+        post :add_user
+        delete :remove_user
+        post :sync_to_authentik
+      end
+    end
   end
   resource :membership_settings, only: [:show, :edit, :update], path: "settings/membership"
   resources :reminder_settings, only: [:index, :show, :update], path: "settings/reminders", param: :key do

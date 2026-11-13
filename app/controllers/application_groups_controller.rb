@@ -1,4 +1,6 @@
 class ApplicationGroupsController < AuthenticatedController
+  include AuthentikGroupSyncing
+
   before_action -> { require_privilege!(:'settings.applications') }
   before_action :set_application
   before_action :set_application_group, only: %i[show edit update destroy add_user remove_user sync_to_authentik]
@@ -50,18 +52,15 @@ class ApplicationGroupsController < AuthenticatedController
   end
 
   def destroy
-    group_name = @application_group.name
-
-    if @application_group.authentik_group_id.present?
-      begin
-        sync = Authentik::GroupSync.new(@application_group)
-        sync.delete!
-      rescue StandardError => e
-        Rails.logger.error("[ApplicationGroupsController] Failed to delete group from Authentik: #{e.message}")
-      end
+    blocked = @application_group.deletion_blocked_message
+    if blocked
+      redirect_to application_application_group_path(@application, @application_group), alert: blocked
+      return
     end
 
-    @application_group.destroy
+    delete_authentik_group(@application_group)
+    group_name = @application_group.name
+    @application_group.destroy!
     redirect_to application_path(@application), notice: "Application group '#{group_name}' deleted."
   end
 
@@ -164,52 +163,5 @@ class ApplicationGroupsController < AuthenticatedController
   def set_default_authentik_name
     prefix = @application.authentik_prefix.presence || DefaultSetting.instance.app_prefix
     @application_group.authentik_name = "#{prefix}:"
-  end
-
-  def sync_group_to_authentik(group)
-    return { status: 'skipped', reason: 'api_not_configured' } unless authentik_api_configured?
-
-    sync = Authentik::GroupSync.new(group)
-    sync.sync!
-  rescue StandardError => e
-    Rails.logger.error("[ApplicationGroupsController] Authentik sync failed: #{e.message}")
-    { status: 'error', error: e.message }
-  end
-
-  def sync_group_members(group)
-    return { status: 'skipped', reason: 'no_authentik_group_id' } if group.authentik_group_id.blank?
-    return { status: 'skipped', reason: 'api_not_configured' } unless authentik_api_configured?
-
-    sync = Authentik::GroupSync.new(group)
-    sync.sync_members!
-  rescue StandardError => e
-    Rails.logger.error("[ApplicationGroupsController] Authentik member sync failed: #{e.message}")
-    { status: 'error', error: e.message }
-  end
-
-  def authentik_api_configured?
-    AuthentikConfig.settings.api_token.present? && AuthentikConfig.settings.api_base_url.present?
-  end
-
-  def build_sync_notice(base_message, sync_result)
-    return base_message if sync_result.nil?
-
-    case sync_result[:status]
-    when 'created'
-      "#{base_message} Group created in Authentik."
-    when 'exists'
-      "#{base_message} Linked to existing Authentik group."
-    when 'updated', 'synced'
-      members_info = sync_result[:members] || sync_result
-      if members_info[:added].to_i.positive? || members_info[:removed].to_i.positive?
-        "#{base_message} Authentik sync: +#{members_info[:added]} / -#{members_info[:removed]} members."
-      else
-        "#{base_message} Synced to Authentik."
-      end
-    when 'error'
-      "#{base_message} Warning: Authentik sync failed - #{sync_result[:error]}"
-    else
-      base_message
-    end
   end
 end

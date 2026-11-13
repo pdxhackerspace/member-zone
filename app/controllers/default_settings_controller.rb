@@ -2,6 +2,9 @@ class DefaultSettingsController < AuthenticatedController
   before_action -> { require_privilege!(:'settings.defaults') }
   def show
     @default_setting = DefaultSetting.instance
+    @custom_core_groups = ApplicationGroup.custom_core.includes(:users, :sync_dependents).ordered_by_name
+    @builtin_core_groups = ApplicationGroup.builtin_core.includes(:application, :sync_dependents).ordered_by_name
+    @never_synced_count = @custom_core_groups.count { |group| group.authentik_group_id.blank? }
   end
 
   def edit

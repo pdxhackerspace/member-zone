@@ -9,6 +9,12 @@ module Authentik
     # unique index, so looking it up by the new name alone would quietly create a second
     # application and rebuild every group under it — orphaning the originals and leaving two
     # ApplicationGroups pushing to the same Authentik group. Adopt the old row instead.
+    # The system application if provisioning has already created it. Does not create or rename,
+    # so a page that only lists core groups stays read-only.
+    def self.existing_system_application
+      Application.find_by(name: SYSTEM_APP_NAME) || Application.find_by(name: LEGACY_SYSTEM_APP_NAME)
+    end
+
     def self.system_application
       existing = Application.find_by(name: SYSTEM_APP_NAME)
       return existing if existing
