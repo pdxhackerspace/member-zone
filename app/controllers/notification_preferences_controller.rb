@@ -1,10 +1,16 @@
 class NotificationPreferencesController < ApplicationController
+  include NotificationPreferencesData
+
   before_action :require_authenticated_user!, unless: :token_access_request?
   before_action :set_subject_user
   before_action :require_subject_user!
 
   def show
-    load_preferences
+    if token_access?
+      load_notification_preferences(@subject_user)
+    else
+      redirect_to preferences_return_path
+    end
   end
 
   def update
@@ -56,23 +62,6 @@ class NotificationPreferencesController < ApplicationController
     @token_access == true
   end
 
-  def load_preferences
-    @grouped_categories = NotificationCategory.grouped_for_member(@subject_user)
-    @opt_out_lookup = NotificationOptOut.where(user: @subject_user).each_with_object({}) do |row, hash|
-      hash[row.category] ||= {}
-      hash[row.category][row.channel] = true
-    end
-    @highlight_category = params[:highlight].presence
-    @highlight_entry = NotificationCategory.find(@highlight_category) if @highlight_category.present?
-    @optional_opt_out_count = count_optional_opt_outs
-  end
-
-  def count_optional_opt_outs
-    NotificationOptOut.where(user: @subject_user).count do |row|
-      NotificationCategory.opt_out_allowed?(row.category)
-    end
-  end
-
   def apply_bulk_updates
     permitted = params.fetch(:preferences, {}).permit!.to_h
     NotificationCategory.each_entry do |entry|
@@ -98,8 +87,10 @@ class NotificationPreferencesController < ApplicationController
   def preferences_return_path(highlight: params[:highlight])
     if token_access?
       token_notification_preferences_path(token: params[:token], highlight: highlight)
+    elsif params[:return_to] == 'profile' || !can?(:'dashboard.admin')
+      user_path(@subject_user, tab: :notifications, view_as: :self, highlight: highlight)
     else
-      notification_preferences_path(highlight: highlight)
+      root_path(tab: :notifications, highlight: highlight)
     end
   end
 

@@ -217,6 +217,8 @@ Payment lists never show a payer's email address. Open a payment to reveal the c
 
 Members manage optional email and Slack reminders from **Notifications** on their dashboard (or **Profile → Notifications**). Every notice type is listed; required notices (membership status changes, parking tickets issued, account security) appear grayed out and cannot be turned off. Staff who receive audit log alerts also see an *Audit log alerts* row they can switch off.
 
+The tabs above your message inbox and message details return you to your own member dashboard, profile, and notification preferences. Opening an unread message updates the unread count immediately.
+
 Optional reminder categories can also be disabled per category on Settings → **Reminders** via **Members can opt out**. Parking permit and ticket reminders default to mandatory, as does the stale application reminder, which goes to reviewers rather than to members.
 
 Applicants without an account can opt out from links in application reminder emails. Opted-out addresses are blocked at the apply gate until an admin removes the opt-out under Settings → **Email opt-outs**.

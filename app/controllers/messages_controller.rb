@@ -1,4 +1,7 @@
 class MessagesController < AuthenticatedController
+  include TrainingHistoryData
+
+  before_action :prepare_member_navigation, only: :index
   before_action :load_message, only: %i[show destroy mark_unread restore]
 
   rescue_from ActiveRecord::RecordNotFound, with: :message_not_found
@@ -16,6 +19,7 @@ class MessagesController < AuthenticatedController
       @message.read!
     end
     @return_folder = sanitized_folder(params[:folder])
+    prepare_member_navigation
   end
 
   def create
@@ -53,6 +57,16 @@ class MessagesController < AuthenticatedController
   end
 
   private
+
+  def prepare_member_navigation
+    @active_tab = :messages
+    @user = @home_user = current_user
+    @home_payments_count = @payments_count = PaymentHistory.for_user(current_user).count
+    @home_parking_notices_count = @parking_notices_count = current_user.parking_notices.not_cleared.count
+    @home_unread_messages_count = @unread_messages_count =
+      current_user.received_messages.not_deleted_by_recipient.unread.count
+    load_completed_training_requests(current_user)
+  end
 
   def load_message
     scope = Message.visible_to(current_user).or(Message.trash_for(current_user))

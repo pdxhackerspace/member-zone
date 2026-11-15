@@ -1,0 +1,82 @@
+<% member_section_tabs = %i[member_dashboard profile payments parking training_history messages notifications] %>
+<% member_section_active = @active_tab.in?(member_section_tabs) %>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <%= link_to root_path(tab: :admin_dashboard), class: "nav-link #{'active' unless member_section_active}", role: "tab" do %>
+      <i class="bi bi-speedometer2 me-1"></i> Admin Dashboard
+    <% end %>
+  </li>
+  <li class="nav-item" role="presentation">
+    <%= link_to root_path(tab: :member_dashboard), class: "nav-link #{'active' if member_section_active}", role: "tab" do %>
+      <i class="bi bi-person-badge me-1"></i> Member Dashboard
+    <% end %>
+  </li>
+</ul>
+
+<% if member_section_active %>
+  <ul class="nav nav-pills nav-pills-sub mb-4 small" role="tablist">
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :member_dashboard), class: "nav-link #{'active' if @active_tab == :member_dashboard}", role: "tab" do %>
+        <i class="bi bi-person me-1"></i> Dashboard
+      <% end %>
+    </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :profile), class: "nav-link #{'active' if @active_tab == :profile}", role: "tab" do %>
+        <i class="bi bi-person-vcard me-1"></i> Profile
+      <% end %>
+    </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :payments), class: "nav-link #{'active' if @active_tab == :payments}", role: "tab" do %>
+        <i class="bi bi-credit-card me-1"></i> Payment History
+        <% if @home_payments_count.to_i > 0 %>
+          <span class="badge bg-secondary ms-1"><%= @home_payments_count %></span>
+        <% end %>
+      <% end %>
+    </li>
+    <% if @home_parking_notices_count.to_i > 0 %>
+      <li class="nav-item" role="presentation">
+        <%= link_to root_path(tab: :parking), class: "nav-link #{'active' if @active_tab == :parking}", role: "tab" do %>
+          <i class="bi bi-car-front me-1"></i> Parking
+          <span class="badge bg-secondary ms-1"><%= @home_parking_notices_count %></span>
+        <% end %>
+      </li>
+    <% end %>
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :training_history), class: "nav-link #{'active' if @active_tab == :training_history}", role: "tab" do %>
+        <i class="bi bi-mortarboard me-1"></i> Training
+        <% if @completed_training_requests.to_a.any? %>
+          <span class="badge bg-secondary ms-1"><%= @completed_training_requests.size %></span>
+        <% end %>
+      <% end %>
+    </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to messages_path(folder: :unread), class: "nav-link #{'active' if @active_tab == :messages}", role: 'tab' do %>
+        <i class="bi bi-chat-dots me-1"></i> Messages
+        <% if @home_unread_messages_count.to_i > 0 %>
+          <span class="badge bg-danger ms-1"><%= @home_unread_messages_count %></span>
+        <% end %>
+      <% end %>
+    </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :notifications),
+          class: "nav-link #{'active' if @active_tab == :notifications}",
+          role: "tab" do %>
+        <i class="bi bi-bell me-1"></i> Notifications
+      <% end %>
+    </li>
+  </ul>
+<% else %>
+  <ul class="nav nav-pills nav-pills-sub mb-4 small" role="tablist">
+    <li class="nav-item" role="presentation">
+      <%= link_to root_path(tab: :admin_dashboard), class: "nav-link #{'active' if @active_tab == :admin_dashboard}", role: "tab" do %>
+        <i class="bi bi-speedometer2 me-1"></i> Dashboard
+      <% end %>
+    </li>
+    <li class="nav-item" role="presentation">
+      <%= link_to parking_notices_path, class: 'nav-link', role: 'tab' do %>
+        <i class="bi bi-car-front me-1"></i> Parking
+      <% end %>
+    </li>
+  </ul>
+<% end %>

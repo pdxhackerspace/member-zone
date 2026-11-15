@@ -11,9 +11,11 @@ class AuditLogNotificationPreferencesTest < ActionDispatch::IntegrationTest
   end
 
   test 'a plain member does not see the audit log alerts row' do
-    sign_in_as_plain_member
+    member = sign_in_as_plain_member
 
     get notification_preferences_path
+    assert_redirected_to user_path(member, tab: :notifications, view_as: :self)
+    follow_redirect!
     assert_response :success
     assert_select 'td', text: /Audit log alerts/, count: 0
   end
@@ -24,6 +26,9 @@ class AuditLogNotificationPreferencesTest < ActionDispatch::IntegrationTest
     sign_in_as_plain_member
 
     get notification_preferences_path
+    assert_redirected_to user_path(member, tab: :notifications, view_as: :self)
+    follow_redirect!
+    assert_response :success
     assert_select 'td', text: /Audit log alerts/
 
     patch notification_preferences_path, params: { preferences: { 'audit_log_alerts' => { 'email' => '0' } } }

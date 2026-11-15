@@ -11,6 +11,26 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     Rails.application.config.x.local_auth.enabled = @original_local_auth_enabled
   end
 
+  test 'notifications stay within the member dashboard after saving' do
+    ReminderSetting.seed_defaults!
+    get root_path(tab: :notifications)
+    assert_response :success
+    assert_select 'a.nav-link.active', text: /Member Dashboard/
+    assert_select 'a.nav-link.active', text: /Notifications/
+    assert_select 'a.nav-link[href=?]', root_path(tab: :profile), text: /Profile/
+    assert_select 'form[action=?] input[name=return_to][value=dashboard]', notification_preferences_path
+    assert_select 'a', text: 'Back to your profile', count: 0
+
+    patch notification_preferences_path, params: {
+      return_to: 'dashboard', preferences: { 'payment_overdue' => { 'email' => '0' } }
+    }
+    assert_redirected_to root_path(tab: :notifications)
+    follow_redirect!
+    assert_response :success
+    assert_select '#pref_payment_overdue_email[checked]', count: 0
+    assert_select 'a.nav-link.active', text: /Notifications/
+  end
+
   test 'admin home defaults to admin dashboard tab' do
     get root_path
     assert_response :success
@@ -96,7 +116,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Membership/i, response.body)
     assert_match(/Request training/i, response.body)
     assert_select 'a.action-card[href=?]', notification_preferences_path, text: /Notifications/
-    assert_select 'a.nav-link[href=?]', notification_preferences_path, text: /Notifications/
+    assert_select 'a.nav-link[href=?]', root_path(tab: :notifications), text: /Notifications/
   end
 
   test 'admin home includes normal user tabs' do
