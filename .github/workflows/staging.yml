@@ -16,14 +16,6 @@ on:
     branches: [staging]
   workflow_dispatch:
 
-# One group for the whole workflow, not one per merge commit: every run builds the tip of
-# staging, so a burst of merges would otherwise race several near-identical builds to push
-# the same `:staging` tag and let whichever finished last win — which is not necessarily
-# the newest commit. Collapsing them keeps the surviving run the newest one.
-concurrency:
-  group: staging-image
-  cancel-in-progress: true
-
 permissions:
   contents: read
   packages: write
@@ -38,6 +30,17 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request && github.event.pull_request.merged == true &&
        !startsWith(github.head_ref, 'release/'))
+
+    # On the job, not the workflow: every run builds the tip of staging, so a burst of
+    # merges wants one group — a per-merge-commit group would race several near-identical
+    # builds to push one `:staging` tag and let whichever finished last win, newest or not.
+    # But `closed` also fires for PRs closed *without* merging, and a workflow-level group
+    # is claimed before `if` is evaluated, so those no-op runs would cancel a real build and
+    # strand the merge with no image. A job-level group is only claimed once the job
+    # survives `if`, so unmerged closes cancel nothing.
+    concurrency:
+      group: staging-image
+      cancel-in-progress: true
 
     runs-on: ubuntu-latest
 
