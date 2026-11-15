@@ -15,7 +15,10 @@ class ApplicationLayoutTest < ActionDispatch::IntegrationTest
       get login_path
 
       assert_response :success
-      assert_select 'footer a[href=?]', 'https://github.com/example/member-zone', text: 'GitHub'
+      assert_select 'footer a[href=?]', 'https://github.com/example/member-zone', text: 'example/member-zone' do
+        assert_select 'i.bi-github[aria-hidden="true"]'
+      end
+      assert_select 'footer span[title=?]', AppVersion.current, text: "v#{AppVersion.semver}"
     end
   end
 
@@ -24,7 +27,9 @@ class ApplicationLayoutTest < ActionDispatch::IntegrationTest
       get login_path
 
       assert_response :success
-      assert_select 'footer a', text: 'GitHub', count: 0
+      assert_select 'footer a', count: 0
+      assert_select 'footer span[aria-hidden="true"]', count: 0
+      assert_select 'footer span[title=?]', AppVersion.current, text: "v#{AppVersion.semver}"
     end
   end
 

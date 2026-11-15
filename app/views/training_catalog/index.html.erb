@@ -85,7 +85,7 @@
                     <% if needs_trainers %>
                       <span class="text-warning text-12">No trainers</span>
                     <% elsif @requestable_topic_ids.include?(topic.id) %>
-                      <%= link_to new_training_request_path, class: 'btn btn-sm btn-outline-info' do %>
+                      <%= link_to new_training_request_path(training_topic_id: topic.id), class: 'btn btn-sm btn-outline-secondary' do %>
                         <i class="bi bi-mortarboard"></i> Request
                       <% end %>
                     <% end %>

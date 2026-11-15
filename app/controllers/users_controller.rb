@@ -1,5 +1,6 @@
 class UsersController < AuthenticatedController
   include TrainingHistoryData
+  include NotificationPreferencesData
   include ParkingStatusFiltering
   include MemberListFiltering
 
@@ -158,6 +159,11 @@ class UsersController < AuthenticatedController
                     :profile
                   end
 
+    if @active_tab == :messages && @view_level == :self && @user == current_user
+      redirect_to messages_path(folder: :unread)
+      return
+    end
+
     # Parking notices for admin and self views. The self view gets stacking
     # status filter pills (default: active only); the admin view keeps the
     # uncleared list.
@@ -185,6 +191,7 @@ class UsersController < AuthenticatedController
     end
 
     if @view_level == :self
+      load_notification_preferences(@user) if @active_tab == :notifications && @user == current_user
       set_self_service_training_data
       set_member_dashboard_data
       load_completed_training_requests(@user)

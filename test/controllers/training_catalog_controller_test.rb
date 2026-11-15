@@ -49,7 +49,8 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/Request Training/i, response.body)
-    assert_match new_training_request_path, response.body
+    assert_select 'a[href=?]', new_training_request_path
+    assert_select 'a[href=?]', new_training_request_path(training_topic_id: @laser_topic.id)
   end
 
   test 'index does not show request training button when no topic has a trainer' do
@@ -167,7 +168,7 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/Request Training/i, response.body)
-    assert_match new_training_request_path, response.body
+    assert_select 'a[href=?]', new_training_request_path(training_topic_id: @laser_topic.id)
   end
 
   test 'show does not display request training button when topic has no trainer' do

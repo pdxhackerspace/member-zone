@@ -409,68 +409,7 @@
     </div>
   </div>
 
-  <ul class="nav nav-tabs mb-3 small" role="tablist">
-    <li class="nav-item" role="presentation">
-      <%= link_to user_path(@user, tab: :dashboard, view_as: params[:view_as]),
-          class: "nav-link #{'active' if @active_tab == :dashboard}",
-          role: "tab" do %>
-        Dashboard
-      <% end %>
-    </li>
-    <li class="nav-item" role="presentation">
-      <%= link_to user_path(@user, tab: :profile, view_as: params[:view_as]), 
-          class: "nav-link #{'active' if @active_tab == :profile}", 
-          role: "tab" do %>
-        Profile
-      <% end %>
-    </li>
-    <li class="nav-item" role="presentation">
-      <%= link_to user_path(@user, tab: :payments, view_as: params[:view_as]), 
-          class: "nav-link #{'active' if @active_tab == :payments}", 
-          role: "tab" do %>
-        Payments
-        <% if @payments_count.to_i > 0 %>
-          <span class="text-secondary small ms-1"><%= @payments_count %></span>
-        <% end %>
-      <% end %>
-    </li>
-    <% if @parking_notices_count.to_i > 0 %>
-      <li class="nav-item" role="presentation">
-        <%= link_to user_path(@user, tab: :parking, view_as: params[:view_as]),
-            class: "nav-link #{'active' if @active_tab == :parking}",
-            role: "tab" do %>
-          Parking <span class="text-secondary small ms-1"><%= @parking_notices_count %></span>
-        <% end %>
-      </li>
-    <% end %>
-    <li class="nav-item" role="presentation">
-      <%= link_to user_path(@user, tab: :training_history, view_as: params[:view_as]),
-          class: "nav-link #{'active' if @active_tab == :training_history}",
-          role: "tab" do %>
-        Training
-        <% if @completed_training_requests.to_a.any? %>
-          <span class="text-secondary small ms-1"><%= @completed_training_requests.size %></span>
-        <% end %>
-      <% end %>
-    </li>
-    <li class="nav-item" role="presentation">
-      <%= link_to user_path(@user, tab: :messages, view_as: params[:view_as]),
-          class: "nav-link #{'active' if @active_tab == :messages}",
-          role: "tab" do %>
-        Messages
-        <% if @unread_messages_count.to_i > 0 %>
-          <span class="text-warning small ms-1"><%= @unread_messages_count %></span>
-        <% end %>
-      <% end %>
-    </li>
-    <li class="nav-item" role="presentation">
-      <%= link_to notification_preferences_path,
-          class: "nav-link #{'active' if controller_name == 'notification_preferences'}",
-          role: "tab" do %>
-        Notifications
-      <% end %>
-    </li>
-  </ul>
+  <%= render "users/self_navigation" %>
 
   <div class="tab-content">
     <% if @active_tab == :dashboard %>
@@ -486,6 +425,8 @@
           filter_url: ->(statuses) { user_path(@user, tab: :parking, statuses: statuses) } %>
       <%= render 'users/tab_parking', parking_notices: @parking_notices_list, actions: :member,
           empty_message: 'No parking notices match these filters.' %>
+    <% elsif @active_tab == :notifications && @user == current_user %>
+      <%= render "notification_preferences/preferences", notification_return_to: "profile" %>
     <% elsif @active_tab == :training_history %>
       <%= render 'users/tab_training_history', user: @user %>
     <% elsif @active_tab == :messages %>

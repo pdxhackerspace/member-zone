@@ -1,6 +1,7 @@
 class DashboardController < AuthenticatedController
   include MemberHomeTabs
   include TrainingHistoryData
+  include NotificationPreferencesData
 
   # Dashboard housekeeping item => the report it links to. Adding a report-backed item
   # means adding a line here rather than reimplementing the report's scope.
@@ -18,6 +19,11 @@ class DashboardController < AuthenticatedController
   before_action -> { require_privilege!(:'dashboard.admin') }
 
   def index
+    if params[:tab] == 'messages'
+      redirect_to messages_path(folder: :unread)
+      return
+    end
+
     @home_user = true_user || current_user
     @active_tab = params[:tab]&.to_sym || :admin_dashboard
 
@@ -56,6 +62,7 @@ class DashboardController < AuthenticatedController
                                 .limit(50)
 
     prepare_member_home_tabs_data
+    load_notification_preferences(@home_user) if @active_tab == :notifications
     load_completed_training_requests(@home_user)
     load_training_history(@home_user) if @active_tab == :training_history
   end

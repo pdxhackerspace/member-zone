@@ -8,6 +8,8 @@
 %>
 
 <div class="py-4">
+  <%= render(can?(:'dashboard.admin') ? "dashboard/navigation" : "users/self_navigation") %>
+
   <div class="mb-3">
     <%= link_to messages_path(folder: @return_folder || :unread),
                 class: 'btn btn-sm btn-outline-secondary' do %>

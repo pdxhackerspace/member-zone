@@ -296,8 +296,8 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select 'a.action-card[href=?]', notification_preferences_path, text: /Notifications/
     assert_select 'a[href=?]', notification_preferences_path, text: /Manage notifications/
-    assert_select 'a.nav-link.active[href=?]', notification_preferences_path, count: 0
-    assert_select 'a.nav-link[href=?]', notification_preferences_path, text: /Notifications/
+    assert_select 'a.nav-link.active[href=?]', user_path(member, tab: :notifications, view_as: :self), count: 0
+    assert_select 'a.nav-link[href=?]', user_path(member, tab: :notifications, view_as: :self), text: /Notifications/
   end
 
   test 'member profile tab links to notification preferences' do

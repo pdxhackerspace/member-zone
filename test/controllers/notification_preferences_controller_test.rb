@@ -10,10 +10,31 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
     with_local_auth do
       sign_in_as_plain_member
       get notification_preferences_path
+      assert_redirected_to user_path(@member, tab: :notifications, view_as: :self)
+      follow_redirect!
       assert_response :success
+      assert_select 'a.nav-link.active', text: 'Notifications'
+      assert_select 'a.nav-link', text: 'Profile'
+      assert_select 'a', text: 'Back to your profile', count: 0
       assert_match 'Notifications', response.body
       assert_match 'Overdue dues and lapse notices', response.body
       assert_match 'Parking permit and ticket reminders', response.body
+    end
+  end
+
+  test 'saving from an admin own profile keeps the profile tabs' do
+    with_local_auth do
+      sign_in_as_admin
+      admin = User.by_email(local_accounts(:active_admin).email).first!
+      patch notification_preferences_path, params: {
+        return_to: 'profile', preferences: { 'orientation' => { 'email' => '0' } }
+      }
+      assert_redirected_to user_path(admin, tab: :notifications, view_as: :self)
+      follow_redirect!
+      assert_response :success
+      assert_select 'a.nav-link.active', text: 'Notifications'
+      assert_select 'a.nav-link[href=?]', user_path(admin, tab: :profile, view_as: :self), text: 'Profile'
+      assert_select '#pref_orientation_email[checked]', count: 0
     end
   end
 
@@ -24,6 +45,7 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
     end
     assert_match 'Turn off email for this notice', response.body
+    assert_match 'Signed in via email link', response.body
   end
 
   test 'POST opt_out creates opt-out and redirects' do
@@ -33,7 +55,7 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
         post notification_preferences_opt_out_path,
              params: { category: 'payment_overdue', channel: 'email' }
       end
-      assert_redirected_to notification_preferences_path
+      assert_redirected_to user_path(@member, tab: :notifications, view_as: :self)
       follow_redirect!
       assert_response :success
     end
@@ -78,7 +100,10 @@ class NotificationPreferencesControllerTest < ActionDispatch::IntegrationTest
                 'payment_overdue' => { 'email' => '0', 'slack' => '1' }
               }
             }
-      assert_redirected_to notification_preferences_path
+      assert_redirected_to user_path(@member, tab: :notifications, view_as: :self)
+      follow_redirect!
+      assert_response :success
+      assert_select 'a.nav-link.active', text: 'Notifications'
       assert NotificationOptOut.opted_out?(@member, category: 'payment_overdue', channel: 'email')
       assert_not NotificationOptOut.opted_out?(@member, category: 'payment_overdue', channel: 'slack')
     end

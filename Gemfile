@@ -128,6 +128,6 @@ group :test do
   gem 'capybara'
   # Validates API responses against docs/api/openapi.yaml in the contract tests.
   gem 'json_schemer'
-  gem 'minitest', '~> 6.0'
+  gem 'minitest', '~> 6.1'
   gem 'selenium-webdriver'
 end

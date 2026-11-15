@@ -6,6 +6,7 @@ class TrainingRequestsController < AuthenticatedController
 
   def new
     @member_requestable_topics = TrainingTopic.available_for_member_requests
+    @selected_topic = @member_requestable_topics.find_by(id: params[:training_topic_id])
   end
 
   def edit
@@ -31,7 +32,8 @@ class TrainingRequestsController < AuthenticatedController
       redirect_to user_path(current_user, tab: :profile),
                   notice: "Your training request for #{topic.name} has been sent."
     else
-      redirect_to new_training_request_path, alert: request.errors.full_messages.to_sentence
+      redirect_to new_training_request_path(training_topic_id: topic.id),
+                  alert: request.errors.full_messages.to_sentence
     end
   end
 
