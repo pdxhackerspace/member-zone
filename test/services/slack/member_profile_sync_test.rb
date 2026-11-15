@@ -69,5 +69,20 @@ module Slack
 
       assert_equal 'https://example.com/existing-avatar.png', user.reload.avatar
     end
+
+    test 'refreshes a Slack avatar and preserves it when the latest URL is missing' do
+      user = users(:two)
+      user.update_columns(avatar: 'https://avatars.slack-edge.com/old.png')
+      slack_user = SlackUser.new(raw_attributes: {
+                                   'profile' => { 'image_192' => 'https://avatars.slack-edge.com/new.png' }
+                                 })
+
+      MemberProfileSync.apply(user: user, slack_user: slack_user)
+      assert_equal 'https://avatars.slack-edge.com/new.png', user.reload.avatar
+
+      slack_user.raw_attributes = { 'profile' => {} }
+      MemberProfileSync.apply(user: user, slack_user: slack_user)
+      assert_equal 'https://avatars.slack-edge.com/new.png', user.reload.avatar
+    end
   end
 end

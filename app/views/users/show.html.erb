@@ -85,7 +85,7 @@
   <div class="d-flex align-items-start justify-content-between mb-3 gap-3 flex-wrap">
     <div class="d-flex align-items-center gap-3">
       <% if image_url.present? %>
-        <img src="<%= image_url %>" alt="<%= @user.display_name %>" class="rounded-circle" style="width: 56px; height: 56px; object-fit: cover;">
+        <%= avatar_image_tag @user, size: 56, src: image_url, alt: @user.display_name, class: 'rounded-circle', style: 'width: 56px; height: 56px; object-fit: cover;' %>
       <% else %>
         <div class="avatar-initial avatar-initial-md"><%= @user.display_name.to_s.first.to_s.upcase %></div>
       <% end %>
@@ -241,7 +241,7 @@
     <div class="card-body">
       <div class="d-flex align-items-center gap-4">
         <% if image_url.present? %>
-          <img src="<%= image_url %>" alt="<%= @user.display_name %>" class="rounded-circle" style="width: 96px; height: 96px; object-fit: cover;">
+          <%= avatar_image_tag @user, size: 96, src: image_url, alt: @user.display_name, class: 'rounded-circle', style: 'width: 96px; height: 96px; object-fit: cover;' %>
         <% else %>
           <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width: 96px; height: 96px;">
             <i class="bi bi-person-fill text-white" style="font-size: 48px;"></i>
