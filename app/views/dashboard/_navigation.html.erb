@@ -58,13 +58,15 @@
         <% end %>
       <% end %>
     </li>
-    <li class="nav-item" role="presentation">
-      <%= link_to root_path(tab: :notifications),
-          class: "nav-link #{'active' if @active_tab == :notifications}",
-          role: "tab" do %>
-        <i class="bi bi-bell me-1"></i> Notifications
-      <% end %>
-    </li>
+    <% if own_notification_preferences? %>
+      <li class="nav-item" role="presentation">
+        <%= link_to root_path(tab: :notifications),
+            class: "nav-link #{'active' if @active_tab == :notifications}",
+            role: "tab" do %>
+          <i class="bi bi-bell me-1"></i> Notifications
+        <% end %>
+      </li>
+    <% end %>
   </ul>
 <% else %>
   <ul class="nav nav-pills nav-pills-sub mb-4 small" role="tablist">

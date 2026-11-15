@@ -31,6 +31,38 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select 'a.nav-link.active', text: /Notifications/
   end
 
+  # The member tabs here render for true_user, but the preferences form writes current_user.
+  # While impersonating a member who holds dashboard.admin those are different people, so the
+  # tab must not be offered rather than show one account's switches and save them onto another.
+  test 'notifications tab is withheld while impersonating' do
+    ReminderSetting.seed_defaults!
+    member = users(:one)
+    grant_privileges(member, 'dashboard.admin')
+    post impersonate_user_path(member.id)
+
+    get root_path(tab: :member_dashboard)
+    assert_response :success
+    assert_select 'a.nav-link[href=?]', root_path(tab: :notifications), count: 0
+
+    get root_path(tab: :notifications)
+    assert_response :success
+    assert_select 'form[action=?]', notification_preferences_path, count: 0
+  end
+
+  test 'impersonated preferences saves return to the profile tab, not the admin dashboard' do
+    ReminderSetting.seed_defaults!
+    member = users(:one)
+    grant_privileges(member, 'dashboard.admin')
+    post impersonate_user_path(member.id)
+
+    patch notification_preferences_path, params: {
+      preferences: { 'payment_overdue' => { 'email' => '0' } }
+    }
+
+    assert_redirected_to user_path(member, tab: :notifications, view_as: :self)
+    assert NotificationOptOut.exists?(user: member, category: 'payment_overdue', channel: 'email')
+  end
+
   test 'admin home defaults to admin dashboard tab' do
     get root_path
     assert_response :success
