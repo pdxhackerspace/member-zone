@@ -52,11 +52,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # No `ref`. On a push event the default is the pushed commit itself, which is
-          # precisely the tree we mean to build — no window in which a later merge changes
-          # what a running build picks up. `git rev-parse HEAD` below names it, so the
-          # image tag cannot drift from the tree either.
+          # On a push, the pushed commit itself — precisely the tree we mean to build, with
+          # no window in which a later merge changes what a running build picks up.
           #
+          # On a manual rebuild, staging, and never the dispatch ref: the Actions UI branch
+          # selector defaults to the default branch, so taking it would quietly build `main`
+          # and publish it over the `:staging` tag. This job only ever publishes staging, so
+          # it only ever builds staging. `git rev-parse HEAD` below names whichever commit
+          # that was, so the image tag cannot drift from the tree either.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'staging' || github.sha }}
           # Full history and tags so the version below can find the newest release tag.
           fetch-depth: 0
           fetch-tags: true
