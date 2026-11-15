@@ -1,20 +1,40 @@
 name: Staging - Build and Push Image
 
-# Build when a PR is merged into staging — not on push to staging (avoids coupling
-# to unrelated pushes while a staging→main release PR is open) and not when validating
-# a PR whose base is main. Optional manual rebuild via workflow_dispatch.
+# Build whatever lands on staging, plus an optional manual rebuild.
 #
-# pull_request_target, not pull_request: on a `pull_request` event raised by a PR from a
-# fork, GITHUB_TOKEN is read-only, so both the GHCR push and the buildx cache export fail
-# ("cache write denied: token has no writable scopes"). pull_request_target runs this file
-# as it exists on the base branch, with a writable token and the base branch's cache scope.
-# That is a trusted context, so this job builds `staging` itself and never a ref carried by
-# the event — see the note on the checkout step.
+# `push`, after two failed attempts with the pull-request events. staging is a protected
+# branch that takes no direct pushes, so every push to it *is* a merged PR — the same
+# moment the old `pull_request: [closed]` trigger was approximating, and the policy that
+# trigger existed to express (`enforce-main-pr-source.yml` and branch protection are where
+# it is actually enforced). What `push` additionally gets right:
+#
+#   * The token is writable. A `pull_request` event raised by a PR from a fork hands the job
+#     a read-only GITHUB_TOKEN, so the GHCR push and the buildx cache export both failed
+#     ("cache write denied: token has no writable scopes") on exactly the fork merges this
+#     workflow most needed to handle. A push event is a base-repository event and always
+#     carries the repository's own token and cache scope.
+#   * This file's source ref is unambiguous: a push event runs the workflow as it exists on
+#     the pushed ref. `pull_request_target` would have been the other way to get a writable
+#     token, but which branch's copy of the file it runs is poorly documented — GitHub's own
+#     event reference describes it in terms of the *default* branch, which here is `main`.
+#     Staging work would then be built by whatever `main` happened to hold, and a change to
+#     this file would do nothing until it was promoted.
+#   * checkout stays out of it. v7 refuses any ref it can match to a fork PR's head or merge
+#     SHA when the event is `pull_request_target`, so building the merge commit needed
+#     `allow-unsafe-pr-checkout: true`. On a push event the guard does not apply at all, and
+#     the default checkout is already the pushed commit.
 on:
-  pull_request_target:
-    types: [closed]
+  push:
     branches: [staging]
   workflow_dispatch:
+
+# Every run builds one commit on staging and pushes one `:staging` tag, so a burst of merges
+# should collapse onto the newest rather than race near-identical builds and let whichever
+# finished last win. Safe at workflow level here because, unlike the `closed` trigger this
+# replaces, there is no event that starts a run which then declines to build.
+concurrency:
+  group: staging-image
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -22,26 +42,6 @@ permissions:
 
 jobs:
   build-and-push:
-    # Do not build when a release/* branch merges (disallowed into staging; defense in depth).
-    # `github.head_ref`, as in enforce-main-pr-source.yml, and not
-    # `github.event.pull_request.head_ref`: the webhook payload spells that `head.ref`, so
-    # the old form read null, startsWith coerced it to '', and the guard never once fired.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request && github.event.pull_request.merged == true &&
-       !startsWith(github.head_ref, 'release/'))
-
-    # On the job, not the workflow: every run builds the tip of staging, so a burst of
-    # merges wants one group — a per-merge-commit group would race several near-identical
-    # builds to push one `:staging` tag and let whichever finished last win, newest or not.
-    # But `closed` also fires for PRs closed *without* merging, and a workflow-level group
-    # is claimed before `if` is evaluated, so those no-op runs would cancel a real build and
-    # strand the merge with no image. A job-level group is only claimed once the job
-    # survives `if`, so unmerged closes cancel nothing.
-    concurrency:
-      group: staging-image
-      cancel-in-progress: true
-
     runs-on: ubuntu-latest
 
     env:
@@ -52,14 +52,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # Always the branch, never the event's merge_commit_sha. checkout v7 refuses any
-          # ref it can match to a fork PR's head or merge SHA under pull_request_target
-          # (allow-unsafe-pr-checkout opts out of that, and is not worth taking), and the
-          # branch is what we actually want: the job only runs for a merged PR, so the tip
-          # of staging already contains it. `git rev-parse HEAD` below names whatever was
-          # really built, so the image tag cannot drift from the tree.
-          ref: staging
-          # Full history and tags so `git describe` can name this build.
+          # No `ref`. On a push event the default is the pushed commit itself, which is
+          # precisely the tree we mean to build — no window in which a later merge changes
+          # what a running build picks up. `git rev-parse HEAD` below names it, so the
+          # image tag cannot drift from the tree either.
+          #
+          # Full history and tags so the version below can find the newest release tag.
           fetch-depth: 0
           fetch-tags: true
 
