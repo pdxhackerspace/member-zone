@@ -3,8 +3,15 @@ name: Staging - Build and Push Image
 # Build when a PR is merged into staging — not on push to staging (avoids coupling
 # to unrelated pushes while a staging→main release PR is open) and not when validating
 # a PR whose base is main. Optional manual rebuild via workflow_dispatch.
+#
+# pull_request_target, not pull_request: on a `pull_request` event raised by a PR from a
+# fork, GITHUB_TOKEN is read-only, so both the GHCR push and the buildx cache export fail
+# ("cache write denied: token has no writable scopes"). pull_request_target runs this file
+# as it exists on the base branch with a writable token. The usual caveat about running
+# untrusted fork code does not bite here: the job only fires on merged PRs and checks out
+# the merge commit, which is code a maintainer has already landed on staging.
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches: [staging]
   workflow_dispatch:
@@ -35,7 +42,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || 'staging' }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || 'staging' }}
           # Full history and tags so `git describe` can name this build.
           fetch-depth: 0
           fetch-tags: true
@@ -86,4 +93,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ steps.meta.outputs.short_sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # ignore-error so a cache service hiccup, or a token that cannot write the cache,
+          # never discards an image that already built and pushed.
+          cache-to: type=gha,mode=max,ignore-error=true

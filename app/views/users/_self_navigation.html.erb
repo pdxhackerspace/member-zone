@@ -54,7 +54,7 @@
       <% end %>
     <% end %>
   </li>
-  <% if @user == current_user %>
+  <% if own_notification_preferences?(@user) %>
     <li class="nav-item" role="presentation">
       <%= link_to user_path(@user, tab: :notifications, view_as: navigation_view),
           class: "nav-link #{'active' if @active_tab == :notifications}",

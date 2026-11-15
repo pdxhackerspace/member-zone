@@ -84,10 +84,14 @@ class NotificationPreferencesController < ApplicationController
     end
   end
 
+  # The subject here is always `current_user`, so the only surfaces worth returning to are
+  # ones that render for `current_user` as well. The admin dashboard's member tabs render
+  # for `true_user`, which is somebody else while impersonating — it drops its Notifications
+  # tab then, so send impersonated sessions to the profile tab, which is the subject's own.
   def preferences_return_path(highlight: params[:highlight])
     if token_access?
       token_notification_preferences_path(token: params[:token], highlight: highlight)
-    elsif params[:return_to] == 'profile' || !can?(:'dashboard.admin')
+    elsif params[:return_to] == 'profile' || impersonating? || !can?(:'dashboard.admin')
       user_path(@subject_user, tab: :notifications, view_as: :self, highlight: highlight)
     else
       root_path(tab: :notifications, highlight: highlight)
