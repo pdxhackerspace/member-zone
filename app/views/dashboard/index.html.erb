@@ -277,7 +277,7 @@
         filter_url: ->(statuses) { root_path(tab: :parking, statuses: statuses) } %>
     <%= render 'users/tab_parking', parking_notices: @home_parking_notices_list, actions: :member,
         empty_message: 'No parking notices match these filters.' %>
-  <% elsif @active_tab == :notifications %>
+  <% elsif @active_tab == :notifications && own_notification_preferences? %>
     <%= render "notification_preferences/preferences", notification_return_to: "dashboard" %>
   <% elsif @active_tab == :training_history %>
     <%= render 'users/tab_training_history', user: @home_user %>

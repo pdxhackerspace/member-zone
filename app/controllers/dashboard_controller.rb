@@ -62,7 +62,13 @@ class DashboardController < AuthenticatedController
                                 .limit(50)
 
     prepare_member_home_tabs_data
-    load_notification_preferences(@home_user) if @active_tab == :notifications
+    # The member tabs on this page render for `true_user`, but the shared preferences form
+    # PATCHes NotificationPreferencesController, which always writes `current_user`. While
+    # impersonating those are different people, so the tab is withheld rather than show one
+    # account's switches and save them onto another — the same test
+    # `users/_self_navigation` applies to its own Notifications tab. See
+    # NotificationPreferencesHelper#own_notification_preferences?, which the views share.
+    load_notification_preferences(@home_user) if @active_tab == :notifications && @home_user == current_user
     load_completed_training_requests(@home_user)
     load_training_history(@home_user) if @active_tab == :training_history
   end
