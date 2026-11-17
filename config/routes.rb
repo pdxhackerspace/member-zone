@@ -4,6 +4,9 @@ Rails.application.routes.draw do
   get 'default_settings/update'
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Prometheus scrape endpoint, authenticated by METRICS_TOKEN. See docs/metrics.md.
+  get '/metrics', to: 'metrics#show', as: :metrics
+
   root "dashboard#index"
 
   get  "/invite/:token",         to: "invite#show",     as: :invite

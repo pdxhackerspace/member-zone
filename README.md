@@ -298,6 +298,10 @@ The documentation is generated from two sources, and contract tests hold the API
 
 `/llms.txt` (an index) and `/api/v1/llms-full.txt` (guide, every endpoint, and every schema) are built from both by `ApiReference::LlmsText`. When adding an endpoint, add it to the spec with `x-required-scope`, and gate the controller with `require_scope!`.
 
+## Metrics
+
+`GET /metrics` serves Prometheus metrics — members by state, application and mail backlogs, integration health, Sidekiq queues, servers and cron schedule, and per-job and per-action counters and durations. It is off until `METRICS_TOKEN` is set (on both the web and Sidekiq containers), and requires that value as a bearer token. See [`docs/metrics.md`](docs/metrics.md) for the scrape configuration, the full metric list, and example alerts.
+
 ## Roles and Privileges
 
 Privileges bundle into roles, roles attach to training topics, and holding a topic confers that topic's roles. Members are never granted privileges directly. `is_admin` remains a superuser bypass, so a misconfigured role cannot lock administrators out.
