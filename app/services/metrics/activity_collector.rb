@@ -40,13 +40,16 @@ module Metrics
             'When the oldest unsent queued mail was created.', unsent.minimum(:created_at))
     end
 
+    # Mirrors ApiToken#state: revoked wins over suspended, suspended over expired. One instant for
+    # both sides of the expiry line, and active is what is left, so the four always sum to the total.
     def api_tokens
+      now = Time.current
       revoked = ApiToken.revoked.count
-      usable = ApiToken.usable.count
-      expired = ApiToken.expired.count
-      suspended = ApiToken.count - revoked - usable - expired
+      suspended = ApiToken.suspended.count
+      expired = ApiToken.expired(now).where(suspended_at: nil).count
+      active = ApiToken.count - revoked - suspended - expired
       gauge('memberzone_api_tokens', 'API tokens by state.')
-        .set_grouped({ 'active' => usable, 'suspended' => suspended, 'expired' => expired, 'revoked' => revoked },
+        .set_grouped({ 'active' => active, 'suspended' => suspended, 'expired' => expired, 'revoked' => revoked },
                      :state)
       gauge('memberzone_api_tokens_used_24h', 'API tokens used in the last 24 hours.',
             ApiToken.where(last_used_at: 1.day.ago..).count)
