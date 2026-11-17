@@ -34,7 +34,10 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     # Unknown /api/v1 paths, answered in the API's error envelope.
     'api/v1/errors' => %w[not_found],
     # The guide, the llms.txt index, and the rendered reference: documentation, granting nothing.
-    'api_docs' => %w[llms_index llms_full reference]
+    'api_docs' => %w[llms_index llms_full reference],
+    # The Prometheus scrape: no member session, gated by the METRICS_TOKEN bearer token in its
+    # own filter, and absent (404) until that token is configured.
+    'metrics' => %w[show]
   }.freeze
 
   FILTER_NAMES = %w[require_authenticated_user! require_admin! require_privilege!

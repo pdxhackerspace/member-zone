@@ -6,7 +6,10 @@ class MembershipStateHelperTest < ActionView::TestCase
   # The membership card's renewal line is wrong for someone who cancelled: the subscription
   # will not renew, and showing the date as a payment — worse, as an overdue one — asks
   # them for money they already told us they were done paying.
+  # Pinned mid-year: the card adds the year to a date in another year, so "45 days from now"
+  # and "3 months ago" would otherwise fail near either end of the year.
   test 'a cancelled member still covered by their payment sees when access ends' do
+    travel_to Time.zone.local(2026, 6, 15, 12)
     access_until = 45.days.from_now
     user = member(state: 'cancelled_member', dues_due_at: access_until)
 
@@ -17,6 +20,7 @@ class MembershipStateHelperTest < ActionView::TestCase
   end
 
   test 'a cancellation whose date has passed reads as ended' do
+    travel_to Time.zone.local(2026, 6, 15, 12)
     access_until = 3.months.ago
     user = member(state: 'inactive_member', dues_due_at: access_until)
 

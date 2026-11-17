@@ -23,9 +23,11 @@ module ActiveSupport
     # The process ID keeps concurrent suite runs sharing a Redis apart too, and is set here as well
     # as per worker because a run too small to parallelize never calls parallelize_setup.
     RfidWebhookService.key_namespace = "test:#{Process.pid}:"
+    Metrics::Store.namespace = "test:#{Process.pid}:"
 
     parallelize_setup do |worker|
       RfidWebhookService.key_namespace = "test:#{Process.pid}:#{worker}:"
+      Metrics::Store.namespace = "test:#{Process.pid}:#{worker}:"
     end
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
