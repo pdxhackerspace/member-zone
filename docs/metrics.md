@@ -120,7 +120,7 @@ processors all record the outcome of their own health check or sync. They are ex
 
 | Metric | |
 | --- | --- |
-| `memberzone_integration_up` | 1 if the last check or sync succeeded. |
+| `memberzone_integration_up` | 1 if the last check or sync succeeded. Absent for an access controller whose type has no ping action: nothing checks it. |
 | `memberzone_integration_enabled` | 1 if switched on. Alert on `up == 0 and enabled == 1`. |
 | `memberzone_integration_status` | Always 1, with the recorded outcome in a `status` label. |
 | `memberzone_integration_last_check_timestamp_seconds` | |

@@ -4,10 +4,11 @@ module Metrics
   # the outcome of its own health check or sync; this exports those in one shape.
   class IntegrationsCollector < Collector
     # kind: label value. status: the column holding the last outcome. up: values that mean
-    # working. name: the column identifying the record. The rest are optional columns.
+    # working. name: the column identifying the record. checked_by: a predicate saying whether
+    # anything checks this record at all. The rest are optional columns.
     SOURCES = [
       { kind: 'access_controller', model: 'AccessController', status: :ping_status, up: %w[success],
-        checked_at: :last_ping_at },
+        checked_at: :last_ping_at, checked_by: :pinged? },
       { kind: 'printer', model: 'Printer', status: :health_status, up: %w[healthy],
         checked_at: :last_health_check_at },
       { kind: 'ai_profile', model: 'AiOllamaProfile', name: :key, status: :health_status, up: %w[healthy],
@@ -48,12 +49,23 @@ module Metrics
     def export(source, record)
       labels = { kind: source[:kind], name: record[source[:name] || :name].to_s }
       status = record[source[:status]].to_s
-      families[:up].set(source[:up].include?(status), labels)
+      families[:up].set(source[:up].include?(status), labels) if checked?(source, record)
       families[:enabled].set(record.has_attribute?(:enabled) ? record.enabled : true, labels)
       families[:status].set(1, labels.merge(status: status))
       families[:checked].set(record[source[:checked_at]], labels)
       families[:succeeded].set(record[source[:succeeded_at]], labels) if source[:succeeded_at]
       families[:errors].set(record[source[:errors]], labels) if source[:errors]
+    end
+
+    # A record nothing checks has no up series: its status never leaves the default, and
+    # exporting that as down would page for an integration nobody is watching.
+    def checked?(source, record)
+      source[:checked_by].nil? || send(source[:checked_by], record)
+    end
+
+    # What AccessControllerPingJob pings: controllers whose enabled type has a ping action.
+    def pinged?(controller)
+      controller.supports_ping? && controller.access_controller_type.enabled?
     end
 
     def access_controllers
