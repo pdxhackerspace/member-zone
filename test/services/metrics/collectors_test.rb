@@ -53,6 +53,26 @@ module Metrics
       assert_equal ApiToken.usable.count, metric_value(text, 'memberzone_api_tokens', state: 'active')
     end
 
+    test 'API tokens are counted by the state the model gives them' do
+      member = users(:one)
+      lapsed = 1.day.ago
+      ApiToken.create!(user: member, created_by: member, name: 'Active')
+      ApiToken.create!(user: member, created_by: member, name: 'Expired').update_columns(expires_at: lapsed)
+      ApiToken.create!(user: member, created_by: member, name: 'Suspended').update_columns(suspended_at: lapsed)
+      ApiToken.create!(user: member, created_by: member, name: 'Suspended and lapsed')
+              .update_columns(suspended_at: lapsed, expires_at: lapsed)
+      ApiToken.create!(user: member, created_by: member, name: 'Revoked')
+              .update_columns(revoked_at: lapsed, suspended_at: lapsed, expires_at: lapsed)
+
+      text = collect(ActivityCollector)
+
+      expected = ApiToken.all.map(&:state).tally
+      %w[active suspended expired revoked].each do |state|
+        assert_equal expected.fetch(state, 0), metric_value(text, 'memberzone_api_tokens', state: state), state
+      end
+      assert_equal 2, expected['suspended']
+    end
+
     test 'an integration reports whether it is up and its last status' do
       printer = Printer.create!(name: 'Front Desk Label Printer', cups_printer_name: 'front-desk')
       printer.update_columns(health_status: 'unhealthy', last_health_check_at: Time.zone.at(1_700_000_000))
