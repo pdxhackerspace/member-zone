@@ -73,6 +73,21 @@ module Metrics
       assert_equal 2, expected['suspended']
     end
 
+    test 'an access controller nothing pings has no up series' do
+      pinged_type = access_controller_types(:laser_controller)
+      pinged_type.update_columns(actions: %w[ping])
+      AccessController.create!(name: 'Pinged Door', hostname: 'p.local', access_controller_type: pinged_type)
+      AccessController.create!(name: 'Silent Door', hostname: 's.local',
+                               access_controller_type: access_controller_types(:door_lock))
+
+      text = collect(IntegrationsCollector)
+
+      assert_equal 0.0, metric_value(text, 'memberzone_integration_up', kind: 'access_controller', name: 'Pinged Door')
+      assert_nil metric_value(text, 'memberzone_integration_up', kind: 'access_controller', name: 'Silent Door')
+      assert_equal 1.0, metric_value(text, 'memberzone_integration_enabled',
+                                     kind: 'access_controller', name: 'Silent Door')
+    end
+
     test 'an integration reports whether it is up and its last status' do
       printer = Printer.create!(name: 'Front Desk Label Printer', cups_printer_name: 'front-desk')
       printer.update_columns(health_status: 'unhealthy', last_health_check_at: Time.zone.at(1_700_000_000))
