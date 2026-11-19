@@ -10,7 +10,7 @@ x-web-common: &web-common
     context: .
     dockerfile: Dockerfile.test
     args:
-      RUBY_VERSION: "4.0.9"
+      RUBY_VERSION: "4.0.10"
   image: member_zone_test:latest
   env_file:
     - .env

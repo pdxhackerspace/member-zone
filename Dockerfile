@@ -1,10 +1,10 @@
 # syntax = docker/dockerfile:1
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
-ARG RUBY_VERSION=4.0.9
+ARG RUBY_VERSION=4.0.10
 FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim AS base
 # Re-declare for this stage so build-args apply; fail fast if the image Ruby ≠ Gemfile (see .ruby-version).
-ARG RUBY_VERSION=4.0.9
+ARG RUBY_VERSION=4.0.10
 RUN test "$(ruby -e 'print RUBY_VERSION')" = "${RUBY_VERSION}" || \
     (echo "Expected Ruby ${RUBY_VERSION}, got $(ruby -v)" >&2; exit 1)
 
@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install --no-install-recommends -y build-essential curl git libpq-dev libvips node-gyp pkg-config python-is-python3 libyaml-dev
 
 # Install JavaScript dependencies
-ARG NODE_VERSION=24.15.0
+ARG NODE_VERSION=26.13.1
 ARG YARN_VERSION=latest
 ENV PATH=/usr/local/node/bin:$PATH
 RUN curl -sL https://github.com/nodenv/node-build/archive/master.tar.gz | tar xz -C /tmp/ && \

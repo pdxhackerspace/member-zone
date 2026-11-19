@@ -8,8 +8,8 @@ alwaysApply: false
 
 ## Docker
 
-- **Base image:** `ruby:4.0.9-slim` with multi-stage build
-- **Node:** Installed via nodenv (Node 24.x) for asset compilation
+- **Base image:** `ruby:4.0.10-slim` with multi-stage build
+- **Node:** Installed via nodenv (Node 26.x) for asset compilation
 - **Yarn:** Use `yarn install --frozen-lockfile` — never modify `yarn.lock` in Docker builds
 - **Assets:** Precompiled with `SECRET_KEY_BASE_DUMMY=1`
 - **Runtime:** Non-root `rails` user; entrypoint at `bin/docker-entrypoint`
