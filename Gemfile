@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby '4.0.9'
+ruby '4.0.10'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem 'rails', '~> 8.1.4'
@@ -40,11 +40,6 @@ gem 'omniauth-rails_csrf_protection'
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem 'jbuilder'
 
-# json 3.0 made JSON.parse's options keyword-only, so ActiveSupport::JSON.decode,
-# which passes them positionally, raises ArgumentError on every call. rails/rails#58601
-# fixes it on 8-1-stable but has not shipped as of Rails 8.1.3.1. Unpin once it does.
-gem 'json', '~> 2.21'
-
 # Use Redis adapter to run Action Cable in production
 gem 'redis', '>= 4.0.1'
 
@@ -78,7 +73,7 @@ gem 'stackprof'
 gem 'net-ssh', '~> 7.3'
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
-gem 'tzinfo-data', platforms: %i[mswin mswin64 mingw x64_mingw jruby]
+gem 'tzinfo-data', platforms: %i[windows jruby]
 
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', require: false
@@ -97,7 +92,7 @@ gem 'dotenv-rails'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
-  gem 'debug', platforms: %i[mri mswin mswin64 mingw x64_mingw]
+  gem 'debug', platforms: %i[mri windows]
 end
 
 # Staging only: browse captured mail at /letter_opener (not loaded in production).

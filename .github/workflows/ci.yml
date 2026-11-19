@@ -63,13 +63,13 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.9'
+          ruby-version: '4.0.10'
           bundler-cache: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           cache: 'yarn'
 
       - name: Install JS dependencies
