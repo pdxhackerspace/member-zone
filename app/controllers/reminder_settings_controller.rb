@@ -1,6 +1,7 @@
 class ReminderSettingsController < AdminController
   include Pagy::Method
   include ParkingPermitDetailsReminderData
+  include ParkingArrivalReminderData
   include ApiTokenExpiryReminderData
 
   PER_PAGE = 50
@@ -26,6 +27,7 @@ class ReminderSettingsController < AdminController
     'orientation' => 'orientation_reminder',
     'parking_notices' => 'parking_permit_expiring_soon',
     'parking_permit_details' => 'parking_permit_details_reminder',
+    'parking_arrival' => 'parking_arrival_reminder',
     'lapsed_access' => 'lapsed_access_reminder',
     'staff_application' => 'staff_application_reminder',
     'api_token_expiry' => 'api_token_expiring_soon'
@@ -103,6 +105,7 @@ class ReminderSettingsController < AdminController
       'orientation' => orientation_counts,
       'parking_notices' => parking_notice_counts,
       'parking_permit_details' => parking_permit_details_counts,
+      'parking_arrival' => parking_arrival_counts,
       'lapsed_access' => lapsed_access_counts,
       'staff_application' => staff_application_counts,
       'api_token_expiry' => api_token_expiry_counts
@@ -154,7 +157,12 @@ class ReminderSettingsController < AdminController
   end
 
   def reminder_setting_params
-    permitted = %i[enabled allow_opt_out start_offset_days interval_days max_reminders]
+    permitted = %i[enabled allow_opt_out]
+    if @reminder_setting.arrival_triggered?
+      permitted << :repeat_after_minutes
+    else
+      permitted << :start_offset_days << :interval_days << :max_reminders
+    end
     permitted << :lookback_days if @reminder_setting.configurable_lookback?
     params.expect(reminder_setting: permitted)
   end
@@ -182,6 +190,7 @@ class ReminderSettingsController < AdminController
     when 'orientation' then load_orientation_show_data
     when 'parking_notices' then load_parking_notices_show_data
     when 'parking_permit_details' then load_parking_permit_details_show_data
+    when 'parking_arrival' then load_parking_arrival_show_data
     when 'lapsed_access' then load_lapsed_access_show_data
     when 'staff_application' then load_staff_application_show_data
     when 'api_token_expiry' then load_api_token_expiry_show_data

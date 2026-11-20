@@ -308,13 +308,15 @@ class WebhooksController < ApplicationController
 
   private
 
-  # Announcing is a courtesy: a queue that's down must not cost the door its access log entry.
+  # Announcements and the parking arrival reminder both start here. The reminder reaches members
+  # who never opted in to being announced, so the job is queued for every matched arrival.
+  # A queue that's down must not cost the door its access log entry.
   def queue_arrival_announcements(access_log)
-    return unless access_log.user&.announce_arrivals? && access_log.arrival?
+    return unless access_log.user_id && access_log.arrival?
 
     Announcers::ArrivalJob.perform_later(access_log.id)
   rescue StandardError => e
-    ErrorReporting.report(e, context: { webhook: 'access', stage: 'announce_arrival' }, severity: :warning)
+    ErrorReporting.report(e, context: { webhook: 'access', stage: 'arrival' }, severity: :warning)
   end
 
   # Runs a handler's authentication check, and owns the decision about what an unset secret means.

@@ -4,17 +4,14 @@ module Announcers
   # An arrival is announced only when the member has switched announcements on, has access (or
   # DefaultSetting allows announcing inactive members; never banned or deceased ones), has a
   # name to be announced by, came in through an outside door (AccessLog#arrival?) just now, and
-  # the announcer hasn't announced them within its repeat window. The window
+  # the announcer hasn't announced them within its repeat window. A scan older than
+  # AccessLog::STALE_AFTER is ignored. The window
   # check and the new run's row are made under a lock on the member, so two scans a second apart
   # (a double tap, two doors in a row) can't both get through.
   #
   # Every decision for a member who has announcements switched on is logged with the reason, so an
   # announcer that stays quiet can be explained from the logs.
   class ArrivalDispatcher
-    # A webhook replaying a backlog (a controller coming back online) shouldn't announce people
-    # who arrived hours ago.
-    STALE_AFTER = 15.minutes
-
     def self.call(access_log, now: Time.current)
       new(access_log, now).call
     end
@@ -61,13 +58,9 @@ module Announcers
       unless DefaultSetting.arrival_location?(@access_log.location)
         return "#{@access_log.location.inspect} is not one of the outside doors"
       end
-      return "entry is older than #{STALE_AFTER.inspect}" unless fresh?
+      return "entry is older than #{AccessLog::STALE_AFTER.inspect}" unless @access_log.fresh?(now: @now)
 
       nil
-    end
-
-    def fresh?
-      @access_log.logged_at.present? && @access_log.logged_at > @now - STALE_AFTER
     end
 
     def claim_runs

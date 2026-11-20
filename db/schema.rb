@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1164,6 +1164,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
     t.integer "lookback_days", default: 1, null: false
     t.integer "max_reminders"
     t.string "name", null: false
+    t.integer "repeat_after_minutes", default: 120, null: false
     t.integer "start_offset_days", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["enabled"], name: "index_reminder_settings_on_enabled"

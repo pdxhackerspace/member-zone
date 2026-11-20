@@ -8,7 +8,7 @@
   <div class="card-body reminder-setting-card-body py-3">
     <p class="text-13 text-secondary mb-2"><%= reminder.description %></p>
     <%= yield %>
-    <div class="text-12 text-secondary mt-1">Cadence: <%= reminder.schedule.description %></div>
+    <div class="text-12 text-secondary mt-1">Cadence: <%= reminder.cadence_description %></div>
     <% opted_out_count = NotificationOptOut.count_for_reminder(reminder.key) %>
     <% if opted_out_count.positive? %>
       <div class="text-12 text-secondary mt-1">
@@ -62,6 +62,17 @@
             </div>
           <% end %>
         </div>
+        <% if reminder.arrival_triggered? %>
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <%= f.label :repeat_after_minutes, 'At most once every', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_repeat_after_minutes_#{reminder.key}" %>
+            <%= f.number_field :repeat_after_minutes,
+                  in: 0..ReminderSetting::MAX_REPEAT_AFTER_MINUTES,
+                  class: 'form-control form-control-sm num',
+                  style: 'width: 5rem;',
+                  id: "reminder_repeat_after_minutes_#{reminder.key}" %>
+            <span class="text-13 text-secondary text-nowrap">minutes — 0 emails every arrival</span>
+          </div>
+        <% else %>
         <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
           <div class="d-flex align-items-center gap-2">
             <%= f.label :start_offset_days, 'First', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_start_offset_days_#{reminder.key}" %>
@@ -98,6 +109,7 @@
             </span>
           </div>
         </div>
+        <% end %>
         <% if reminder.key == 'parking_notices' && reminder.unlimited_reminders? %>
           <div class="text-12 text-warning mt-2">
             Parking picks its email from where a send falls in the sequence, so the final notice is the last one sent.
@@ -106,16 +118,19 @@
         <% end %>
       <% end %>
       <div class="d-flex flex-wrap align-items-center gap-2">
-        <%= button_to "Send now",
-              send_now_reminder_setting_path(reminder.key),
-              method: :post,
-              class: "btn btn-outline-secondary btn-sm",
-              form: {
-                data: {
-                  turbo_confirm: "Send #{reminder.name.downcase} to everyone due right now?"
-                }
-              } %>
-        <%= link_to "View due list", reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
+        <% unless reminder.arrival_triggered? %>
+          <%= button_to "Send now",
+                send_now_reminder_setting_path(reminder.key),
+                method: :post,
+                class: "btn btn-outline-secondary btn-sm",
+                form: {
+                  data: {
+                    turbo_confirm: "Send #{reminder.name.downcase} to everyone due right now?"
+                  }
+                } %>
+        <% end %>
+        <%= link_to reminder.arrival_triggered? ? 'View members' : 'View due list',
+                    reminder_setting_path(reminder.key), class: "btn btn-outline-secondary btn-sm" %>
         <% if email_template %>
           <%= link_to "Email template", email_template_path(email_template), class: "btn btn-outline-secondary btn-sm" %>
         <% end %>

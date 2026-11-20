@@ -67,7 +67,12 @@ class EmailTemplate < ApplicationRecord
     '{{api_token_hint}}' => 'Last four characters of the API token (API token emails only)',
     '{{api_token_holder}}' => 'Member or service account holding the API token (API token emails only)',
     '{{api_token_expires_at}}' => 'Date the API token expires (API token emails only)',
-    '{{api_tokens_url}}' => 'Link to the page where the recipient can extend the token (API token emails only)'
+    '{{api_tokens_url}}' => 'Link to the page where the recipient can extend the token (API token emails only)',
+    '{{notices_html}}' => 'HTML list of open permits and tickets, each with a clear link ' \
+                          '(parking arrival reminder only)',
+    '{{notices_text}}' => 'Plain-text list of open permits and tickets, each with a clear link ' \
+                          '(parking arrival reminder only)',
+    '{{notice_count}}' => 'How many open notices the arrival reminder lists (parking arrival reminder only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
@@ -105,6 +110,9 @@ class EmailTemplate < ApplicationRecord
       {{recipient_role}}
       {{trainer_names}}
       {{contact_details}}
+    ],
+    'parking_arrival_reminder' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{notice_count}} {{notices_html}} {{notices_text}}
     ]
   }.freeze
 
@@ -932,6 +940,30 @@ class EmailTemplate < ApplicationRecord
         {{permit_form_url}}
 
         This link works until {{permit_form_expires_at}} and does not sign you in. You can also update the permit from your member profile: {{parking_notice_url}}
+
+        Best regards,
+        The {{organization_name}} Team
+      TEXT
+    },
+    'parking_arrival_reminder' => {
+      name: 'Parking Arrival Reminder',
+      description: 'Sent when a member arrives with an open parking permit or ticket',
+      subject: '{{organization_name}}: Open parking to take care of',
+      body_html: <<~HTML,
+        <h1>Open parking to take care of</h1>
+        <p>Hello {{member_name}},</p>
+        <p>You just arrived, and you still have open parking. Each link below opens that one notice and lets you clear it. The link does not sign you in.</p>
+        {{notices_html}}
+        <p>Best regards,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Open parking to take care of
+
+        Hello {{member_name}},
+
+        You just arrived, and you still have open parking. Each link below opens that one notice and lets you clear it. The link does not sign you in.
+
+        {{notices_text}}
 
         Best regards,
         The {{organization_name}} Team
