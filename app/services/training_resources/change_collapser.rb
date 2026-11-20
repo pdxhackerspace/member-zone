@@ -25,12 +25,27 @@ module TrainingResources
     def collapse(group)
       ordered = group.sort_by { |change| [change.occurred_at, change.id.to_i] }
       ids = ordered.map(&:id)
-      added = ordered.find { |change| change.kind.end_with?('_added') }
+      added = ordered.rfind { |change| change.kind.end_with?('_added') }
       removed = ordered.rfind { |change| change.kind.end_with?('_removed') }
-      return removed_result(added, removed, ids) if removed && (added.nil? || removed.occurred_at >= added.occurred_at)
+      return removed_result(added, removed, ids) if removal_latest?(removed, added)
       return [entry(refreshed_add(added, ordered), ids)] if added
 
       edit_entries(ordered, ids)
+    end
+
+    # The latest add and the latest removal decide. A resource that was removed and
+    # then added again is present, so the digest shows the add.
+    def removal_latest?(removed, added)
+      return false unless removed
+      return true unless added
+
+      later?(removed, added)
+    end
+
+    def later?(candidate, other)
+      return true if candidate.occurred_at > other.occurred_at
+
+      candidate.occurred_at == other.occurred_at && candidate.id.to_i > other.id.to_i
     end
 
     def removed_result(added, removed, ids)

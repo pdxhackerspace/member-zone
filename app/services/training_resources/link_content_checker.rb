@@ -5,6 +5,7 @@ module TrainingResources
   class LinkContentChecker
     FLAP_LIMIT = 5
     TEXT_LIMIT = 20_000
+    POLL_GRACE = 12.hours
 
     def self.call(now: Time.current, http: nil, resolver: nil)
       return unless ReminderSetting.enabled?(REMINDER_KEY)
@@ -119,8 +120,10 @@ module TrainingResources
       snapshot.update!(checked_at: @now, status: 'too_large', error: nil)
     end
 
+    # The poll is daily, and the digest interval can be one day, so a snapshot from
+    # the previous check must not look like a gap. Half a day past the interval does.
     def stale?
-      snapshot.checked_at.present? && snapshot.checked_at < @now - interval_days.days
+      snapshot.checked_at.present? && snapshot.checked_at < @now - interval_days.days - POLL_GRACE
     end
 
     def interval_days

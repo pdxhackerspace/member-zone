@@ -27,6 +27,18 @@ module TrainingResources
       assert_equal 'private address', error.message
     end
 
+    test 'refuses an IPv4 address written as an IPv6 mapped address' do
+      error = assert_raises(OutboundUrlGuard::Forbidden) do
+        OutboundUrlGuard.validate!('https://example.com/guide', resolver: resolver('::ffff:127.0.0.1'))
+      end
+      assert_equal 'private address', error.message
+
+      literal = assert_raises(OutboundUrlGuard::Forbidden) do
+        OutboundUrlGuard.validate!('http://[::ffff:169.254.169.254]/latest')
+      end
+      assert_equal 'private address', literal.message
+    end
+
     test 'refuses localhost and a URL with credentials' do
       assert_raises(OutboundUrlGuard::Forbidden) do
         OutboundUrlGuard.validate!('http://localhost/guide', resolver: resolver('93.184.216.34'))

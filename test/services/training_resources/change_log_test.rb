@@ -45,6 +45,23 @@ module TrainingResources
       assert_equal 1, TrainingResourceChange.count
     end
 
+    test 'assigning topics on an unsaved document records nothing until it is saved' do
+      document = Document.new(title: '')
+      document.training_topic_ids = [@topic.id]
+
+      assert_empty TrainingResourceChange.all
+
+      document.title = 'Safety'
+      document.file.attach(io: StringIO.new('hello'), filename: 'safety.pdf', content_type: 'application/pdf')
+      document.save!
+
+      added = TrainingResourceChange.where(kind: 'document_added')
+      assert_equal [document.id], added.pluck(:resource_id)
+      added = added.first
+      assert_equal document.id, added.resource_id
+      assert_equal 'safety.pdf', added.details['filename']
+    end
+
     test 'adding a document to topics, replacing its file, and removing a topic are recorded once each' do
       document = build_document(@topic, @other)
       document.update!(title: 'Safety checklist')

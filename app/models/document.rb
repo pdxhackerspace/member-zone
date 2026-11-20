@@ -12,6 +12,7 @@ class Document < ApplicationRecord
 
   before_save :capture_training_resource_edit
   before_destroy :remember_topics_for_change_log
+  after_create_commit :log_topics_added_with_document
   after_update_commit :log_training_resource_edit
   after_destroy_commit :log_training_resource_removal
 
@@ -56,8 +57,16 @@ class Document < ApplicationRecord
     end
   end
 
+  # after_add runs when ids are assigned, including on the unsaved record the new
+  # form builds. Those topics are logged once the document actually exists.
   def log_topic_document_added(topic)
+    return if new_record?
+
     TrainingResources::ChangeLog.document_added(self, topic)
+  end
+
+  def log_topics_added_with_document
+    training_topics.each { |topic| TrainingResources::ChangeLog.document_added(self, topic) }
   end
 
   def log_topic_document_removed(topic)

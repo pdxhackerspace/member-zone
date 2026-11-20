@@ -49,6 +49,19 @@ module TrainingResources
       assert_equal 'untrackable', @link.content_snapshot.reload.status
     end
 
+    test 'a one-day interval still compares a page checked yesterday' do
+      ReminderSetting.find_by!(key: 'training_resource_updates').update!(interval_days: 1)
+      check(page('Original'))
+      @link.content_snapshot.update!(checked_at: 25.hours.ago)
+
+      check(page('Rewritten overnight'))
+
+      snapshot = @link.content_snapshot.reload
+      assert_equal 'watching', snapshot.status
+      assert snapshot.candidate_digest.present?
+      assert_empty TrainingResourceChange.all
+    end
+
     test 'a page that has not been checked within the interval is baselined again' do
       check(page('Original'))
       @link.content_snapshot.update!(checked_at: 8.days.ago)

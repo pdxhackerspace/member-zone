@@ -150,7 +150,18 @@ module TrainingResources
     def last_digest_at
       return @last_digest_at if defined?(@last_digest_at)
 
-      @last_digest_at = TrainingResourceChange.where.not(notified_at: nil).maximum(:notified_at)
+      @last_digest_at = [stamped_at, queued_at].compact.max
+    end
+
+    # A queued digest starts the interval even when another recipient failed, so the
+    # people who already received it do not get the next day's edits early. Unstamped
+    # rows stay pending and go out on the next interval to whoever missed them.
+    def stamped_at
+      TrainingResourceChange.where.not(notified_at: nil).maximum(:notified_at)
+    end
+
+    def queued_at
+      QueuedMail.where(mailer_action: MAILER_ACTION).maximum(:created_at)
     end
 
     def interval_days

@@ -71,6 +71,45 @@ module TrainingResources
       assert_equal 4, QueuedMail.where(mailer_action: 'training_resources_updated').count
     end
 
+    test 'removing a link and adding it again still tells people it came back' do
+      [3.hours.ago, 2.hours.ago, 1.hour.ago].zip(
+        %w[link_added link_removed link_added],
+        ['Guide', 'Guide', 'Came back']
+      ).each do |at, kind, title|
+        TrainingResourceChange.create!(
+          training_topic: @topic, resource_type: 'TrainingTopicLink', resource_id: 9001,
+          kind: kind, title: title, details: { 'url' => 'https://example.com/guide' }, occurred_at: at
+        )
+      end
+
+      TrainingResources::UpdateDigest.call
+
+      body = QueuedMail.find_by!(recipient: @trained, mailer_action: 'training_resources_updated').body_html
+      assert_includes body, 'Came back'
+      assert_not_includes body, 'Link removed'
+    end
+
+    test 'one failed recipient does not let the next day mail everyone else' do
+      TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
+      fail_trainer_profile_url { TrainingResources::UpdateDigest.call }
+
+      assert_equal [@trained.id], QueuedMail.where(mailer_action: 'training_resources_updated').pluck(:recipient_id)
+      assert TrainingResourceChange.pending.any?
+
+      TrainingTopicLink.create!(training_topic: @topic, title: 'More', url: 'https://example.com/more')
+      TrainingResources::UpdateDigest.call
+      assert_equal 1, QueuedMail.where(mailer_action: 'training_resources_updated').count
+
+      travel 8.days do
+        TrainingResources::UpdateDigest.call
+      end
+
+      mails = QueuedMail.where(mailer_action: 'training_resources_updated')
+      assert_equal 3, mails.count
+      assert_includes mails.find_by!(recipient: @trainer).body_html, 'Guide'
+      assert_includes mails.where(recipient: @trained).order(:id).last.body_html, 'More'
+    end
+
     test 'the reminders summary counts waiting changes and who would be mailed today' do
       TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
       summary = TrainingResources::UpdateDigest.summary
@@ -78,6 +117,22 @@ module TrainingResources
       assert_equal 1, summary.pending_count
       assert_equal 2, summary.due_recipient_count
       assert_match '1 change waiting across 1 topic', summary.context
+    end
+
+    private
+
+    def fail_trainer_profile_url
+      real = nil
+      real = MemberMailer.method(:profile_url_for)
+      trainer = @trainer
+      MemberMailer.define_singleton_method(:profile_url_for) do |user|
+        raise 'smtp down' if user == trainer
+
+        real.call(user)
+      end
+      yield
+    ensure
+      MemberMailer.define_singleton_method(:profile_url_for) { |user| real.call(user) } if real
     end
   end
 end

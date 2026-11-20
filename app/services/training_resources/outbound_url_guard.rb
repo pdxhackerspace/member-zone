@@ -9,24 +9,30 @@ module TrainingResources
 
     FORBIDDEN_HOSTS = %w[localhost localhost.localdomain metadata.google.internal].freeze
 
+    Resolved = Struct.new(:uri, :address, keyword_init: true)
+
     def self.validate!(url, resolver: Resolv)
-      new(resolver).validate!(url)
+      resolve!(url, resolver: resolver).uri
+    end
+
+    def self.resolve!(url, resolver: Resolv)
+      new(resolver).resolve!(url)
     end
 
     def initialize(resolver)
       @resolver = resolver
     end
 
-    def validate!(url)
+    def resolve!(url)
       uri = parse_http(url)
       raise Forbidden, 'private address' if forbidden_host?(uri.host) || forbidden_literal?(uri.host)
-      return uri if ip_literal?(uri.host)
+      return Resolved.new(uri: uri, address: uri.host) if ip_literal?(uri.host)
 
       addresses = Array(@resolver.getaddresses(uri.host))
       raise Forbidden, 'could not resolve' if addresses.empty?
       raise Forbidden, 'private address' if addresses.any? { |address| forbidden_ip?(address) }
 
-      uri
+      Resolved.new(uri: uri, address: addresses.first)
     end
 
     private
@@ -59,6 +65,7 @@ module TrainingResources
 
     def forbidden_ip?(value)
       addr = IPAddr.new(value)
+      addr = addr.native if addr.ipv4_mapped?
       addr.loopback? || addr.private? || addr.link_local? || unspecified?(addr) || multicast?(addr)
     rescue IPAddr::InvalidAddressError
       true
