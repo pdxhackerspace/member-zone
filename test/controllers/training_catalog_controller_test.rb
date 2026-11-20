@@ -101,6 +101,97 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_no_match record_training_path, response.body
   end
 
+  test 'index shows a subtopic indented under its parent' do
+    parent = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: true)
+    child = TrainingTopic.create!(
+      name: 'Sewing machines', parent: parent, offered_to_members: true, description: 'Domestic machines'
+    )
+    TrainerCapability.create!(user: users(:one), training_topic: parent)
+    TrainerCapability.create!(user: users(:one), training_topic: child)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    assert_select '.topic-nest-1', text: /Sewing machines/
+    child_link = css_select("a[href='#{training_catalog_topic_path(child)}']").first
+    row_text = child_link.ancestors('tr').first.text.squish
+    assert_includes row_text, 'Craft Lab'
+    assert_includes row_text, 'Domestic machines'
+    assert_operator response.body.index(parent.name), :<, response.body.index(child.name)
+  end
+
+  test 'index indents a grandchild under its own parent' do
+    area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: true)
+    child = TrainingTopic.create!(name: 'Sewing machines', parent: area, offered_to_members: true)
+    grandchild = TrainingTopic.create!(name: 'Serger', parent: child, offered_to_members: true)
+    TrainerCapability.create!(user: users(:one), training_topic: grandchild)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    assert_select '.topic-nest-2', text: /Serger/
+    row = css_select("a[href='#{training_catalog_topic_path(grandchild)}']").first.ancestors('tr').first
+    assert_includes row.text.squish, 'Sewing machines'
+    assert_select "a[href='#{training_catalog_topic_path(child)}']", count: 0
+  end
+
+  test 'index does not link a topic that cannot be requested' do
+    parent = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    child = TrainingTopic.create!(name: 'Sewing machines', parent: parent, offered_to_members: true)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    assert_match 'Sewing machines', response.body
+    assert_match 'Craft Lab', response.body
+    assert_select "a[href='#{training_catalog_topic_path(child)}']", count: 0
+    assert_select "a[href='#{training_catalog_topic_path(parent)}']", count: 0
+    assert_select "tr[data-href='#{training_catalog_topic_path(child)}']", count: 0
+  end
+
+  test 'admin index links a topic that cannot be requested' do
+    parent = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    child = TrainingTopic.create!(name: 'Sewing machines', parent: parent, offered_to_members: true)
+
+    sign_in_as_admin
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(child)}']", text: 'Sewing machines'
+    assert_select "a[href='#{training_catalog_topic_path(parent)}']", text: 'Craft Lab'
+  end
+
+  test 'member trained in an unoffered parent gets a link to it' do
+    parent = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
+    TrainingTopic.create!(name: 'Sewing machines', parent: parent, offered_to_members: true)
+    sign_in_as_member
+    Training.create!(trainee: signed_in_member, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(parent)}']", text: 'Craft Lab'
+  end
+
+  test 'member trained in an unoffered topic sees it and can open it' do
+    topic = TrainingTopic.create!(name: 'Internal orientation', offered_to_members: false)
+    sign_in_as_member
+    Training.create!(trainee: signed_in_member, training_topic: topic, trainer: users(:one), trained_at: Time.current)
+
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(topic)}']", text: 'Internal orientation'
+
+    get training_catalog_topic_path(topic)
+
+    assert_response :success
+    assert_match 'Internal orientation', response.body
+  end
+
   # Show
 
   test 'member can view a topic that is offered to members' do
@@ -400,6 +491,17 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{edit_training_topic_path(@laser_topic)}']", count: 0
   end
 
+  test 'catalog view_all links an unoffered topic the member is not trained in' do
+    hidden = TrainingTopic.create!(name: 'Closed shop tour', offered_to_members: false)
+    sign_in_as_member
+    grant_privileges(signed_in_member, 'training.catalog.view_all')
+
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(hidden)}']", text: 'Closed shop tour'
+  end
+
   test 'catalog index lists unoffered topics the curator may edit and no others' do
     sign_in_as_member
     area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)
@@ -414,6 +516,8 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_match subtopic.name, response.body
     assert_no_match 'Metal shop', response.body
     assert_match @laser_topic.name, response.body
+    assert_select "a[href='#{training_catalog_topic_path(area)}']", text: area.name
+    assert_select "a[href='#{training_catalog_topic_path(subtopic)}']", text: subtopic.name
   end
 
   test 'show returns friendly error for unknown topic' do

@@ -47,16 +47,41 @@
             </tr>
           </thead>
           <tbody>
-            <% @training_topics.each do |topic| %>
+            <% @training_topics.each do |topic, depth| %>
               <% trainer_counts = @topic_trainer_counts[topic.id] || { total: 0, active: 0, inactive: 0 } %>
               <% trained_counts = @topic_trained_counts[topic.id] || { total: 0, active: 0, inactive: 0 } %>
               <% needs_trainers = topic.offered_to_members? && trainer_counts[:active].zero? %>
-              <tr onclick="if (!event.target.closest('a, button')) window.location='<%= training_catalog_topic_path(topic) %>'" style="cursor: pointer;">
+              <% linked = training_catalog_topic_linked?(topic) %>
+              <tr
+                <% if linked %>
+                  data-href="<%= training_catalog_topic_path(topic) %>"
+                  onclick="if (!event.target.closest('a, button')) window.location = this.dataset.href"
+                <% end %>
+              >
                 <td>
-                  <strong><%= link_to topic.name, training_catalog_topic_path(topic), class: 'text-decoration-none' %></strong>
-                  <% if topic.description.present? %>
-                    <div class="text-muted small"><%= truncate(topic.description.to_s, length: 140) %></div>
-                  <% end %>
+                  <% nest_class = training_catalog_nest_class(topic, depth) %>
+                  <div<% if nest_class %> class="<%= nest_class %>"<% end %>>
+                    <% if topic.parent %>
+                      <div class="text-12 text-secondary">
+                        <i class="bi bi-arrow-return-right me-1" aria-hidden="true"></i>
+                        <% if training_catalog_topic_linked?(topic.parent) %>
+                          <%= link_to topic.parent.name, training_catalog_topic_path(topic.parent), class: 'link-secondary text-decoration-none' %>
+                        <% else %>
+                          <%= topic.parent.name %>
+                        <% end %>
+                      </div>
+                    <% end %>
+                    <strong>
+                      <% if linked %>
+                        <%= link_to topic.name, training_catalog_topic_path(topic), class: 'text-decoration-none' %>
+                      <% else %>
+                        <%= topic.name %>
+                      <% end %>
+                    </strong>
+                    <% if topic.description.present? %>
+                      <div class="text-muted small"><%= truncate(topic.description.to_s, length: 140) %></div>
+                    <% end %>
+                  </div>
                 </td>
                 <% if current_user_admin? %>
                   <td class="text-center">
