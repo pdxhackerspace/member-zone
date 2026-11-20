@@ -116,12 +116,13 @@ module Reminders
     end
 
     test 'a description cannot inject markup into the email' do
-      @notice.update!(description: '<script>alert(1)</script> {{notices_html}}')
+      @notice.update!(description: '<script>alert(1)</script> {{notices_html}}', location: 'Bay {{notice_count}}')
 
       body = ParkingArrivalMessage.call(@user, [@notice])
 
       assert_includes body[:notices_html], '&lt;script&gt;'
       assert_not_includes body[:notices_html], '<script>'
+      assert_includes body[:notices_text], 'Bay'
       assert_not_includes body[:notices_text], '{{'
     end
 

@@ -40,7 +40,7 @@ module Reminders
     end
 
     def heading_text(notice)
-      "#{notice.notice_type_display} — #{place(notice)}"
+      "#{plain(notice.notice_type_display)} — #{plain(place(notice))}"
     end
 
     def button(notice)

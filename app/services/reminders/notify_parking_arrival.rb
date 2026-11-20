@@ -32,12 +32,13 @@ module Reminders
       return log_skip(reason) if reason
 
       notices = ParkingArrivalEligibility.notices_for(@user, now: @now)
-      MemberMailer.parking_arrival_reminder(@user, ParkingArrivalMessage.call(@user, notices)).deliver_later
+      return log_skip('no open notice to mention') if notices.empty?
+
+      # Claim the window before the mail is queued. Enqueue waits for this transaction to
+      # commit, so a failure here sends nothing and the next arrival can try again.
       ParkingArrivalEligibility.record_delivery!(@user, at: @now)
+      MemberMailer.parking_arrival_reminder(@user, ParkingArrivalMessage.call(@user, notices)).deliver_later
       log("sent #{notices.size} #{'notice'.pluralize(notices.size)}")
-    rescue StandardError => e
-      Rails.logger.error("[NotifyParkingArrival] user_id=#{@user&.id} failed: #{e.class}: #{e.message}")
-      nil
     end
 
     # Most scans have nothing to say. Those stay at debug so a busy door does not fill the log;
