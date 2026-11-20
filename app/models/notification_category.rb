@@ -66,6 +66,13 @@ class NotificationCategory
       reminder_key: 'parking_permit_details',
       mailer_actions: %w[parking_permit_details_reminder]
     },
+    'parking_arrival' => {
+      name: 'Parking reminders when you arrive',
+      description: 'A reminder when you arrive with an open parking permit or ticket, with a link to clear it.',
+      group: 'Reminders',
+      reminder_key: 'parking_arrival',
+      mailer_actions: %w[parking_arrival_reminder]
+    },
     # The device-issued emails sit here because the member asked for them at the kiosk moments
     # earlier, and the form link is the only way to get the permit they asked for.
     'parking_issued' => {

@@ -68,6 +68,10 @@ Rails.application.routes.draw do
   patch "/parking_permit/:token", to: "parking_permit_forms#update"
   get   "/parking_permit/:token/pdf", to: "parking_permit_forms#pdf", as: :parking_permit_form_pdf
 
+  # No-login page reached from a parking arrival reminder. The link itself does not clear anything.
+  get  "/parking_clear/:token", to: "parking_clearances#show", as: :parking_clearance
+  post "/parking_clear/:token", to: "parking_clearances#create"
+
   # Impersonation
   post "/impersonate/:user_id", to: "impersonations#create", as: :impersonate_user, constraints: { user_id: /[^\/]+/ }
   delete "/impersonate", to: "impersonations#destroy", as: :stop_impersonation

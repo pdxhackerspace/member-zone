@@ -119,6 +119,19 @@ The entry sign greeting is an announcer like any other: a program in `announcers
 The access controller sync no longer sends `greeting_name`, so signs that read it from there stop
 greeting anyone until the sign announcer is set up.
 
+## Parking arrival reminder
+
+Arriving also emails a member who still has an open parking permit or ticket, with a link that
+clears that one notice. It is not an announcer: announcers are programs members opt in to, and
+this reminder has to reach people who never asked to be announced, including members who chose
+"Don't greet me". It shares the arrival itself — an `opened` or `unlocked` scan at an outside
+door, logged in the last 15 minutes — and nothing else. The Announcers page lists it as a built-in
+entry so the page shows everything that fires when someone comes in.
+
+Whether it sends, how soon it may repeat, and whether members can hush it are the reminder's own
+settings under **Settings → Reminders**. Hushing it does not hush the scheduled expiration
+reminders, and it does not stop the arrival from being announced. See `docs/notifications.md`.
+
 ## Member-facing text
 
 The paragraph under **Announce arrivals** on the profile is the `announce_arrivals_help` text

@@ -14,6 +14,12 @@ class AccessLogArrivalTest < ActiveSupport::TestCase
     assert_not AccessLog.new(action: 'locked', location: 'unit2 front door').arrival?
   end
 
+  test 'a scan from the last few minutes is fresh and an older one is not' do
+    assert AccessLog.new(logged_at: Time.current).fresh?
+    assert_not AccessLog.new(logged_at: 1.hour.ago).fresh?
+    assert_not AccessLog.new(logged_at: nil).fresh?
+  end
+
   test 'a door that is not an outside door is not an arrival' do
     assert_not AccessLog.new(action: 'opened', location: 'unit2 shop door').arrival?
     assert_not AccessLog.new(action: 'enabled', location: 'laser-access').arrival?

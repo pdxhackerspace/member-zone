@@ -17,6 +17,7 @@ class AnnouncersController < AuthenticatedController
     # Everyone with announcements switched on, including members who chose no announcer, so an
     # admin can see who will and won't be announced, and why.
     @opted_in_members = User.where(announce_arrivals: true).includes(:announcers).ordered_by_display_name
+    @parking_arrival_reminder = ReminderSetting.for_key('parking_arrival')
   end
 
   def show
