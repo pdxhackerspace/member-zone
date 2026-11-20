@@ -491,6 +491,17 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{edit_training_topic_path(@laser_topic)}']", count: 0
   end
 
+  test 'catalog view_all links an unoffered topic the member is not trained in' do
+    hidden = TrainingTopic.create!(name: 'Closed shop tour', offered_to_members: false)
+    sign_in_as_member
+    grant_privileges(signed_in_member, 'training.catalog.view_all')
+
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(hidden)}']", text: 'Closed shop tour'
+  end
+
   test 'catalog index lists unoffered topics the curator may edit and no others' do
     sign_in_as_member
     area = TrainingTopic.create!(name: 'Craft Lab', offered_to_members: false)

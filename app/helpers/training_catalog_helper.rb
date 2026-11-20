@@ -1,6 +1,6 @@
 module TrainingCatalogHelper
-  # Admins link every topic (@linked_topic_ids is nil). Everyone else links a topic
-  # they can request, already hold, or are allowed to open.
+  # Admins and catalog view-all holders link every topic (@linked_topic_ids is nil).
+  # Everyone else links a topic they can request, already hold, or are allowed to open.
   def training_catalog_topic_linked?(topic)
     @linked_topic_ids.nil? || @linked_topic_ids.include?(topic.id)
   end

@@ -95,10 +95,11 @@ class TrainingCatalogController < AuthenticatedController
     end
   end
 
-  # Nil means every topic is linkable (admins). Otherwise a name links when a member can
-  # request the topic, the viewer is trained in it, or the viewer may open its page.
+  # Nil means every topic is linkable: admins, and anyone who may view the whole catalog.
+  # Otherwise a name links when a member can request the topic, the viewer is trained in
+  # it, or the viewer may open its page.
   def linked_catalog_topic_ids
-    return if current_user_admin?
+    return if current_user_admin? || can?(:'training.catalog.view_all')
 
     @trainable_on_request_topic_ids |
       @trained_topic_ids |
