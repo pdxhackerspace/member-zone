@@ -1,0 +1,40 @@
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <% if @pending_resource_changes.any? %>
+      <div class="table-responsive">
+        <table class="table table-compact mb-0">
+          <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Change</th>
+              <th>Title</th>
+              <th>When</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @pending_resource_changes.each do |change| %>
+              <tr>
+                <td>
+                  <%= link_to change.training_topic.name, edit_training_topic_path(change.training_topic),
+                              class: 'text-decoration-none' %>
+                </td>
+                <td class="text-secondary"><%= change.kind_label %></td>
+                <td class="cell-truncate" title="<%= change.title %>"><%= change.title %></td>
+                <td><%= admin_profile_time(change.occurred_at) %></td>
+                <td class="text-secondary"><%= change.actor&.display_name %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <% if @pagy.pages > 1 %>
+        <div class="p-3 border-top">
+          <%== pagy_bootstrap_nav(@pagy) %>
+        </div>
+      <% end %>
+    <% else %>
+      <p class="text-secondary text-13 mb-0 p-3">No resource changes are waiting.</p>
+    <% end %>
+  </div>
+</div>

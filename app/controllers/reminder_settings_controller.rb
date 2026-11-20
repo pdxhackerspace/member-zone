@@ -3,6 +3,7 @@ class ReminderSettingsController < AdminController
   include ParkingPermitDetailsReminderData
   include ParkingArrivalReminderData
   include ApiTokenExpiryReminderData
+  include TrainingResourceUpdatesReminderData
 
   PER_PAGE = 50
 
@@ -15,7 +16,8 @@ class ReminderSettingsController < AdminController
     'parking_permit_details' => Reminders::NotifyParkingPermitDetails,
     'lapsed_access' => Reminders::NotifyLapsedAccess,
     'staff_application' => MembershipApplications::NotifyDirectorsOfStaleApplications,
-    'api_token_expiry' => Reminders::NotifyApiTokenExpiry
+    'api_token_expiry' => Reminders::NotifyApiTokenExpiry,
+    'training_resource_updates' => TrainingResources::SendDigest
   }.freeze
 
   # The one template that headlines each reminder's card, where its own list of templates is
@@ -30,7 +32,8 @@ class ReminderSettingsController < AdminController
     'parking_arrival' => 'parking_arrival_reminder',
     'lapsed_access' => 'lapsed_access_reminder',
     'staff_application' => 'staff_application_reminder',
-    'api_token_expiry' => 'api_token_expiring_soon'
+    'api_token_expiry' => 'api_token_expiring_soon',
+    'training_resource_updates' => 'training_resources_updated'
   }.freeze
 
   before_action :set_reminder_setting, only: %i[show update send_now]
@@ -108,7 +111,8 @@ class ReminderSettingsController < AdminController
       'parking_arrival' => parking_arrival_counts,
       'lapsed_access' => lapsed_access_counts,
       'staff_application' => staff_application_counts,
-      'api_token_expiry' => api_token_expiry_counts
+      'api_token_expiry' => api_token_expiry_counts,
+      'training_resource_updates' => training_resource_update_counts
     }
   end
 
@@ -161,7 +165,8 @@ class ReminderSettingsController < AdminController
     if @reminder_setting.arrival_triggered?
       permitted << :repeat_after_minutes
     else
-      permitted << :start_offset_days << :interval_days << :max_reminders
+      permitted << :interval_days
+      permitted << :start_offset_days << :max_reminders unless @reminder_setting.digest?
     end
     permitted << :lookback_days if @reminder_setting.configurable_lookback?
     params.expect(reminder_setting: permitted)
@@ -194,6 +199,7 @@ class ReminderSettingsController < AdminController
     when 'lapsed_access' then load_lapsed_access_show_data
     when 'staff_application' then load_staff_application_show_data
     when 'api_token_expiry' then load_api_token_expiry_show_data
+    when 'training_resource_updates' then load_training_resource_updates_show_data
     end
   end
 

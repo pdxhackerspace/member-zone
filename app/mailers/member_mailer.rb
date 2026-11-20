@@ -178,6 +178,18 @@ class MemberMailer < ApplicationMailer
     end
   end
 
+  def training_resources_updated(user, opts = {})
+    @user = user
+    @organization = organization_name
+    assign_training_resource_update(opts)
+
+    if send_from_template('training_resources_updated', user, training_resource_update_extras)
+      # Email sent from database template
+    else
+      mail(to: @user.email, subject: "#{@organization}: Updates for #{@updated_topics}")
+    end
+  end
+
   def trainer_capability_granted(user, training_topic:)
     @user = user
     @organization = organization_name
@@ -696,7 +708,14 @@ class MemberMailer < ApplicationMailer
     merge_parking_notice_template_keys!(vars, extra_args, user)
     merge_slack_signup_template_keys!(vars, extra_args)
     merge_lapsed_access_template_keys!(vars, extra_args)
+    merge_training_resource_template_keys!(vars, extra_args)
     vars.merge!(CredentialMailVariables.call(extra_args)) if CredentialMailVariables.applicable?(extra_args)
+  end
+
+  def self.merge_training_resource_template_keys!(vars, extra_args)
+    %i[update_count updated_topics resource_updates_html resource_updates_text profile_url].each do |key|
+      vars[key] = extra_args[key].to_s if extra_args.key?(key)
+    end
   end
 
   def self.merge_lapsed_access_template_keys!(vars, extra_args)
@@ -739,6 +758,21 @@ class MemberMailer < ApplicationMailer
   end
 
   private
+
+  def assign_training_resource_update(opts)
+    opts = opts.to_h.symbolize_keys
+    @update_count = opts[:update_count]
+    @updated_topics = opts[:updated_topics]
+    @resource_updates_html = opts[:resource_updates_html]
+    @resource_updates_text = opts[:resource_updates_text]
+    @profile_url = opts[:profile_url]
+  end
+
+  def training_resource_update_extras
+    { update_count: @update_count, updated_topics: @updated_topics,
+      resource_updates_html: @resource_updates_html, resource_updates_text: @resource_updates_text,
+      profile_url: @profile_url }
+  end
 
   # Shared by the three credential emails: the template if enabled, otherwise the view named
   # after the action. Values come from +opts+ (plain names, dates and reasons) and never

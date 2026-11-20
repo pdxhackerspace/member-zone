@@ -1,0 +1,6 @@
+<h1>Updates for topics you know</h1>
+<p>Hello <%= @user.display_name %>,</p>
+<p>There <%= @update_count %> for <strong><%= @updated_topics %></strong> at <%= @organization %>.</p>
+<%= @resource_updates_html.html_safe %>
+<p>You can open these from your profile: <%= link_to @profile_url, @profile_url %></p>
+<p>Best regards,<br>The <%= @organization %> Team</p>

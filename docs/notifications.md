@@ -122,6 +122,14 @@ The pace is `reminder_settings.repeat_after_minutes` (120 by default; 0 means ev
 
 Mail is delivered directly rather than through the review queue. The job records the send when it hands the message off. Members hush it from the `parking_arrival` notification category; that does not hush `parking_notices`.
 
+## Training resource updates
+
+`training_resource_updates` tells trainers and trained members when a topic's documents or links change. It is a digest, not a `Reminders::Schedule` sequence: Schedule restarts whenever its anchor moves, and a new batch of changes would look like a new anchor and send immediately. The cap is one digest for the whole installation per `interval_days` (7 by default), counted from `training_resource_changes.notified_at`.
+
+Edits made in the app are recorded as they happen, and only while the reminder is enabled, so turning it on does not announce a backlog. Linked pages are re-fetched daily. `ETag` and `Last-Modified` can skip a download, but a change is the page's text hash, confirmed on the next check, so a page that differs on every fetch never sends mail. A check that has not run for longer than the interval starts over from a new baseline.
+
+The email names the topic and what changed. It does not name who made the edit; that stays on the change row for admins. Members and trainers share one opt-out, and someone only hears about changes that happened after they were trained or made a trainer, whichever is earlier.
+
 ## Adding a new member email
 
 1. Add the mailer action to a category in `NotificationCategory::CATALOG`, or to `MailRecipientGuard::ADMIN_MAILER_ACTIONS` if staff-only. This covers email template keys too, not just `MemberMailer` methods.

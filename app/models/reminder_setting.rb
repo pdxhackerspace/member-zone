@@ -1,6 +1,7 @@
 class ReminderSetting < ApplicationRecord
   include ReminderSettingArrival
   include ReminderSettingTemplates
+  include ReminderSettingDigest
 
   # Every reminder's cadence is the same three numbers: how long after its anchor the first
   # one goes out (negative to send before the anchor), how long between the ones after that,
@@ -176,6 +177,22 @@ class ReminderSetting < ApplicationRecord
       # its own sends.
       reminder_mailer_actions: [],
       email_template_keys: %w[api_token_expiring_soon]
+    },
+    # Not a Schedule sequence. A new batch of changes would look like a new anchor and
+    # send immediately, which is the opposite of a cap. The digest stamps its own rows.
+    'training_resource_updates' => {
+      name: 'Training resource updates',
+      description: 'Tells trainers and trained members when a topic\'s documents or links change, including when ' \
+                   'a linked page\'s contents change. One email covers every topic, at most once per interval.',
+      enabled: false,
+      allow_opt_out: true,
+      anchor_description: 'the last digest',
+      start_offset_days: 0,
+      interval_days: 7,
+      max_reminders: nil,
+      digest: true,
+      reminder_mailer_actions: [],
+      email_template_keys: %w[training_resources_updated]
     }
   }.freeze
 

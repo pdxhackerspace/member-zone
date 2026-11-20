@@ -16,7 +16,9 @@ Every reminder is timed the same way, by three fields on its card. There is noth
 - **then every — N days** — the gap between reminders after the first.
 - **up to — N reminders** — how many to send in total. Leave it blank for no limit.
 
-The parking arrival reminder is the exception. It has one field, **At most once every N minutes**, because it sends when someone badges in rather than on the daily run, and it has no **Send now**.
+The parking arrival reminder is one exception. It has one field, **At most once every N minutes**, because it sends when someone badges in rather than on the daily run, and it has no **Send now**.
+
+Training resource updates are the other. That card has one field, **At most every N days**, because it is a digest rather than a sequence: however many topics changed, each person gets at most one email per interval.
 
 Underneath, the card states the cadence back to you in plain English — "Cadence: 5 days after the dues date, then every 7 days, with no limit" — so you can check a change did what you meant before anything goes out.
 
@@ -168,6 +170,18 @@ Warns before an API token expires, so a token still in use gets extended and an 
 It goes to the token's **contact** — for a member's own token, the member. When the contact is no longer an active member (or a service-account token has none), it goes to everyone who holds *Manage service-account API tokens* instead.
 
 **Timing** counts back from the expiry date: 14 days before, then every 7, at most 3. Extending a token moves its expiry and starts the sequence over.
+
+### Training resource updates
+
+Tells everyone trained in a topic, and everyone who can train it, when that topic's documents or links change. **This reminder ships disabled.**
+
+It covers a link or document being added, edited, or removed, and a linked page whose contents change. Pages are checked once a day. A page has to look the same on two checks in a row before anyone is told, so a page that changes on every load stays quiet. Pages the server cannot read (a private address, a login wall, a file that is too large) are marked on the topic page for the people who edit its links, and they are not described as updates.
+
+Each person gets **one email** covering every topic they train or are trained in, and the whole installation sends that digest **at most once per interval** — 7 days out of the box. Someone only hears about changes from after they were trained, or after they became a trainer. The email says what changed. It does not say who made the edit.
+
+**Send now** sends whatever is waiting and starts the interval over. While the reminder is off, changes are not recorded and pages are not checked, so turning it on does not produce a catch-up email.
+
+**Email copy** is editable under Settings → Email templates (`Training Resource Updates`). The digest waits in the outbound mail review queue. Members can opt out under **Training document and link updates**.
 
 ## Application backlog on the admin dashboard
 
@@ -342,6 +356,8 @@ To take away a trainer capability, use the member's profile (Training and access
 Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open.
 
 People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
+
+When training resource updates are enabled, each link also says when its page was last checked, when the contents last changed, or that the page can't be read. Members who cannot edit the links do not see that.
 
 Stewards and curators can reach every topic they look after, even ones not offered to members: a topic shows up in the catalog, and its page opens, for anyone who holds *Edit topic resource links*, *Manage topic documents*, *Edit topic descriptions*, or *Create subtopics* for it (or for its parent topic). The same people get the **Edit** button at the top of the topic page, which opens the topic's settings limited to what their role covers.
 

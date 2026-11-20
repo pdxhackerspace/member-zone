@@ -70,6 +70,12 @@
           · <span class="text-secondary"><%= @lapsed_access_window_count %> inactive, badged in during the window total</span>
         <% end %>
       </div>
+    <% elsif @reminder_setting.key == 'training_resource_updates' %>
+      <div class="text-13 text-secondary mt-1">
+        <span class="fw-medium text-body"><%= @training_resource_due_count %></span> would be emailed on the next run
+        · <span class="text-secondary"><%= @training_resource_summary.context %></span>
+      </div>
+      <div class="text-12 text-secondary mt-1"><%= @training_resource_summary.note %></div>
     <% elsif @reminder_setting.key == 'staff_application' %>
       <div class="text-13 text-secondary mt-1">
         <span class="fw-medium text-body"><%= @staff_application_due_count %></span> would be emailed on the next run
@@ -519,3 +525,4 @@
   </div>
 <% end %>
 <%= render 'parking_arrival' if @reminder_setting.key == 'parking_arrival' %>
+<%= render 'training_resource_updates' if @reminder_setting.key == 'training_resource_updates' %>

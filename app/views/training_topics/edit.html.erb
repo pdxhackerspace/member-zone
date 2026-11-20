@@ -199,7 +199,7 @@
     
     <% if @training_topic.links.any? %>
       <div class="mb-4">
-        <% @training_topic.links.order(:title).each do |link| %>
+        <% @training_topic.links.includes(:content_snapshot).order(:title).each do |link| %>
           <div class="border rounded p-3 mb-2" id="link-row-<%= link.id %>">
             <%# Display mode %>
             <div class="link-display-<%= link.id %> d-flex justify-content-between align-items-center">
@@ -207,6 +207,7 @@
                 <strong><%= link.title %></strong>
                 <br>
                 <%= link_to link.url, link.url, target: "_blank", rel: "noopener", class: "text-decoration-none small text-truncate d-inline-block", style: "max-width: 400px;" %>
+                <div><%= link_check_status(link) %></div>
               </div>
               <div class="d-flex gap-2">
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleEditLink(<%= link.id %>)">

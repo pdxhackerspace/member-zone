@@ -13,7 +13,7 @@ class EmailTemplate
         .merge(membership)
         .merge(applications)
         .merge(invitations)
-        .merge(training)
+        .merge(training).merge(TrainingResourcePreviewVariables.all)
         .merge(slack)
         .merge(lapsed_access)
         .merge(parking)
