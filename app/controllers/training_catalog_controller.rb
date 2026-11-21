@@ -77,22 +77,38 @@ class TrainingCatalogController < AuthenticatedController
     end
   end
 
-  # Roots first, each followed by its subtopics. Depth comes from the full tree, so a
-  # visible subtopic stays indented when its parent is hidden from this viewer.
+  # Roots first, each followed by its subtopics. A parent stays in the list when one of
+  # its topics is visible, even if the parent itself is not offered to members.
   def ordered_visible_topics
     visible_ids = visible_topics.pluck(:id).to_set
-    TrainingTopic.includes(:parent).tree_ordered.select { |topic, _depth| visible_ids.include?(topic.id) }
+    ordered = TrainingTopic.tree_ordered
+    display_ids = visible_ids | ancestor_ids(ordered, visible_ids)
+    ordered.select { |topic, _depth| display_ids.include?(topic.id) }
+  end
+
+  def ancestor_ids(ordered, topic_ids)
+    by_id = ordered.to_h { |topic, _depth| [topic.id, topic] }
+    ids = Set.new
+    topic_ids.each do |id|
+      parent_id = by_id[id]&.parent_id
+      parent_id = by_id[parent_id]&.parent_id while parent_id && ids.add?(parent_id)
+    end
+    ids
   end
 
   def filtered_training_topics(ordered)
-    case params[:training_filter]
-    when 'offered'
-      ordered.select { |topic, _depth| topic.offered_to_members? }
-    when 'needs_trainers'
-      ordered.select { |topic, _depth| needs_trainers?(topic) }
-    else
-      ordered
-    end
+    matched = case params[:training_filter]
+              when 'offered'
+                ordered.select { |topic, _depth| topic.offered_to_members? }
+              when 'needs_trainers'
+                ordered.select { |topic, _depth| needs_trainers?(topic) }
+              else
+                return ordered
+              end
+
+    keep_ids = matched.to_set { |topic, _depth| topic.id }
+    keep_ids.merge(ancestor_ids(ordered, keep_ids))
+    ordered.select { |topic, _depth| keep_ids.include?(topic.id) }
   end
 
   # Nil means every topic is linkable: admins, and anyone who may view the whole catalog.
