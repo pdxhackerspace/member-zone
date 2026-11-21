@@ -4,6 +4,7 @@
 class AddParkingArrivalReminder < ActiveRecord::Migration[8.1]
   def up
     add_column :reminder_settings, :repeat_after_minutes, :integer, null: false, default: 120
+    ReminderSetting.reset_column_information
 
     EmailTemplate.seed_defaults!
     ReminderSetting.seed_defaults!
