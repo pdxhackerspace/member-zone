@@ -319,6 +319,8 @@ The bar at the bottom totals it (for example, *4 members × 2 topics → 6 train
 
 **Add training** on a member's profile (Training & access) records one topic for that member. Administrators pick the trainer in that menu before choosing the topic. The training record and the journal line both name that trainer; the journal's "by" column stays the administrator who entered it. Anyone else using Add training is recorded as themselves. The Train button on a topic page does not ask for a trainer.
 
+When an administrator names someone else as the trainer, that person gets a message saying they were named, and every other active trainer for the topic gets a message naming who was trained and by whom. The member still gets the usual training email. The administrator who entered it is not messaged, and inactive trainers are left out except the person named as the trainer, who is told either way. Naming yourself does not send these messages. Appointing a trainer sends the same messages when that appointment also records a training under someone else's name.
+
 To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
 
 ## Topic resources

@@ -50,6 +50,39 @@ class TrainerAppointerTest < ActiveSupport::TestCase
     assert_equal 3, result.skipped_count
   end
 
+  test 'messages the credited trainer when appointing also records their training' do
+    admin = users(:public_profile_user)
+    admin.update_columns(is_admin: true)
+    trainer = users(:two)
+    trainee = users(:three)
+    TrainerCapability.create!(user: users(:one), training_topic: @topic)
+
+    assert_difference 'Message.count', 2 do
+      TrainerAppointer.new(
+        current_user: admin, training_topic: @topic, trainee_ids: [trainee.id.to_s],
+        trainer: trainer, trained_at: @trained_at
+      ).call
+    end
+
+    assert_includes Message.find_by!(recipient: trainer).body, 'named you as the trainer'
+    assert_includes Message.find_by!(recipient: users(:one)).body, "by #{trainer.display_name}"
+  end
+
+  test 'appointing without a new training record does not message trainers' do
+    admin = users(:public_profile_user)
+    admin.update_columns(is_admin: true)
+    trainee = users(:two)
+    Training.create!(trainee: trainee, training_topic: @topic, trained_at: 1.week.ago)
+    TrainerCapability.create!(user: users(:three), training_topic: @topic)
+
+    assert_no_difference 'Message.count' do
+      TrainerAppointer.new(
+        current_user: admin, training_topic: @topic, trainee_ids: [trainee.id.to_s],
+        trainer: users(:three), trained_at: @trained_at
+      ).call
+    end
+  end
+
   test 'emails the new trainer' do
     trainee = users(:two)
 

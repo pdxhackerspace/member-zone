@@ -38,18 +38,21 @@ class TrainerAppointer
   end
 
   def appoint(trainee, result)
+    recorded = nil
     ActiveRecord::Base.transaction do
-      result.trained_count += 1 if record_missing_training(trainee)
+      recorded = record_missing_training(trainee)
+      result.trained_count += 1 if recorded
       TrainerCapability.create!(user: trainee, training_topic: training_topic)
       log_capability_added(trainee)
     end
+    TrainingAttributionNotifier.new(training: recorded, actor: current_user).call
     notify(trainee)
     result.appointed_count += 1
     result.inactive_trainee_ids << trainee.id unless trainee.active?
   end
 
   def record_missing_training(trainee)
-    return false if Training.exists?(trainee: trainee, training_topic: training_topic)
+    return if Training.exists?(trainee: trainee, training_topic: training_topic)
 
     training = Training.create!(trainee: trainee, trainer: trainer, training_topic: training_topic,
                                 trained_at: trained_at)
@@ -58,7 +61,7 @@ class TrainerAppointer
           'trainer' => trainer&.display_name || 'Unknown',
           'trained_at' => training.trained_at.iso8601
         })
-    true
+    training
   end
 
   def log_capability_added(trainee)
