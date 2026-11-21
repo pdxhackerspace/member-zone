@@ -62,6 +62,16 @@ module TrainingResources
       assert_equal 'safety.pdf', added.details['filename']
     end
 
+    test 'deleting a freshly loaded document still records that it was removed' do
+      document = build_document(@topic)
+
+      Document.find(document.id).destroy!
+
+      removed = TrainingResourceChange.find_by!(kind: 'document_removed', resource_id: document.id)
+      assert_equal @topic.id, removed.training_topic_id
+      assert_equal 'safety.pdf', removed.details['filename']
+    end
+
     test 'adding a document to topics, replacing its file, and removing a topic are recorded once each' do
       document = build_document(@topic, @other)
       document.update!(title: 'Safety checklist')

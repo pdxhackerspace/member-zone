@@ -11,7 +11,7 @@ class Document < ApplicationRecord
   scope :ordered, -> { order(:title) }
 
   before_save :capture_training_resource_edit
-  before_destroy :remember_topics_for_change_log
+  before_destroy :remember_topics_for_change_log, prepend: true
   after_create_commit :log_topics_added_with_document
   after_update_commit :log_training_resource_edit
   after_destroy_commit :log_training_resource_removal
@@ -75,6 +75,8 @@ class Document < ApplicationRecord
     TrainingResources::ChangeLog.document_removed(self, topic)
   end
 
+  # The join rows are destroyed by dependent: :destroy before a normal before_destroy,
+  # and a document loaded by id has not cached its topics. Read them first.
   def remember_topics_for_change_log
     @topics_for_change_log = training_topics.to_a
   end

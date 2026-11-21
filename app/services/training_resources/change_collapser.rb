@@ -83,14 +83,30 @@ module TrainingResources
 
     def merged_details(added, ordered)
       details = added.details.deep_dup
-      content = ordered.rfind { |change| change.kind == 'link_content_changed' }
-      return details unless content
+      ordered.each { |change| apply_later_details(details, change) }
+      details
+    end
 
-      details.merge(
-        'added_line_count' => content.details['added_line_count'],
-        'excerpts' => content.details['excerpts'],
-        'changed_on' => content.details['changed_on']
-      )
+    def apply_later_details(details, change)
+      apply_link_update(details, change.details) if change.kind == 'link_updated'
+      apply_document_update(details, change.details) if change.kind == 'document_updated'
+      apply_content_change(details, change.details) if change.kind == 'link_content_changed'
+    end
+
+    def apply_link_update(details, change_details)
+      url = change_details['url']
+      details['url'] = url.last if url.is_a?(Array)
+    end
+
+    def apply_document_update(details, change_details)
+      file = change_details['file']
+      details.merge!(file['to']) if file.is_a?(Hash) && file['to'].is_a?(Hash)
+    end
+
+    def apply_content_change(details, change_details)
+      details['added_line_count'] = change_details['added_line_count']
+      details['excerpts'] = change_details['excerpts']
+      details['changed_on'] = change_details['changed_on']
     end
 
     def entry(change, ids)

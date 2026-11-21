@@ -127,6 +127,24 @@ module TrainingResources
       assert TrainingResourceChange.pending.none?
     end
 
+    test 'an add edited before the digest shows the current url and file' do
+      link = TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
+      link.update!(title: 'Safety guide', url: 'https://example.com/safety')
+      document = Document.new(title: 'Notes', training_topic_ids: [@topic.id])
+      document.file.attach(io: StringIO.new('hello'), filename: 'notes.pdf', content_type: 'application/pdf')
+      document.save!
+      document.update!(title: 'Checklist')
+      document.file.attach(io: StringIO.new('newer'), filename: 'checklist.pdf', content_type: 'application/pdf')
+
+      TrainingResources::UpdateDigest.call
+
+      body = QueuedMail.find_by!(recipient: @trained, mailer_action: 'training_resources_updated').body_html
+      assert_includes body, 'https://example.com/safety'
+      assert_includes body, 'checklist.pdf'
+      assert_not_includes body, 'https://example.com/guide'
+      assert_not_includes body, 'notes.pdf'
+    end
+
     test 'the reminders summary counts waiting changes and who would be mailed today' do
       TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
       summary = TrainingResources::UpdateDigest.summary
