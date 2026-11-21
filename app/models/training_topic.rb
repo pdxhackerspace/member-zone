@@ -27,6 +27,11 @@ class TrainingTopic < ApplicationRecord
 
   scope :roots, -> { where(parent_id: nil) }
   scope :offered_for_members, -> { where(offered_to_members: true) }
+  # Topics a member may open just to see or message the people trained in them,
+  # even when the topic itself is not offered for training requests.
+  scope :roster_shared, lambda {
+    where(trained_members_visible: true).or(where(trained_members_contactable: true))
+  }
   scope :with_trainers, -> { joins(:trainer_capabilities).distinct }
   # Only counts trainers whose membership is still active; inactive trainers
   # are not contacted, so topics whose only trainers are inactive are not
@@ -101,6 +106,10 @@ class TrainingTopic < ApplicationRecord
 
   def subtopic?
     parent_id.present?
+  end
+
+  def roster_shared?
+    trained_members_visible? || trained_members_contactable?
   end
 
   # A member trained in this topic's direct parent runs the area it belongs to, so they

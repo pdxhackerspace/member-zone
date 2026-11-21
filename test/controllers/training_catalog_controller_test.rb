@@ -525,6 +525,29 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{training_catalog_topic_path(subtopic)}']", text: subtopic.name
   end
 
+  test 'member can open an unoffered topic that shares its roster and contact it from the list' do
+    parent = TrainingTopic.create!(
+      name: 'Steward Woodshop', offered_to_members: false,
+      trained_members_visible: true, trained_members_contactable: true
+    )
+    TrainingTopic.create!(name: 'Table saw', parent: parent, offered_to_members: true)
+    steward = users(:two)
+    Training.create!(trainee: steward, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(parent)}']", text: 'Steward Woodshop'
+    assert_select "a[href='#{training_catalog_topic_path(parent, anchor: 'contact-trained-members')}']", text: /Contact/
+
+    get training_catalog_topic_path(parent)
+
+    assert_response :success
+    assert_select '#trained-members a[href=?]', user_path(steward), text: steward.display_name
+    assert_select '#contact-trained-members'
+  end
+
   test 'member does not see who is trained until the topic allows it' do
     trainee = users(:two)
     Training.create!(trainee: trainee, training_topic: @laser_topic, trainer: users(:one), trained_at: Time.current)
