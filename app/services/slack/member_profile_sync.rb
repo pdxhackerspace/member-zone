@@ -41,22 +41,43 @@ module Slack
       updates[:pronouns] = @slack_user.pronouns if @slack_user.pronouns.present? && @user.pronouns.blank?
 
       profile = @slack_user.raw_attributes&.dig('profile') || {}
-      if @user.avatar.blank? || slack_avatar?
-        image_192_url = profile['image_192']
-        updates[:avatar] = image_192_url if image_192_url.present?
-      end
+      image_192_url = profile['image_192']
+      updates[:avatar] = image_192_url if image_192_url.present? && replace_avatar?(profile)
       updates[:bio] = @slack_user.title if @slack_user.title.present? && @user.bio.blank?
 
       @user.update!(updates) if updates.any?
     end
 
-    def slack_avatar?
-      return true if @user.avatar == @slack_user.raw_attributes&.dig('openid_claims', 'picture')
+    # A blank avatar only takes a photo the member actually uploaded. Slack's default
+    # image_192 is a Gravatar URL, and storing it makes the next real photo look custom.
+    def replace_avatar?(profile)
+      return slack_avatar? if @user.avatar.present?
 
-      host = URI.parse(@user.avatar).host.to_s.downcase
+      profile['image_original'].present?
+    end
+
+    def slack_avatar?
+      avatar = @user.avatar.to_s
+      return true if avatar == @slack_user.raw_attributes&.dig('openid_claims', 'picture')
+
+      host = URI.parse(avatar).host.to_s.downcase
+      slack_host?(host) || slack_default_gravatar?(avatar, host)
+    rescue URI::InvalidURIError
+      false
+    end
+
+    def slack_host?(host)
       host == 'slack-edge.com' || host.end_with?('.slack-edge.com') ||
         host == 'slack.com' || host.end_with?('.slack.com')
-    rescue URI::InvalidURIError
+    end
+
+    # No uploaded photo: image_192 is Gravatar, and its fallback image is hosted on Slack.
+    def slack_default_gravatar?(avatar, host)
+      return false unless host == 'gravatar.com' || host.end_with?('.gravatar.com')
+
+      decoded = URI.decode_www_form_component(avatar).downcase
+      decoded.include?('slack-edge.com') || decoded.include?('.slack.com')
+    rescue ArgumentError
       false
     end
 
