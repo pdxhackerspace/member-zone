@@ -31,6 +31,7 @@
   <% end %>
 </div>
 
+<div data-controller="training-contact">
 <% if @training_topics.any? %>
   <div class="card shadow-sm border-0">
       <div class="table-responsive">
@@ -71,6 +72,15 @@
                     <% if topic.description.present? %>
                       <div class="text-muted small"><%= truncate(topic.description.to_s, length: 140) %></div>
                     <% end %>
+                    <% roster_names = topic.trained_members_visible? ? Array(@roster_members[topic.id]) : [] %>
+                    <% if roster_names.any? %>
+                      <% roster = TrainingTopicRoster.new(topic: topic, viewer: current_user) %>
+                      <div class="d-flex flex-wrap gap-2 mt-1">
+                        <% roster_names.each do |member| %>
+                          <span class="text-13"><%= training_roster_name(member, roster) %></span>
+                        <% end %>
+                      </div>
+                    <% end %>
                   </div>
                 </td>
                 <% if current_user_admin? %>
@@ -103,6 +113,16 @@
                       <%= link_to new_training_request_path(training_topic_id: topic.id), class: 'btn btn-sm btn-outline-secondary' do %>
                         <i class="bi bi-mortarboard"></i> Request
                       <% end %>
+                    <% elsif @contactable_topic_ids.include?(topic.id) %>
+                      <% recipients = names_for_catalog_contact(topic) %>
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              data-bs-toggle="modal" data-bs-target="#training-contact-modal"
+                              data-action="training-contact#open"
+                              data-contact-url="<%= training_catalog_topic_contact_path(topic) %>"
+                              data-contact-topic="<%= topic.name %>"
+                              data-contact-detail="<%= training_contact_detail(recipients) %>">
+                        <i class="bi bi-chat"></i> Contact
+                      </button>
                     <% end %>
                   </div>
                 </td>
@@ -117,3 +137,32 @@
     No training topics are currently available.
   </div>
 <% end %>
+
+<div class="modal fade" id="training-contact-modal" tabindex="-1" aria-labelledby="training-contact-title" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <%= form_with url: training_catalog_path, method: :post, data: { training_contact_target: 'form' } do %>
+        <%= hidden_field_tag :return_to, 'catalog' %>
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="training-contact-title" data-training-contact-target="title">Message trained members</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-13 text-secondary" data-training-contact-target="detail"></p>
+          <div class="mb-3">
+            <%= label_tag :subject, 'Subject', class: 'form-label text-13' %>
+            <%= text_field_tag :subject, nil, class: 'form-control', required: true, maxlength: TrainingTopicContact::MAX_SUBJECT %>
+          </div>
+          <div>
+            <%= label_tag :body, 'Message', class: 'form-label text-13' %>
+            <%= text_area_tag :body, nil, rows: 4, class: 'form-control', required: true, maxlength: TrainingTopicContact::MAX_BODY %>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <%= submit_tag 'Send message', class: 'btn btn-primary btn-sm' %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+</div>

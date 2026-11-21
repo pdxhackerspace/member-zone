@@ -28,6 +28,8 @@ class TrainingCatalogController < AuthenticatedController
                                                    .to_set
     @requestable_topic_ids = @trainable_on_request_topic_ids - @trained_topic_ids
     @linked_topic_ids = linked_catalog_topic_ids
+    @contactable_topic_ids = contactable_catalog_topic_ids
+    @roster_members = TrainingTopicRoster.active_members_by_topic(@training_topics.map(&:first))
     @can_record_training = current_user_admin? ? TrainingTopic.exists? : current_user.trainer_capabilities.exists?
   end
 
@@ -53,10 +55,10 @@ class TrainingCatalogController < AuthenticatedController
     ).deliver
 
     if result.error
-      redirect_to training_catalog_topic_path(@training_topic), alert: result.error
+      redirect_to after_contact_path, alert: result.error
     else
       notice = "Message sent to #{result.sent_count} #{'member'.pluralize(result.sent_count)}."
-      redirect_to training_catalog_topic_path(@training_topic), notice: notice
+      redirect_to after_contact_path, notice: notice
     end
   end
 
@@ -132,15 +134,34 @@ class TrainingCatalogController < AuthenticatedController
   end
 
   # Nil means every topic is linkable: admins, and anyone who may view the whole catalog.
-  # Otherwise a name links when a member can request the topic, the viewer is trained in
-  # it or its parent, or the viewer may open its page.
+  # Otherwise a name links when a member can request the topic, the topic shares its
+  # roster, the viewer is trained in it or its parent, or the viewer may open its page.
   def linked_catalog_topic_ids
     return if current_user_admin? || can?(:'training.catalog.view_all')
 
     @trainable_on_request_topic_ids |
       @trained_topic_ids |
       current_user.topics_with_page_access.pluck(:id).to_set |
-      TrainingTopic.where(parent_id: @trained_topic_ids.to_a).pluck(:id).to_set
+      TrainingTopic.where(parent_id: @trained_topic_ids.to_a).pluck(:id).to_set |
+      TrainingTopic.roster_shared.pluck(:id).to_set
+  end
+
+  # Topics whose row offers Contact: the viewer may message, and someone else active
+  # is trained there. Request stays the row's button when the topic is requestable.
+  def contactable_catalog_topic_ids
+    Training.joins(:trainee).merge(User.active)
+            .where(training_topic_id: topics_viewer_may_contact.select(:id))
+            .where.not(trainee_id: current_user.id)
+            .distinct
+            .pluck(:training_topic_id)
+            .to_set
+  end
+
+  def topics_viewer_may_contact
+    return TrainingTopic.all if current_user_admin?
+
+    TrainingTopic.where(trained_members_contactable: true)
+                 .or(TrainingTopic.where(parent_id: @trained_topic_ids.to_a))
   end
 
   def needs_trainers?(topic)
@@ -164,24 +185,33 @@ class TrainingCatalogController < AuthenticatedController
     return true if @training_topic.offered_to_members?
     return true if current_user.may_open_topic_page?(@training_topic)
     return true if Training.exists?(trainee: current_user, training_topic: @training_topic)
+    return true if @training_topic.roster_shared?
 
     @training_topic.parent_held_by?(current_user)
   end
 
   def training_contact_rate_limited
-    redirect_to training_catalog_topic_path(@training_topic),
-                alert: 'Too many messages. Try again in an hour.'
+    redirect_to after_contact_path, alert: 'Too many messages. Try again in an hour.'
+  end
+
+  # The catalog list sends its own message, and lands back on the list.
+  def after_contact_path
+    return training_catalog_path if params[:return_to] == 'catalog'
+
+    training_catalog_topic_path(@training_topic)
   end
 
   # A privilege here only ever widens what a member sees: every member keeps the topics on
   # offer, training.catalog.view_all adds the ones that are not, a steward or curator also
   # sees the unoffered topics whose page they may edit, a member sees topics they hold, and
-  # holding a topic reveals its direct subtopics.
+  # holding a topic reveals its direct subtopics, and a topic that shares its roster
+  # is listed even when it is not offered.
   def visible_topics
     return TrainingTopic.all if current_user_admin? || can?(:'training.catalog.view_all')
 
     held_ids = Training.where(trainee: current_user).select(:training_topic_id)
     TrainingTopic.offered_for_members
+                 .or(TrainingTopic.roster_shared)
                  .or(TrainingTopic.where(id: current_user.topics_with_page_access.select(:id)))
                  .or(TrainingTopic.where(id: held_ids))
                  .or(TrainingTopic.where(parent_id: held_ids))
