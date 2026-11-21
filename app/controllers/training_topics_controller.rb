@@ -21,7 +21,7 @@ class TrainingTopicsController < AuthenticatedController
   end
 
   def create
-    @training_topic = TrainingTopic.new(training_topic_params)
+    @training_topic = TrainingTopic.new(training_topic_create_params)
 
     if @training_topic.save
       redirect_to after_create_path, notice: 'Training topic created successfully.'
@@ -167,7 +167,16 @@ class TrainingTopicsController < AuthenticatedController
     @eligible_parents = @training_topic.eligible_parents
   end
 
+  # Listing and contact are topic setup, the same as whether a topic is offered.
+  # A role that can add a subtopic must not be able to publish that roster while creating it.
+  def training_topic_create_params
+    return training_topic_params if can?(:'training.topics.manage')
+
+    training_topic_params.except(:trained_members_visible, :trained_members_contactable)
+  end
+
   def training_topic_params
-    params.expect(training_topic: %i[name offered_to_members description parent_id])
+    params.expect(training_topic: %i[name offered_to_members description parent_id
+                                     trained_members_visible trained_members_contactable])
   end
 end

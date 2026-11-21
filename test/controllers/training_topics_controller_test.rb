@@ -102,6 +102,24 @@ class TrainingTopicsControllerTest < ActionDispatch::IntegrationTest
     assert_not @laser_topic.offered_to_members?
   end
 
+  test 'admin can let members see and contact the people trained in a topic' do
+    sign_in_as_admin
+    get edit_training_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select 'label', text: 'Show trained members'
+    assert_select 'label', text: 'Let members contact them'
+
+    patch training_topic_path(@laser_topic), params: {
+      training_topic: { trained_members_visible: '1', trained_members_contactable: '1' }
+    }
+
+    assert_redirected_to edit_training_topic_path(@laser_topic)
+    @laser_topic.reload
+    assert @laser_topic.trained_members_visible?
+    assert @laser_topic.trained_members_contactable?
+  end
+
   test 'admin can destroy a topic with no trainings or capabilities' do
     sign_in_as_admin
     topic = TrainingTopic.create!(name: 'Temporary Topic')

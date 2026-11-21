@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_20_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_21_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1389,6 +1389,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_140000) do
     t.string "name", null: false
     t.boolean "offered_to_members", default: true, null: false
     t.bigint "parent_id"
+    t.boolean "trained_members_contactable", default: false, null: false
+    t.boolean "trained_members_visible", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_training_topics_on_name", unique: true
     t.index ["offered_to_members"], name: "index_training_topics_on_offered_to_members"

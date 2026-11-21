@@ -7,6 +7,15 @@ module TrainingCatalogHelper
 
   # One step of indent per ancestor, capped so a deep tree cannot shove the name
   # off a narrow table.
+  # Links a trained member or trainer when the viewer may open their profile.
+  def training_roster_name(member, roster)
+    css = 'text-decoration-none'
+    css += ' text-secondary' unless member.active?
+    return link_to(member.display_name, user_path(member), class: css) if roster.profile_linked?(member)
+
+    tag.span(member.display_name, class: ('text-secondary' unless member.active?))
+  end
+
   def training_catalog_nest_class(topic, depth)
     return if topic.parent_id.blank?
 
