@@ -101,11 +101,11 @@ module Slack
       assert_equal 0, result.created_count
     end
 
-    test 'update_members does not overwrite an existing member avatar' do
+    test 'update_members refreshes an existing Slack avatar' do
       user = users(:two)
       user.update_columns(
         email: 'member-sync@example.com',
-        avatar: 'https://example.com/existing-avatar.png',
+        avatar: 'https://avatars.slack-edge.com/existing-avatar.png',
         slack_id: nil,
         slack_handle: nil
       )
@@ -129,7 +129,7 @@ module Slack
 
       Slack::UserSynchronizer.new(client: client).call(update_members: true)
 
-      assert_equal 'https://example.com/existing-avatar.png', user.reload.avatar
+      assert_equal 'https://example.com/slack-avatar.png', user.reload.avatar
     end
 
     test 'update_members creates members for unmatched slack users' do
@@ -157,6 +157,25 @@ module Slack
       slack_user = SlackUser.find_by!(slack_id: 'U-NEW-MEMBER')
       assert_not_nil slack_user.user_id
       assert_equal 'Brand New Slack User', slack_user.user.full_name
+    end
+
+    test 'workspace sync replaces a sign-in Gravatar and preserves its source across roster syncs' do
+      user = users(:two)
+      user.update!(avatar: 'https://secure.gravatar.com/avatar/old')
+      claims = { 'picture' => user.avatar }
+      slack_user = SlackUser.create!(slack_id: 'U-OIDC-PHOTO', user: user,
+                                     raw_attributes: { 'openid_claims' => claims })
+      photo = 'https://avatars.slack-edge.com/new-photo.png'
+      client = StubClient.new([{ slack_id: slack_user.slack_id, is_bot: false, deleted: false,
+                                 raw_attributes: { 'profile' => { 'image_192' => photo } } }])
+
+      Slack::UserSynchronizer.new(client: client).call
+      assert_equal claims, slack_user.reload.raw_attributes['openid_claims']
+      assert_equal claims['picture'], user.reload.avatar
+
+      Slack::UserSynchronizer.new(client: client).call(update_members: true)
+      assert_equal photo, user.reload.avatar
+      assert_equal claims, slack_user.reload.raw_attributes['openid_claims']
     end
 
     test 'links existing slack records that were imported earlier' do

@@ -41,7 +41,9 @@ module Slack
 
     def upsert_slack_record(attrs)
       record = SlackUser.find_or_initialize_by(slack_id: attrs[:slack_id])
+      claims = record.raw_attributes&.dig('openid_claims')
       record.assign_attributes(attrs)
+      record.raw_attributes = (record.raw_attributes || {}).merge('openid_claims' => claims) if claims.present?
       # A savepoint, because the whole run shares one transaction: another session claiming
       # this address first trips the unique index on the email digest, and Postgres would
       # otherwise leave the transaction aborted and take the rest of the sync down with it.

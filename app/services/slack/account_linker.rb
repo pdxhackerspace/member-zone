@@ -37,6 +37,7 @@ module Slack
       conflict = verify_no_conflicts(slack_user)
       return conflict if conflict
 
+      sync_photo(slack_user)
       return Result.new(:success, 'Your Slack account is already linked.') if slack_user.user_id == @user.id
 
       slack_user.update!(user_id: @user.id)
@@ -44,6 +45,17 @@ module Slack
     end
 
     private
+
+    def sync_photo(slack_user)
+      picture = @payload['picture'].to_s.strip.presence
+      return if picture.blank?
+
+      previous_picture = slack_user.raw_attributes&.dig('openid_claims', 'picture')
+      SlackUser.transaction do
+        @user.update!(avatar: picture) if @user.avatar.blank? || @user.avatar == previous_picture
+        slack_user.update!(raw_attributes: (slack_user.raw_attributes || {}).merge('openid_claims' => @payload))
+      end
+    end
 
     def verify_team
       team = @payload[TEAM_CLAIM]

@@ -1,9 +1,7 @@
 <%# Renders a 32px user avatar with gravatar fallback and placeholder.
     Locals: user (required) %>
-<% if user.avatar.present? %>
-  <img src="<%= user.avatar %>" alt="<%= user.display_name %>" class="rounded-1" style="width: 32px; height: 32px;">
-<% elsif user.email.present? %>
-  <img src="<%= gravatar_url(user.email, size: 32) %>" alt="<%= user.display_name %>" class="rounded-1" style="width: 32px; height: 32px;">
+<% if user.avatar.present? || user.email.present? %>
+  <%= avatar_image_tag user, size: 32, alt: user.display_name, class: 'rounded-1', style: 'width: 32px; height: 32px;' %>
 <% else %>
   <div class="rounded-1 d-inline-block bg-secondary-subtle" style="width: 32px; height: 32px;"></div>
 <% end %>

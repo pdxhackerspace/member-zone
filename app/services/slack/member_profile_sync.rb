@@ -41,13 +41,23 @@ module Slack
       updates[:pronouns] = @slack_user.pronouns if @slack_user.pronouns.present? && @user.pronouns.blank?
 
       profile = @slack_user.raw_attributes&.dig('profile') || {}
-      if @user.avatar.blank? && profile['image_original'].present?
+      if @user.avatar.blank? || slack_avatar?
         image_192_url = profile['image_192']
         updates[:avatar] = image_192_url if image_192_url.present?
       end
       updates[:bio] = @slack_user.title if @slack_user.title.present? && @user.bio.blank?
 
       @user.update!(updates) if updates.any?
+    end
+
+    def slack_avatar?
+      return true if @user.avatar == @slack_user.raw_attributes&.dig('openid_claims', 'picture')
+
+      host = URI.parse(@user.avatar).host.to_s.downcase
+      host == 'slack-edge.com' || host.end_with?('.slack-edge.com') ||
+        host == 'slack.com' || host.end_with?('.slack.com')
+    rescue URI::InvalidURIError
+      false
     end
 
     def sync_profile_links
