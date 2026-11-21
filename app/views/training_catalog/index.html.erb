@@ -61,16 +61,6 @@
                 <td>
                   <% nest_class = training_catalog_nest_class(topic, depth) %>
                   <div<% if nest_class %> class="<%= nest_class %>"<% end %>>
-                    <% if topic.parent %>
-                      <div class="text-12 text-secondary">
-                        <i class="bi bi-arrow-return-right me-1" aria-hidden="true"></i>
-                        <% if training_catalog_topic_linked?(topic.parent) %>
-                          <%= link_to topic.parent.name, training_catalog_topic_path(topic.parent), class: 'link-secondary text-decoration-none' %>
-                        <% else %>
-                          <%= topic.parent.name %>
-                        <% end %>
-                      </div>
-                    <% end %>
                     <strong>
                       <% if linked %>
                         <%= link_to topic.name, training_catalog_topic_path(topic), class: 'text-decoration-none' %>
