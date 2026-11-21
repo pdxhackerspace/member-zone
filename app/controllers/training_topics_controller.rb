@@ -168,6 +168,7 @@ class TrainingTopicsController < AuthenticatedController
   end
 
   def training_topic_params
-    params.expect(training_topic: %i[name offered_to_members description parent_id])
+    params.expect(training_topic: %i[name offered_to_members description parent_id
+                                     trained_members_visible trained_members_contactable])
   end
 end

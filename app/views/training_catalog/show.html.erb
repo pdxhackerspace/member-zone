@@ -50,9 +50,7 @@
           <ul class="list-unstyled mb-0">
             <% @trainers.each do |trainer| %>
               <li class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-                <%= link_to trainer.display_name,
-                            user_path(trainer),
-                            class: "text-decoration-none #{'text-secondary' unless trainer.active?}" %>
+                <%= training_roster_name(trainer, @roster) %>
                 <% if current_user_admin? && !trainer.active? %>
                   <span class="badge text-bg-secondary-subtle small fw-normal">Inactive</span>
                 <% end %>
@@ -67,28 +65,53 @@
   </div>
 
   <div class="col-lg-6">
-    <div class="card shadow-sm border-0 h-100">
+    <div class="card shadow-sm border-0 h-100" id="trained-members">
       <div class="card-body">
         <h2 class="h5 mb-3"><i class="bi bi-people me-2"></i>Trained Members</h2>
-        <% if @trainees.any? %>
+        <% if @roster.list_visible? && @trainees.any? %>
           <ul class="list-unstyled mb-0">
             <% @trainees.each do |trainee| %>
               <li class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-                <%= link_to trainee.display_name,
-                            user_path(trainee),
-                            class: "text-decoration-none #{'text-secondary' unless trainee.active?}" %>
-                <% if current_user_admin? && !trainee.active? %>
+                <%= training_roster_name(trainee, @roster) %>
+                <% unless trainee.active? %>
                   <span class="badge text-bg-secondary-subtle small fw-normal">Inactive</span>
                 <% end %>
               </li>
             <% end %>
           </ul>
+        <% elsif @roster.list_visible? || @roster.active_trained_count.zero? %>
+          <p class="text-secondary text-13 mb-0">No members have been trained in this topic yet.</p>
         <% else %>
-          <p class="text-muted mb-0">No members have been trained in this topic yet.</p>
+          <p class="text-secondary text-13 mb-0"><%= pluralize(@roster.active_trained_count, 'member') %> trained.</p>
         <% end %>
       </div>
     </div>
   </div>
 </div>
+
+<% if @contact_recipient_count.positive? %>
+  <div class="card shadow-sm border-0 my-4" id="contact-trained-members">
+    <div class="card-body">
+      <h2 class="h5 mb-2">Message trained members</h2>
+      <p class="text-13 text-secondary mb-3">
+        This goes to <%= pluralize(@contact_recipient_count, 'member') %> trained in this topic.
+        They can reply to you.
+      </p>
+      <%= form_with url: training_catalog_topic_contact_path(@training_topic), class: 'row g-3' do |f| %>
+        <div class="col-12">
+          <%= f.label :subject, 'Subject', class: 'form-label text-13' %>
+          <%= f.text_field :subject, class: 'form-control', required: true, maxlength: TrainingTopicContact::MAX_SUBJECT %>
+        </div>
+        <div class="col-12">
+          <%= f.label :body, 'Message', class: 'form-label text-13' %>
+          <%= f.text_area :body, rows: 4, class: 'form-control', required: true, maxlength: TrainingTopicContact::MAX_BODY %>
+        </div>
+        <div class="col-12">
+          <%= f.submit 'Send message', class: "btn btn-sm #{@requestable ? 'btn-outline-secondary' : 'btn-primary'}" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
 
 <%= render 'training_catalog/resources' %>

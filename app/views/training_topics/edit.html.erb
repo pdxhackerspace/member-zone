@@ -69,6 +69,18 @@
               <%= f.label :offered_to_members, "Offered to members", class: "form-check-label" %>
             </div>
           </div>
+          <div class="col-12">
+            <div class="form-check">
+              <%= f.check_box :trained_members_visible, class: "form-check-input" %>
+              <%= f.label :trained_members_visible, "Show trained members", class: "form-check-label" %>
+            </div>
+            <div class="form-text mb-3">Anyone who can open this page can see who is trained in it.</div>
+            <div class="form-check">
+              <%= f.check_box :trained_members_contactable, class: "form-check-input" %>
+              <%= f.label :trained_members_contactable, "Let members contact them", class: "form-check-label" %>
+            </div>
+            <div class="form-text">Anyone who can open this page can send one message to everyone trained in it.</div>
+          </div>
         <% end %>
         <div class="col-md-3">
           <%= f.submit "Update Topic", class: "btn btn-primary w-100" %>
