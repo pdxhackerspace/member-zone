@@ -11,6 +11,7 @@ class TrainingRequestsController < AuthenticatedController
 
   def edit
     @requester = @training_request.user
+    @other_trainers = TrainingRequestResponder.other_trainers(@training_request, sender: true_user)
   end
 
   def create
@@ -47,18 +48,17 @@ class TrainingRequestsController < AuthenticatedController
     # Authority to answer came from the real account, so the reply is signed by it too. An
     # impersonating session that used current_user here would post the member being viewed as
     # the author of an answer to a queue they may have no part in.
-    message = true_user.sent_messages.build(
-      recipient: @training_request.user,
-      subject: "Training request response: #{@training_request.training_topic.name}",
-      body: body
-    )
+    result = TrainingRequestResponder.new(
+      request: @training_request,
+      sender: true_user,
+      body: body,
+      notify_other_trainers: params.dig(:training_request, :notify_other_trainers) == '1'
+    ).call
 
-    if message.save
-      MemberMailer.message_received(message).deliver_later
-      @training_request.respond!(true_user)
-      redirect_to user_path(current_user), notice: 'Response sent to member.'
+    if result.success
+      redirect_to user_path(current_user), notice: result.notice
     else
-      redirect_to edit_training_request_path(@training_request), alert: message.errors.full_messages.to_sentence
+      redirect_to edit_training_request_path(@training_request), alert: result.error
     end
   end
 

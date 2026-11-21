@@ -52,6 +52,7 @@ class TrainingRecorder
     )
     record_training_journal(trainee, training.trained_at)
     enqueue_training_completed_mail(trainee)
+    TrainingAttributionNotifier.new(training: training, actor: current_user).call
     @recorded_count += 1
     @inactive_trainee_ids << trainee.id unless trainee.active?
   end

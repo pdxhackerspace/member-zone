@@ -151,6 +151,21 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
 
     get edit_training_request_path(training_requests(:pending_laser_request))
     assert_response :success
+    assert_select 'input[type=checkbox][name=?][checked]', 'training_request[notify_other_trainers]'
+    assert_match 'Also send this response to the other trainers', response.body
+  end
+
+  test 'response form names the other trainers who will receive a copy' do
+    trainer = sign_in_as_trainer
+    topic = training_topics(:laser_cutting)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: users(:one), training_topic: topic)
+
+    get edit_training_request_path(training_requests(:pending_laser_request))
+
+    assert_response :success
+    assert_select '.form-text', text: users(:one).display_name
+    assert_select '.form-text', text: /#{Regexp.escape(trainer.display_name)}/, count: 0
   end
 
   test 'member cannot open response form for request' do
@@ -177,6 +192,63 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'responded', request.status
     assert_equal trainer, request.responded_by
     assert_not_nil request.responded_at
+    assert_equal 'Response sent to member.', flash[:notice]
+  end
+
+  test 'trainer response also goes to the other active trainers when the box is checked' do
+    trainer = sign_in_as_trainer
+    topic = training_topics(:laser_cutting)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: users(:one), training_topic: topic)
+    users(:two).update!(membership_state: 'inactive_member')
+    TrainerCapability.find_or_create_by!(user: users(:two), training_topic: topic)
+    request = training_requests(:pending_laser_request)
+    body = 'Happy to help. Please message me in #help to schedule.'
+
+    assert_difference 'Message.count', 2 do
+      assert_enqueued_emails 2 do
+        patch training_request_path(request), params: {
+          training_request: { response_body: body, notify_other_trainers: '1' }
+        }
+      end
+    end
+
+    member_message = Message.find_by!(recipient: request.user)
+    assert_equal trainer, member_message.sender
+    assert_equal body, member_message.body
+    assert_equal "Training request response: #{topic.name}", member_message.subject
+
+    copy = Message.find_by!(recipient: users(:one))
+    assert_equal trainer, copy.sender
+    assert_equal "Training request response to #{request.user.display_name}: #{topic.name}", copy.subject
+    assert_includes copy.body, body
+    assert_nil Message.find_by(recipient: users(:two))
+    assert_nil Message.find_by(recipient: trainer)
+    assert_equal 'Response sent to member and the other trainers.', flash[:notice]
+  end
+
+  test 'trainer can keep the response from the other trainers' do
+    trainer = sign_in_as_trainer
+    topic = training_topics(:laser_cutting)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: users(:one), training_topic: topic)
+    request = training_requests(:pending_laser_request)
+
+    assert_difference 'Message.count', 1 do
+      assert_enqueued_emails 1 do
+        patch training_request_path(request), params: {
+          training_request: {
+            response_body: 'I will follow up with you directly.',
+            notify_other_trainers: '0'
+          }
+        }
+      end
+    end
+
+    assert_nil Message.find_by(recipient: users(:one))
+    assert_equal 'Response sent to member.', flash[:notice]
+    assert_equal 'responded', request.reload.status
+    assert_equal trainer, request.responded_by
   end
 
   test 'trainer can mark a request as trained which records training and closes the request' do

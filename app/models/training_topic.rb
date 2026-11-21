@@ -62,6 +62,16 @@ class TrainingTopic < ApplicationRecord
     topic_roles.exists?
   end
 
+  # Active trainers to tell about something on this topic. Inactive trainers are left out,
+  # matching a training request, which only emails trainers whose membership is still active.
+  def notifiable_trainers(except:)
+    scope = trainers.active.order(:full_name, :id)
+    ids = Array(except).filter_map(&:id)
+    return scope if ids.empty?
+
+    scope.where.not(id: ids)
+  end
+
   # Roots first, each followed by its own subtopics, as [topic, depth] pairs for rendering the
   # tree as a flat list. Anything orphaned or circular is appended rather than silently dropped.
   def self.tree_ordered
