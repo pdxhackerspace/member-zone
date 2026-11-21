@@ -5,6 +5,18 @@ class ReminderSettingTest < ActiveSupport::TestCase
     ReminderSetting.seed_defaults!
   end
 
+  test 'repeat_after_minutes is not validated before its column exists' do
+    setting = ReminderSetting.new(key: 'parking_arrival', name: 'Parking arrival')
+    setting.define_singleton_method(:has_attribute?) do |name|
+      return false if name.to_s == 'repeat_after_minutes'
+
+      super(name)
+    end
+
+    assert_nothing_raised { setting.valid? }
+    assert_empty setting.errors[:repeat_after_minutes]
+  end
+
   test 'seed_defaults ignores catalog keys that have no column' do
     ReminderSetting.where(key: 'lapsed_access').delete_all
 

@@ -215,9 +215,12 @@ class ReminderSetting < ApplicationRecord
             numericality: { only_integer: true, greater_than_or_equal_to: 1,
                             less_than_or_equal_to: MAX_REMINDER_COUNT },
             allow_nil: true
+  # The column is added by a later migration than the one that first seeds reminders.
+  # Validating it before then calls a reader the model does not have yet, and db:prepare aborts.
   validates :repeat_after_minutes,
             numericality: { only_integer: true, greater_than_or_equal_to: 0,
-                            less_than_or_equal_to: MAX_REPEAT_AFTER_MINUTES }
+                            less_than_or_equal_to: MAX_REPEAT_AFTER_MINUTES },
+            if: -> { has_attribute?(:repeat_after_minutes) }
 
   scope :ordered, -> { order(:name) }
 
