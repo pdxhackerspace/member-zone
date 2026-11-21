@@ -127,6 +127,49 @@ module TrainingResources
       assert TrainingResourceChange.pending.none?
     end
 
+    test 'adding a resource again ignores edits from before that add' do
+      record_change(4.hours.ago, 'link_added', 'Old', { 'url' => 'https://example.com/old' })
+      record_change(3.hours.ago, 'link_updated', 'Edited',
+                    { 'url' => ['https://example.com/old', 'https://example.com/edited'] })
+      record_change(2.hours.ago, 'link_removed', 'Edited', { 'url' => 'https://example.com/edited' })
+      record_change(1.hour.ago, 'link_added', 'Came back', { 'url' => 'https://example.com/new' })
+
+      TrainingResources::UpdateDigest.call
+
+      body = digest_body
+      assert_includes body, 'https://example.com/new'
+      assert_not_includes body, 'https://example.com/edited'
+      assert_not_includes body, 'https://example.com/old'
+    end
+
+    test 'a url edit drops excerpts taken from the previous page' do
+      record_change(3.hours.ago, 'link_added', 'Guide', { 'url' => 'https://example.com/old' })
+      record_change(2.hours.ago, 'link_content_changed', 'Guide',
+                    { 'added_line_count' => 1, 'excerpts' => ['Acrylic needs two passes'] })
+      record_change(1.hour.ago, 'link_updated', 'Guide',
+                    { 'url' => ['https://example.com/old', 'https://example.com/new'] })
+
+      TrainingResources::UpdateDigest.call
+
+      body = digest_body
+      assert_includes body, 'https://example.com/new'
+      assert_not_includes body, 'Acrylic needs two passes'
+    end
+
+    test 'a page change after a url edit still quotes the new page' do
+      record_change(3.hours.ago, 'link_added', 'Guide', { 'url' => 'https://example.com/old' })
+      record_change(2.hours.ago, 'link_updated', 'Guide',
+                    { 'url' => ['https://example.com/old', 'https://example.com/new'] })
+      record_change(1.hour.ago, 'link_content_changed', 'Guide',
+                    { 'added_line_count' => 1, 'excerpts' => ['New page line'] })
+
+      TrainingResources::UpdateDigest.call
+
+      body = digest_body
+      assert_includes body, 'https://example.com/new'
+      assert_includes body, 'New page line'
+    end
+
     test 'an add edited before the digest shows the current url and file' do
       link = TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
       link.update!(title: 'Safety guide', url: 'https://example.com/safety')
@@ -155,6 +198,17 @@ module TrainingResources
     end
 
     private
+
+    def digest_body
+      QueuedMail.find_by!(recipient: @trained, mailer_action: 'training_resources_updated').body_html
+    end
+
+    def record_change(at, kind, title, details)
+      TrainingResourceChange.create!(
+        training_topic: @topic, resource_type: 'TrainingTopicLink', resource_id: 9001,
+        kind: kind, title: title, details: details, occurred_at: at
+      )
+    end
 
     def fail_trainer_profile_url
       real = nil

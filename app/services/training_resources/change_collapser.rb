@@ -4,6 +4,7 @@ module TrainingResources
   # Someone who was already told it existed still hears that it was removed.
   class ChangeCollapser
     Entry = Struct.new(:change, :source_ids, keyword_init: true)
+    PAGE_DETAIL_KEYS = %w[added_line_count excerpts changed_on].freeze
 
     def self.entries(changes, announced_ids: [])
       new(changes, announced_ids).entries
@@ -81,9 +82,11 @@ module TrainingResources
       copy
     end
 
+    # Only edits after this add belong on the line. An earlier life of the same
+    # resource, or a page excerpt from before a URL change, would be the wrong one.
     def merged_details(added, ordered)
       details = added.details.deep_dup
-      ordered.each { |change| apply_later_details(details, change) }
+      ordered.each { |change| apply_later_details(details, change) if later?(change, added) }
       details
     end
 
@@ -95,7 +98,10 @@ module TrainingResources
 
     def apply_link_update(details, change_details)
       url = change_details['url']
-      details['url'] = url.last if url.is_a?(Array)
+      return unless url.is_a?(Array)
+
+      details['url'] = url.last
+      PAGE_DETAIL_KEYS.each { |key| details.delete(key) }
     end
 
     def apply_document_update(details, change_details)
