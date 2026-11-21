@@ -70,6 +70,59 @@ module Slack
       assert_equal 'https://example.com/existing-avatar.png', user.reload.avatar
     end
 
+    test 'does not store a Slack default Gravatar when the member has no uploaded photo' do
+      user = users(:two)
+      user.update_columns(avatar: nil)
+      gravatar = 'https://secure.gravatar.com/avatar/abc?s=192&d=' \
+                 'https%3A%2F%2Fa.slack-edge.com%2Fdf10d%2Fimg%2Favatars%2Fava_0001-192.png'
+      slack_user = SlackUser.create!(
+        slack_id: 'U-DEFAULT-AVATAR',
+        raw_attributes: { 'profile' => { 'image_192' => gravatar } }
+      )
+
+      MemberProfileSync.apply(user: user, slack_user: slack_user)
+
+      assert_nil user.reload.avatar
+    end
+
+    test 'replaces a stored Slack default Gravatar once a real photo exists' do
+      user = users(:two)
+      gravatar = 'https://secure.gravatar.com/avatar/abc?s=192&d=' \
+                 'https%3A%2F%2Fa.slack-edge.com%2Fdf10d%2Fimg%2Favatars%2Fava_0001-192.png'
+      user.update_columns(avatar: gravatar)
+      slack_user = SlackUser.create!(
+        slack_id: 'U-UPLOADED-AVATAR',
+        raw_attributes: {
+          'profile' => {
+            'image_original' => 'https://avatars.slack-edge.com/original.png',
+            'image_192' => 'https://avatars.slack-edge.com/new.png'
+          }
+        }
+      )
+
+      MemberProfileSync.apply(user: user, slack_user: slack_user)
+
+      assert_equal 'https://avatars.slack-edge.com/new.png', user.reload.avatar
+    end
+
+    test 'does not replace a member gravatar that did not come from Slack' do
+      user = users(:two)
+      user.update_columns(avatar: 'https://secure.gravatar.com/avatar/theirs')
+      slack_user = SlackUser.create!(
+        slack_id: 'U-CUSTOM-GRAVATAR',
+        raw_attributes: {
+          'profile' => {
+            'image_original' => 'yes',
+            'image_192' => 'https://avatars.slack-edge.com/new.png'
+          }
+        }
+      )
+
+      MemberProfileSync.apply(user: user, slack_user: slack_user)
+
+      assert_equal 'https://secure.gravatar.com/avatar/theirs', user.reload.avatar
+    end
+
     test 'refreshes a Slack avatar and preserves it when the latest URL is missing' do
       user = users(:two)
       user.update_columns(avatar: 'https://avatars.slack-edge.com/old.png')
