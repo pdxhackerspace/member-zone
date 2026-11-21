@@ -2,9 +2,12 @@ class TrainingAttributionNotifier
   # An admin recording a class someone else taught tells that trainer, and the topic's other
   # active trainers, through the same direct message a copied training-request reply uses.
   # Naming yourself sends nothing: the person who entered it already knows.
-  def initialize(training:, actor:)
+  def initialize(training:, actor:, except: [])
     @training = training
     @actor = actor
+    # People granted this topic during the same action are not its trainers yet, so a batch
+    # appointment must not tell them about the classmates appointed beside them.
+    @except = Array(except)
   end
 
   def call
@@ -17,11 +20,11 @@ class TrainingAttributionNotifier
 
   private
 
-  attr_reader :training, :actor
+  attr_reader :training, :actor, :except
 
   def recipients
     named = training.trainer
-    others = training.training_topic.notifiable_trainers(except: [actor, training.trainee, named])
+    others = training.training_topic.notifiable_trainers(except: [actor, training.trainee, named, *except])
     people = [actor.id, training.trainee_id].include?(named.id) ? [] : [named]
     people + others.to_a
   end

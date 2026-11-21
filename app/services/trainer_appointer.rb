@@ -16,6 +16,7 @@ class TrainerAppointer
   end
 
   def call
+    @appointed_in_batch = []
     trainees = User.where(id: trainee_ids).index_by { |user| user.id.to_s }
     result = Result.new(0, 0, trainee_ids.count { |id| trainees[id].nil? }, [])
 
@@ -45,7 +46,8 @@ class TrainerAppointer
       TrainerCapability.create!(user: trainee, training_topic: training_topic)
       log_capability_added(trainee)
     end
-    TrainingAttributionNotifier.new(training: recorded, actor: current_user).call
+    @appointed_in_batch << trainee
+    TrainingAttributionNotifier.new(training: recorded, actor: current_user, except: @appointed_in_batch).call
     notify(trainee)
     result.appointed_count += 1
     result.inactive_trainee_ids << trainee.id unless trainee.active?

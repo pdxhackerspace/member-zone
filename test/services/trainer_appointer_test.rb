@@ -68,6 +68,45 @@ class TrainerAppointerTest < ActiveSupport::TestCase
     assert_includes Message.find_by!(recipient: users(:one)).body, "by #{trainer.display_name}"
   end
 
+  test 'a batch appointment does not tell the new trainers about each other' do
+    admin = users(:public_profile_user)
+    admin.update_columns(is_admin: true)
+    credited = users(:one)
+    existing = users(:no_email)
+    first = users(:two)
+    second = users(:three)
+    TrainerCapability.create!(user: credited, training_topic: @topic)
+    TrainerCapability.create!(user: existing, training_topic: @topic)
+
+    TrainerAppointer.new(
+      current_user: admin, training_topic: @topic, trainee_ids: [first.id.to_s, second.id.to_s],
+      trainer: credited, trained_at: @trained_at
+    ).call
+
+    assert_equal 2, Message.where(recipient: credited).count
+    assert_equal 2, Message.where(recipient: existing).count
+    assert_nil Message.find_by(recipient: first)
+    assert_nil Message.find_by(recipient: second)
+  end
+
+  test 'an existing trainer included in the batch still hears about new appointments' do
+    admin = users(:public_profile_user)
+    admin.update_columns(is_admin: true)
+    credited = users(:one)
+    already = users(:two)
+    newbie = users(:three)
+    TrainerCapability.create!(user: credited, training_topic: @topic)
+    TrainerCapability.create!(user: already, training_topic: @topic)
+
+    TrainerAppointer.new(
+      current_user: admin, training_topic: @topic, trainee_ids: [already.id.to_s, newbie.id.to_s],
+      trainer: credited, trained_at: @trained_at
+    ).call
+
+    assert Message.exists?(recipient: already)
+    assert_nil Message.find_by(recipient: newbie)
+  end
+
   test 'appointing without a new training record does not message trainers' do
     admin = users(:public_profile_user)
     admin.update_columns(is_admin: true)
