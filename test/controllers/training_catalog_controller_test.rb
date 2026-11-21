@@ -114,10 +114,11 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select '.topic-nest-1', text: /Sewing machines/
-    child_link = css_select("a[href='#{training_catalog_topic_path(child)}']").first
-    row_text = child_link.ancestors('tr').first.text.squish
-    assert_includes row_text, 'Craft Lab'
-    assert_includes row_text, 'Domestic machines'
+    child_row = css_select("a[href='#{training_catalog_topic_path(child)}']").first.ancestors('tr').first
+    assert_not_includes child_row.text, 'Craft Lab'
+    assert_includes child_row.text.squish, 'Domestic machines'
+    parent_row = css_select("a[href='#{training_catalog_topic_path(parent)}']").first.ancestors('tr').first
+    assert_select parent_row, '.topic-nest-1', count: 0
     assert_operator response.body.index(parent.name), :<, response.body.index(child.name)
   end
 
@@ -131,9 +132,10 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     get training_catalog_path
 
     assert_response :success
+    assert_select '.topic-nest-1', text: /Sewing machines/
     assert_select '.topic-nest-2', text: /Serger/
     row = css_select("a[href='#{training_catalog_topic_path(grandchild)}']").first.ancestors('tr').first
-    assert_includes row.text.squish, 'Sewing machines'
+    assert_not_includes row.text, 'Sewing machines'
     assert_select "a[href='#{training_catalog_topic_path(child)}']", count: 0
   end
 
@@ -150,6 +152,9 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{training_catalog_topic_path(child)}']", count: 0
     assert_select "a[href='#{training_catalog_topic_path(parent)}']", count: 0
     assert_select "tr[data-href='#{training_catalog_topic_path(child)}']", count: 0
+    parent_name = css_select('td strong').find { |node| node.text.strip == 'Craft Lab' }
+    assert_nil parent_name.ancestors('.topic-nest-1, .topic-nest-2').first
+    assert_select '.topic-nest-1', text: /Sewing machines/
   end
 
   test 'admin index links a topic that cannot be requested' do
