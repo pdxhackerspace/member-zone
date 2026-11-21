@@ -1,15 +1,17 @@
 module TrainingResources
   # Turns a burst of edits to one resource into the lines a digest should show.
-  # Adding something and then removing it before the digest goes out is silence.
+  # Adding something and then removing it before anyone is told is silence.
+  # Someone who was already told it existed still hears that it was removed.
   class ChangeCollapser
     Entry = Struct.new(:change, :source_ids, keyword_init: true)
 
-    def self.entries(changes)
-      new(changes).entries
+    def self.entries(changes, announced_ids: [])
+      new(changes, announced_ids).entries
     end
 
-    def initialize(changes)
+    def initialize(changes, announced_ids)
       @changes = changes
+      @announced_ids = Array(announced_ids).to_set(&:to_i)
     end
 
     def entries
@@ -27,7 +29,7 @@ module TrainingResources
       ids = ordered.map(&:id)
       added = ordered.rfind { |change| change.kind.end_with?('_added') }
       removed = ordered.rfind { |change| change.kind.end_with?('_removed') }
-      return removed_result(added, removed, ids) if removal_latest?(removed, added)
+      return removed_result(added, removed, ordered, ids) if removal_latest?(removed, added)
       return [entry(refreshed_add(added, ordered), ids)] if added
 
       edit_entries(ordered, ids)
@@ -48,10 +50,22 @@ module TrainingResources
       candidate.occurred_at == other.occurred_at && candidate.id.to_i > other.id.to_i
     end
 
-    def removed_result(added, removed, ids)
-      return [] if added
+    def removed_result(added, removed, ordered, ids)
+      return [] if added && !told_it_existed?(ordered, removed)
 
       [entry(removed, ids)]
+    end
+
+    def told_it_existed?(ordered, removed)
+      ordered.any? { |change| announced?(change) && present_before?(change, removed) }
+    end
+
+    def present_before?(change, removed)
+      !change.kind.end_with?('_removed') && !later?(change, removed)
+    end
+
+    def announced?(change)
+      @announced_ids.include?(change.id.to_i)
     end
 
     def edit_entries(ordered, ids)

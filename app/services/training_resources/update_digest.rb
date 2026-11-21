@@ -47,7 +47,7 @@ module TrainingResources
     end
 
     def deliver_to(user, mailed, holds)
-      entries = entries_for(user, holds)
+      entries = entries_for(user, holds, mailed)
       ids = entries.flat_map(&:source_ids).uniq - mailed[user.id].to_a
       return true if ids.empty?
 
@@ -76,12 +76,13 @@ module TrainingResources
       return 0 if pending.empty? || !due?
 
       holds = membership_holds
-      recipients.count { |user| entries_for(user, holds).any? }
+      mailed = mailed_change_ids
+      recipients.count { |user| entries_for(user, holds, mailed).any? }
     end
 
-    def entries_for(user, holds)
+    def entries_for(user, holds, mailed)
       visible = pending.select { |change| visible_to?(user, change, holds) }
-      ChangeCollapser.entries(visible)
+      ChangeCollapser.entries(visible, announced_ids: mailed[user.id])
     end
 
     def visible_to?(user, change, holds)

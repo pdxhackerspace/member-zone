@@ -16,6 +16,6 @@ module ReminderSettingDigest
   def cadence_description
     return "At most every #{interval_days} #{'day'.pluralize(interval_days)}" if digest?
 
-    schedule.description
+    super
   end
 end

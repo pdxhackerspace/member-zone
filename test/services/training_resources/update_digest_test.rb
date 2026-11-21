@@ -110,6 +110,23 @@ module TrainingResources
       assert_includes mails.where(recipient: @trained).order(:id).last.body_html, 'More'
     end
 
+    test 'someone already told a resource was added still hears that it was removed' do
+      link = TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
+      fail_trainer_profile_url { TrainingResources::UpdateDigest.call }
+      link.destroy!
+
+      travel 8.days do
+        assert_equal 1, TrainingResources::UpdateDigest.summary.due_recipient_count
+        TrainingResources::UpdateDigest.call
+      end
+
+      trained = QueuedMail.where(recipient: @trained, mailer_action: 'training_resources_updated').order(:id)
+      assert_equal 2, trained.count
+      assert_includes trained.last.body_html, 'Link removed'
+      assert_empty QueuedMail.where(recipient: @trainer, mailer_action: 'training_resources_updated')
+      assert TrainingResourceChange.pending.none?
+    end
+
     test 'the reminders summary counts waiting changes and who would be mailed today' do
       TrainingTopicLink.create!(training_topic: @topic, title: 'Guide', url: 'https://example.com/guide')
       summary = TrainingResources::UpdateDigest.summary
