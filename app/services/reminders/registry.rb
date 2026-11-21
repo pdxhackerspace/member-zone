@@ -14,6 +14,7 @@ module Reminders
         'orientation' => OrientationEligibility,
         'parking_notices' => ParkingNoticeEligibility,
         'parking_permit_details' => ParkingPermitDetailsEligibility,
+        'parking_arrival' => ParkingArrivalEligibility,
         'lapsed_access' => LapsedAccessEligibility,
         'staff_application' => StaleApplicationEligibility,
         'api_token_expiry' => ApiTokenExpiryEligibility

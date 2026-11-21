@@ -1,0 +1,39 @@
+<div class="mb-3">
+  <h1 class="h-page-title mb-0">Parking <%= @notice.notice_type %></h1>
+  <div class="text-13 text-secondary mt-1">
+    For <%= @member.display_name %>. This link does not sign you in.
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3">Status</dt>
+      <dd class="col-sm-9"><%= @notice.status_display %></dd>
+      <dt class="col-sm-3">Where</dt>
+      <dd class="col-sm-9"><%= @notice.location_display.presence || '—' %></dd>
+      <dt class="col-sm-3">Description</dt>
+      <dd class="col-sm-9"><%= @notice.description.presence || '—' %></dd>
+      <dt class="col-sm-3">Expires</dt>
+      <dd class="col-sm-9"><%= @notice.expires_at.strftime('%B %d, %Y') %></dd>
+    </dl>
+  </div>
+</div>
+
+<div class="mt-3">
+  <% if @notice.cleared? %>
+    <p class="text-secondary mb-0">This <%= @notice.notice_type %> is already cleared. You're all set.</p>
+  <% elsif @notice.clearance_requested? && !@notice.clearable_by?(@member) %>
+    <p class="text-secondary mb-0">You've asked staff to clear this. They'll take a look.</p>
+  <% elsif @notice.clearable_by?(@member) %>
+    <p class="text-secondary">Clearing this marks it done and stops the reminders about it.</p>
+    <%= button_to parking_clearance_path(token: params[:token]), class: 'btn btn-primary' do %>
+      Clear this <%= @notice.notice_type %>
+    <% end %>
+  <% else %>
+    <p class="text-secondary">This one needs a staff member to clear it.</p>
+    <%= button_to parking_clearance_path(token: params[:token]), class: 'btn btn-primary' do %>
+      Request clearance
+    <% end %>
+  <% end %>
+</div>

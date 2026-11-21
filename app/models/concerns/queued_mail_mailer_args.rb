@@ -31,6 +31,9 @@ module QueuedMailMailerArgs
         [user, extra_args.slice(:credential_names, :credential_reason)]
       when 'login_link_sent'
         [user, extra_args.slice(:login_url)]
+      when 'training_resources_updated'
+        [user, extra_args.slice(:update_count, :updated_topics, :resource_updates_html, :resource_updates_text,
+                                :profile_url)]
       else
         [user]
       end

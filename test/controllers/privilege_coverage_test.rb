@@ -29,6 +29,9 @@ class PrivilegeCoverageTest < ActiveSupport::TestCase
     'webhooks' => %w[receive],
     # The emailed 12-hour link: the token reaches one permit and signs nobody in.
     'parking_permit_forms' => %w[show update pdf],
+    # The emailed 7-day link: the token reaches one member's place on one notice and signs
+    # nobody in. Opening it does not clear the notice.
+    'parking_clearances' => %w[show create],
     # The API reference describes the API and grants nothing; clients read it before holding a token.
     'api/v1/specs' => %w[show],
     # Unknown /api/v1 paths, answered in the API's error envelope.

@@ -32,6 +32,18 @@
                         required: true,
                         placeholder: 'Share how the member can schedule training, prerequisites, or next steps.' %>
       </div>
+      <div class="form-check mb-3">
+        <%= hidden_field_tag 'training_request[notify_other_trainers]', '0' %>
+        <%= check_box_tag 'training_request[notify_other_trainers]', '1', true,
+                          class: 'form-check-input',
+                          id: 'training_request_notify_other_trainers' %>
+        <%= label_tag 'training_request_notify_other_trainers',
+                      'Also send this response to the other trainers',
+                      class: 'form-check-label' %>
+        <% if @other_trainers.any? %>
+          <div class="form-text"><%= @other_trainers.map(&:display_name).to_sentence %></div>
+        <% end %>
+      </div>
       <%= f.submit 'Send Response', class: 'btn btn-primary' %>
     <% end %>
   </div>

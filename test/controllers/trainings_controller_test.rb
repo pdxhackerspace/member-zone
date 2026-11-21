@@ -124,6 +124,31 @@ class TrainingsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match 'profile-add-training-trainer', response.body
   end
 
+  test 'admin attributing a recorded training messages that trainer and the topic trainers' do
+    admin = sign_in_as_admin
+    trainer = users(:one)
+    other = users(:two)
+    trainee = users(:three)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+    TrainerCapability.create!(user: other, training_topic: @laser_topic)
+
+    assert_difference 'Message.count', 2 do
+      post record_training_path, params: {
+        training_topic_id: @laser_topic.id,
+        trainer_id: trainer.id,
+        trained_at: Date.current.iso8601,
+        trainee_ids: [trainee.id]
+      }
+    end
+
+    assert_redirected_to training_catalog_path
+    assert_equal admin, Message.find_by!(recipient: trainer).sender
+    assert_includes Message.find_by!(recipient: trainer).body, 'named you as the trainer'
+    assert_includes Message.find_by!(recipient: other).body, "by #{trainer.display_name}"
+    assert_nil Message.find_by(recipient: admin)
+    assert_nil Message.find_by(recipient: trainee)
+  end
+
   test 'admin can backdate training and attribute it to an authorized trainer' do
     sign_in_as_admin
     trainer = users(:one)

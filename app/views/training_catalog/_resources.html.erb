@@ -22,6 +22,7 @@
                   <i class="bi bi-link-45deg text-secondary"></i>
                   <%= link_to link.title, link.url, target: '_blank', rel: 'noopener', class: 'text-decoration-none' %>
                   <span class="text-12 text-secondary text-truncate"><%= link.url %></span>
+                  <%= link_check_status(link) %>
                   <span class="btn btn-outline-secondary btn-sm ms-auto">Edit</span>
                 </summary>
                 <%= form_with model: link, url: training_topic_link_path(@training_topic, link), local: true,

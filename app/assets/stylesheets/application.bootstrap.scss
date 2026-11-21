@@ -223,6 +223,11 @@
 .table-compact tbody tr:hover td { background: rgba(255,255,255,0.02); }
 .table-compact .num { font-variant-numeric: tabular-nums; text-align: right; }
 .table-compact .muted-num { color: var(--bs-secondary-color); }
+/* A subtopic sits in from its parent on the training catalog. One class per depth. */
+.topic-nest-1 { padding-left: 1.25rem; }
+.topic-nest-2 { padding-left: 2.5rem; }
+.topic-nest-3 { padding-left: 3.75rem; }
+.topic-nest-4 { padding-left: 5rem; }
 
 /* === List table styling ===
    The roomier sibling of .table-compact, for index pages where the table is the whole

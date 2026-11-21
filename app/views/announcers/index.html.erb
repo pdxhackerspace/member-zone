@@ -19,6 +19,31 @@
 
 <div class="row g-3">
   <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body py-3">
+        <div class="d-flex align-items-start gap-2">
+          <span class="status-dot mt-1 <%= @parking_arrival_reminder.enabled? ? 'status-success' : 'status-muted' %>"></span>
+          <div>
+            <div class="fw-medium">
+              Parking arrival reminder
+              <span class="badge text-bg-secondary-subtle ms-1">Built in</span>
+            </div>
+            <div class="text-12 text-secondary mt-1">
+              Emails a member who arrives with an open permit or ticket. It runs for every arrival, including
+              members who have not opted in to being announced. They hush the email from Notifications.
+            </div>
+            <div class="text-12 text-secondary mt-1">
+              <%= @parking_arrival_reminder.enabled? ? 'On' : 'Off' %>
+              · <%= @parking_arrival_reminder.repeat_window_description %>
+              <% if current_user_admin? %>
+                · <%= link_to 'Reminder settings', reminder_setting_path('parking_arrival'), class: 'text-decoration-none' %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <% if @announcers.any? %>
       <div class="card shadow-sm border-0">
         <div class="table-responsive">

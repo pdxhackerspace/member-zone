@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1164,6 +1164,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
     t.integer "lookback_days", default: 1, null: false
     t.integer "max_reminders"
     t.string "name", null: false
+    t.integer "repeat_after_minutes", default: 120, null: false
     t.integer "start_offset_days", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["enabled"], name: "index_reminder_settings_on_enabled"
@@ -1323,6 +1324,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
     t.index ["training_topic_id"], name: "index_training_requests_on_training_topic_id"
     t.index ["user_id", "training_topic_id", "status"], name: "idx_training_requests_user_topic_status"
     t.index ["user_id"], name: "index_training_requests_on_user_id"
+  end
+
+  create_table "training_resource_changes", force: :cascade do |t|
+    t.bigint "actor_id"
+    t.datetime "created_at", null: false
+    t.jsonb "details", default: {}, null: false
+    t.string "kind", null: false
+    t.datetime "notified_at"
+    t.datetime "occurred_at", null: false
+    t.bigint "resource_id"
+    t.string "resource_type"
+    t.string "title", null: false
+    t.bigint "training_topic_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actor_id"], name: "index_training_resource_changes_on_actor_id"
+    t.index ["notified_at"], name: "index_training_resource_changes_on_notified_at"
+    t.index ["training_topic_id", "occurred_at"], name: "index_training_resource_changes_on_topic_and_occurred_at"
+  end
+
+  create_table "training_topic_link_snapshots", force: :cascade do |t|
+    t.string "candidate_digest"
+    t.string "candidate_etag"
+    t.string "candidate_last_modified"
+    t.text "candidate_text"
+    t.datetime "changed_at"
+    t.datetime "checked_at"
+    t.datetime "created_at", null: false
+    t.string "digest"
+    t.string "error"
+    t.string "etag"
+    t.integer "flap_count", default: 0, null: false
+    t.string "last_modified"
+    t.string "status", default: "baseline", null: false
+    t.text "text"
+    t.bigint "training_topic_link_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_topic_link_id"], name: "index_training_topic_link_snapshots_on_training_topic_link_id", unique: true
   end
 
   create_table "training_topic_links", force: :cascade do |t|
@@ -1592,6 +1630,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_120000) do
   add_foreign_key "training_requests", "training_topics"
   add_foreign_key "training_requests", "users"
   add_foreign_key "training_requests", "users", column: "responded_by_id"
+  add_foreign_key "training_resource_changes", "training_topics", on_delete: :cascade
+  add_foreign_key "training_resource_changes", "users", column: "actor_id", on_delete: :nullify
+  add_foreign_key "training_topic_link_snapshots", "training_topic_links", on_delete: :cascade
   add_foreign_key "training_topic_links", "training_topics"
   add_foreign_key "training_topic_roles", "roles"
   add_foreign_key "training_topic_roles", "training_topics"

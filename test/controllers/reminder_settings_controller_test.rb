@@ -27,7 +27,8 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Stale application reminder', response.body
     assert_select 'input[type=submit][value=Save]', count: 0
     assert_select 'form[data-controller=?]', 'reminder-setting-form'
-    assert_select 'button', text: 'Send now', count: ReminderSetting::CATALOG.size
+    sendable = ReminderSetting::CATALOG.count { |_key, attrs| attrs[:arrival_triggered] != true }
+    assert_select 'button', text: 'Send now', count: sendable
   end
 
   test 'index states each reminder cadence and offers the three fields that set it' do
@@ -59,6 +60,35 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match 'the final notice never goes out', response.body
+  end
+
+  test 'index offers a repeat window for the parking arrival reminder and no send now' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_select 'input#reminder_repeat_after_minutes_parking_arrival[value=?]', '120'
+    assert_select 'input#reminder_start_offset_days_parking_arrival', count: 0
+    assert_match 'On arrival, at most once every 120 minutes', response.body
+    assert_select "form[action='#{send_now_reminder_setting_path('parking_arrival')}']", count: 0
+  end
+
+  test 'update saves the parking arrival repeat window' do
+    patch reminder_setting_url('parking_arrival'), params: {
+      reminder_setting: { enabled: '1', allow_opt_out: '1', repeat_after_minutes: '30' }
+    }
+
+    assert_redirected_to reminder_settings_url
+    arrival = ReminderSetting.find_by!(key: 'parking_arrival')
+    assert arrival.enabled?
+    assert_equal 30, arrival.repeat_after_minutes
+  end
+
+  test 'parking arrival members list names who has an open notice' do
+    get reminder_setting_url('parking_arrival')
+
+    assert_response :success
+    assert_match 'members with open notices', response.body
+    assert_match users(:one).display_name, response.body
   end
 
   test 'update saves a reminder cadence' do
@@ -504,6 +534,34 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select 'td', text: 'Front door kiosk'
+  end
+
+  test 'training resource updates uses one interval and lists waiting changes' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Training resource updates', response.body
+    assert_match 'At most every', response.body
+    assert_select 'input#reminder_interval_days_training_resource_updates'
+    assert_select 'input#reminder_start_offset_days_training_resource_updates', count: 0
+    assert_select 'input#reminder_max_reminders_training_resource_updates', count: 0
+
+    get reminder_setting_url('training_resource_updates')
+
+    assert_response :success
+    assert_match 'No resource changes are waiting', response.body
+    assert_match 'At most every 7 days', response.body
+  end
+
+  test 'updating the training resource interval ignores sequence fields' do
+    patch reminder_setting_url('training_resource_updates'), params: {
+      reminder_setting: { enabled: '0', interval_days: '14', start_offset_days: '3', max_reminders: '2' }
+    }
+
+    setting = ReminderSetting.find_by!(key: 'training_resource_updates')
+    assert_equal 14, setting.interval_days
+    assert_equal 0, setting.start_offset_days
+    assert_nil setting.max_reminders
   end
 
   private

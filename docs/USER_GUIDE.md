@@ -16,6 +16,10 @@ Every reminder is timed the same way, by three fields on its card. There is noth
 - **then every — N days** — the gap between reminders after the first.
 - **up to — N reminders** — how many to send in total. Leave it blank for no limit.
 
+The parking arrival reminder is one exception. It has one field, **At most once every N minutes**, because it sends when someone badges in rather than on the daily run, and it has no **Send now**.
+
+Training resource updates are the other. That card has one field, **At most every N days**, because it is a digest rather than a sequence: however many topics changed, each person gets at most one email per interval.
+
 Underneath, the card states the cadence back to you in plain English — "Cadence: 5 days after the dues date, then every 7 days, with no limit" — so you can check a change did what you meant before anything goes out.
 
 Two things are worth knowing about how the numbers behave:
@@ -131,6 +135,18 @@ Changing the interval or the maximum changes which days those four emails land o
 
 Each notice runs its own sequence, so clearing one has no effect on another. Giving a notice a new expiration date starts its sequence over from the warning.
 
+### Parking arrival reminder
+
+Emails a member when they badge in at an outside door and still have an open permit or ticket. Disabled by default. Members can hush it from Notifications; doing so does not stop the expiration reminders above, and it does not stop arrival announcements.
+
+**Timing** is a repeat window in minutes, not the three day fields. Out of the box it is 120 minutes, so a member who comes and goes through more than one door gets one email. Set it to 0 to email every arrival. There is no **Send now**: nobody is due until they actually arrive. The card counts members who currently have open notices, and how many were reminded today.
+
+A notice issued inside the window is left out of the email, because the "issued" message has only just gone out. A notice that already has a clearance request is left out too.
+
+Each notice in the email has its own button. The button opens a page that does not sign the member in; the link itself does not clear anything, because mail programs open links on their own. From that page the member clears the notice, or, when the notice needs staff clearance, asks staff to clear it. The link works for 7 days. **Email copy** is the `Parking Arrival Reminder` template. The list of notices is `{{notices_html}}` in the HTML body and `{{notices_text}}` in the plain-text body — leave both in if you reword it, since the template cannot loop over notices itself.
+
+The same reminder is listed on **Settings → Announcers** as a built-in entry, so that page shows everything that happens when someone arrives. It is not an announcer program and members cannot opt out of the check, only of the email.
+
 ### Blank parking permit reminder
 
 Reminds members who took a **blank** parking permit from an access control device (see [Parking permits from access control devices](#parking-permits-from-access-control-devices)) to record what they parked and where. **Ships enabled**, because the device only hands out a blank permit on the understanding that the member fills it in later. Members can opt out.
@@ -154,6 +170,18 @@ Warns before an API token expires, so a token still in use gets extended and an 
 It goes to the token's **contact** — for a member's own token, the member. When the contact is no longer an active member (or a service-account token has none), it goes to everyone who holds *Manage service-account API tokens* instead.
 
 **Timing** counts back from the expiry date: 14 days before, then every 7, at most 3. Extending a token moves its expiry and starts the sequence over.
+
+### Training resource updates
+
+Tells everyone trained in a topic, and everyone who can train it, when that topic's documents or links change. **This reminder ships disabled.**
+
+It covers a link or document being added, edited, or removed, and a linked page whose contents change. Pages are checked once a day. A page has to look the same on two checks in a row before anyone is told, so a page that changes on every load stays quiet. Pages the server cannot read (a private address, a login wall, a file that is too large) are marked on the topic page for the people who edit its links, and they are not described as updates.
+
+Each person gets **one email** covering every topic they train or are trained in, and the whole installation sends that digest **at most once per interval** — 7 days out of the box. Someone only hears about changes from after they were trained, or after they became a trainer. The email says what changed. It does not say who made the edit.
+
+**Send now** sends whatever is waiting and starts the interval over. While the reminder is off, changes are not recorded and pages are not checked, so turning it on does not produce a catch-up email.
+
+**Email copy** is editable under Settings → Email templates (`Training Resource Updates`). The digest waits in the outbound mail review queue. Members can opt out under **Training document and link updates**.
 
 ## Application backlog on the admin dashboard
 
@@ -264,6 +292,8 @@ Administrators (and anyone with *Configure arrival announcers*) use **Settings �
 
 The paragraph members see under **Announce arrivals** is the *Announce arrivals (profile help text)* text fragment. See `docs/announcers.md` for how programs are written.
 
+**Parking arrival reminder** appears on the same page as a built-in entry. It emails members who arrive with an open permit or ticket, including members who have not opted in to being announced. Turn it on, set how often it may repeat, and let members hush it from **Settings → Reminders**. See [Parking arrival reminder](#parking-arrival-reminder).
+
 ## Credentials
 
 ### Requesting a credential (members)
@@ -319,6 +349,8 @@ The bar at the bottom totals it (for example, *4 members × 2 topics → 6 train
 
 **Add training** on a member's profile (Training & access) records one topic for that member. Administrators pick the trainer in that menu before choosing the topic. The training record and the journal line both name that trainer; the journal's "by" column stays the administrator who entered it. Anyone else using Add training is recorded as themselves. The Train button on a topic page does not ask for a trainer.
 
+When an administrator names someone else as the trainer, that person gets a message saying they were named, and every other active trainer for the topic gets a message naming who was trained and by whom. The member still gets the usual training email. The administrator who entered it is not messaged, and inactive trainers are left out except the person named as the trainer, who is told either way. Naming yourself does not send these messages. Appointing a trainer sends the same messages when that appointment also records a training under someone else's name.
+
 To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
 
 ## Topic resources
@@ -326,6 +358,8 @@ To take away a trainer capability, use the member's profile (Training and access
 Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open.
 
 People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
+
+When training resource updates are enabled, each link also says when its page was last checked, when the contents last changed, or that the page can't be read. Members who cannot edit the links do not see that.
 
 Stewards and curators can reach every topic they look after, even ones not offered to members: a topic shows up in the catalog, and its page opens, for anyone who holds *Edit topic resource links*, *Manage topic documents*, *Edit topic descriptions*, or *Create subtopics* for it (or for its parent topic). The same people get the **Edit** button at the top of the topic page, which opens the topic's settings limited to what their role covers.
 

@@ -210,11 +210,20 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
   end
 
-  test 'an arrival by a member who has not opted in queues nothing' do
+  test 'an arrival by a member who has not opted in still queues the arrival job' do
     DefaultSetting.instance.update!(arrival_locations: ['unit2 front door'])
 
     with_env('ACCESS_WEBHOOK_KEY' => 'access-key') do
-      assert_no_enqueued_jobs(only: Announcers::ArrivalJob) { post_access(key: 'access-key') }
+      assert_enqueued_with(job: Announcers::ArrivalJob) { post_access(key: 'access-key') }
+    end
+  end
+
+  test 'leaving through an outside door queues nothing' do
+    DefaultSetting.instance.update!(arrival_locations: ['unit2 front door'])
+    line = 'Nov 15 14:41:35 unit2 accesscontrol[2113]: Example User One has locked unit2 front door'
+
+    with_env('ACCESS_WEBHOOK_KEY' => 'access-key') do
+      assert_no_enqueued_jobs(only: Announcers::ArrivalJob) { post_access(key: 'access-key', line: line) }
     end
   end
 
@@ -339,8 +348,8 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
          headers: { 'X-Authentik-Secret' => secret, 'CONTENT_TYPE' => 'application/json' }
   end
 
-  def post_access(key:)
-    post webhook_receive_path(slug: access_webhook.slug), params: { key: key, line: access_log_line }
+  def post_access(key:, line: access_log_line)
+    post webhook_receive_path(slug: access_webhook.slug), params: { key: key, line: line }
   end
 
   # webhook_type is unique, and the fixtures already hold the only 'access' row — so this enables

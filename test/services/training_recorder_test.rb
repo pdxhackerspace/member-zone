@@ -1,6 +1,8 @@
 require 'test_helper'
 
 class TrainingRecorderTest < ActiveSupport::TestCase
+  include ActionMailer::TestHelper
+
   setup do
     @topic = training_topics(:laser_cutting)
     @trainer = users(:one)
@@ -141,6 +143,82 @@ class TrainingRecorderTest < ActiveSupport::TestCase
     end
   end
 
+  test 'admin attributing training messages that trainer and the other active trainers' do
+    admin = admin_actor
+    named = users(:one)
+    other = users(:two)
+    quiet = users(:no_email)
+    inactive_trainer = inactive_member(:private_profile_user)
+    trainee = inactive_member(:three)
+    grant_topic_training(named, other, quiet, inactive_trainer)
+
+    assert_difference 'Message.count', 3 do
+      assert_enqueued_emails 2 do
+        record_attributed(actor: admin, trainee: trainee, trainer: named)
+      end
+    end
+
+    assert_equal admin, Message.find_by!(recipient: named).sender
+    assert_includes Message.find_by!(recipient: named).body, 'named you as the trainer'
+    assert_includes Message.find_by!(recipient: named).body, @trained_at.to_date.to_fs(:long)
+    assert_includes Message.find_by!(recipient: other).body, "by #{named.display_name}"
+    assert Message.exists?(recipient: quiet, sender: admin)
+    assert_nil Message.find_by(recipient: admin)
+    assert_nil Message.find_by(recipient: trainee)
+    assert_nil Message.find_by(recipient: inactive_trainer)
+  end
+
+  test 'an inactive trainer named on the record is still told' do
+    named = inactive_member(:one)
+    grant_topic_training(users(:two))
+
+    record_attributed(actor: admin_actor, trainee: @trainee, trainer: named)
+
+    assert_includes Message.find_by!(recipient: named).body, 'named you as the trainer'
+    assert_includes Message.find_by!(recipient: users(:two)).body, "by #{named.display_name}"
+  end
+
+  test 'admin naming an outside trainer still messages them and the topic trainers' do
+    admin = admin_actor
+    named = users(:one)
+    topic_trainer = users(:two)
+    TrainerCapability.create!(user: named, training_topic: training_topics(:woodworking))
+    TrainerCapability.create!(user: topic_trainer, training_topic: @topic)
+
+    record_attributed(actor: admin, trainee: @trainee, trainer: named)
+
+    assert Message.exists?(recipient: named, sender: admin)
+    assert_includes Message.find_by!(recipient: topic_trainer).body, "by #{named.display_name}"
+  end
+
+  test 'recording yourself as the trainer does not message the topic trainers' do
+    admin = admin_actor
+    TrainerCapability.create!(user: users(:two), training_topic: @topic)
+
+    assert_no_difference 'Message.count' do
+      record_attributed(actor: admin, trainee: @trainee, trainer: admin)
+    end
+  end
+
+  test 'a trainer recording a class does not message other trainers' do
+    grant_topic_training(@trainer, users(:two))
+
+    assert_no_difference 'Message.count' do
+      record_attributed(actor: @trainer, trainee: @trainee, trainer: users(:two))
+    end
+  end
+
+  test 'skipping an already trained member does not message trainers' do
+    admin = admin_actor
+    named = users(:one)
+    TrainerCapability.create!(user: named, training_topic: @topic)
+    Training.create!(trainee: @trainee, trainer: named, training_topic: @topic, trained_at: 1.week.ago)
+
+    assert_no_difference 'Message.count' do
+      record_attributed(actor: admin, trainee: @trainee, trainer: named)
+    end
+  end
+
   test 'notifies an active member without being asked' do
     active = users(:two)
 
@@ -175,10 +253,26 @@ class TrainingRecorderTest < ActiveSupport::TestCase
   private
 
   def inactive_user
-    user = users(:two)
-    user.update!(membership_state: 'inactive_member')
-    assert_not user.reload.active?
-    user
+    inactive_member(:two).tap { |user| assert_not user.active? }
+  end
+
+  def inactive_member(fixture)
+    users(fixture).tap { |user| user.update!(membership_state: 'inactive_member') }.reload
+  end
+
+  def admin_actor
+    users(:public_profile_user).tap { |user| user.update_columns(is_admin: true) }
+  end
+
+  def grant_topic_training(*users)
+    users.each { |user| TrainerCapability.create!(user: user, training_topic: @topic) }
+  end
+
+  def record_attributed(actor:, trainee:, trainer:)
+    TrainingRecorder.new(
+      current_user: actor, training_topic: @topic, trainee_ids: [trainee.id.to_s],
+      trainer: trainer, trained_at: @trained_at
+    ).call
   end
 
   def training_completed_mail_count(user)

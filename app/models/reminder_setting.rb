@@ -1,4 +1,8 @@
 class ReminderSetting < ApplicationRecord
+  include ReminderSettingArrival
+  include ReminderSettingTemplates
+  include ReminderSettingDigest
+
   # Every reminder's cadence is the same three numbers: how long after its anchor the first
   # one goes out (negative to send before the anchor), how long between the ones after that,
   # and how many to send in total. A nil max_reminders repeats for as long as the subject
@@ -107,6 +111,23 @@ class ReminderSetting < ApplicationRecord
       reminder_mailer_actions: [],
       email_template_keys: %w[parking_permit_details_reminder]
     },
+    'parking_arrival' => {
+      name: 'Parking arrival reminder',
+      description: 'Emails a member when they arrive with an open parking permit or ticket, with a link to clear ' \
+                   'each one. A notice issued inside the repeat window is left out, because the issued email has ' \
+                   'only just gone out. Members can hush it; the scheduled expiration reminders are separate.',
+      enabled: false,
+      allow_opt_out: true,
+      anchor_description: 'arrival',
+      start_offset_days: 0,
+      interval_days: 1,
+      max_reminders: nil,
+      repeat_after_minutes: 120,
+      arrival_triggered: true,
+      # Sent as the member badges in, so it cannot wait in the review queue. The job records its own sends.
+      reminder_mailer_actions: [],
+      email_template_keys: %w[parking_arrival_reminder]
+    },
     'lapsed_access' => {
       name: 'Lapsed member access reminder',
       description: 'Daily reminder to inactive members who badged in recently that their membership has lapsed ' \
@@ -156,6 +177,22 @@ class ReminderSetting < ApplicationRecord
       # its own sends.
       reminder_mailer_actions: [],
       email_template_keys: %w[api_token_expiring_soon]
+    },
+    # Not a Schedule sequence. A new batch of changes would look like a new anchor and
+    # send immediately, which is the opposite of a cap. The digest stamps its own rows.
+    'training_resource_updates' => {
+      name: 'Training resource updates',
+      description: 'Tells trainers and trained members when a topic\'s documents or links change, including when ' \
+                   'a linked page\'s contents change. One email covers every topic, at most once per interval.',
+      enabled: false,
+      allow_opt_out: true,
+      anchor_description: 'the last digest',
+      start_offset_days: 0,
+      interval_days: 7,
+      max_reminders: nil,
+      digest: true,
+      reminder_mailer_actions: [],
+      email_template_keys: %w[training_resources_updated]
     }
   }.freeze
 
@@ -163,6 +200,7 @@ class ReminderSetting < ApplicationRecord
   MAX_START_OFFSET_DAYS = 365
   MAX_INTERVAL_DAYS = 365
   MAX_REMINDER_COUNT = 100
+  MAX_REPEAT_AFTER_MINUTES = 7 * 24 * 60
 
   validates :key, presence: true, uniqueness: true
   validates :name, presence: true
@@ -177,6 +215,9 @@ class ReminderSetting < ApplicationRecord
             numericality: { only_integer: true, greater_than_or_equal_to: 1,
                             less_than_or_equal_to: MAX_REMINDER_COUNT },
             allow_nil: true
+  validates :repeat_after_minutes,
+            numericality: { only_integer: true, greater_than_or_equal_to: 0,
+                            less_than_or_equal_to: MAX_REPEAT_AFTER_MINUTES }
 
   scope :ordered, -> { order(:name) }
 
@@ -254,36 +295,6 @@ class ReminderSetting < ApplicationRecord
   # category pointing at it, which is what makes the switch meaningless there.
   def member_facing?
     NotificationCategory.reminder_backed.any? { |entry| entry.reminder_key == key }
-  end
-
-  # Nothing joins a reminder to its templates in the database — QueuedMail resolves a template
-  # from the mailer action at send time — so the catalog names the keys a reminder can send.
-  def email_template_keys
-    CATALOG.dig(key, :email_template_keys) || []
-  end
-
-  def email_templates
-    self.class.templates_for_keys(email_template_keys)
-  end
-
-  # Every reminder's templates in one query, for pages that list the whole catalog.
-  def self.email_templates_by_reminder_key
-    found = EmailTemplate.where(key: catalog_email_template_keys).index_by(&:key)
-    CATALOG.transform_values do |attrs|
-      attrs.fetch(:email_template_keys, []).filter_map { |key| found[key] }
-    end
-  end
-
-  def self.catalog_email_template_keys
-    CATALOG.values.flat_map { |attrs| attrs.fetch(:email_template_keys, []) }
-  end
-
-  # Catalog order is the order the reminder sends them in, which the database cannot express.
-  def self.templates_for_keys(keys)
-    return [] if keys.empty?
-
-    found = EmailTemplate.where(key: keys).index_by(&:key)
-    keys.filter_map { |key| found[key] }
   end
 
   def self.sync_catalog_attributes!

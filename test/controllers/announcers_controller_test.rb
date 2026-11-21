@@ -36,6 +36,9 @@ class AnnouncersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match 'Slack', response.body
     assert_match 'unit2 front door', response.body
+    assert_match 'Parking arrival reminder', response.body
+    assert_match 'Built in', response.body
+    assert_select 'a[href=?]', reminder_setting_path('parking_arrival'), count: 0
     assert_no_match 'xoxb-secret', response.body
   end
 

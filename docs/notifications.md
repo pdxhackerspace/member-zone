@@ -6,7 +6,7 @@ Member-facing emails are grouped into **notification categories**. Each category
 
 Members manage optional notices at `/profile/notifications`. Preferences are stored in `notification_opt_outs` (one row per user, category, and channel). Absence of a row means subscribed.
 
-Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. Parking reminders default to mandatory, as does `staff_application`, which goes to reviewers rather than to members.
+Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `parking_arrival`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. The scheduled parking expiration reminders default to mandatory, as does `staff_application`, which goes to reviewers rather than to members. The arrival reminder is optional: a member can hush the email they get when they badge in without hushing the expiration sequence.
 
 ## Reminder cadence
 
@@ -28,6 +28,7 @@ The **anchor** is the timestamp a reminder counts from, and each `Reminders::*El
 | `orientation` | `users.membership_approved_at` | +14, every 14, unlimited |
 | `parking_notices` | `parking_notices.expires_at` | −3, every 7, max 4 |
 | `parking_permit_details` | `parking_notices.details_requested_at` | +1, every 2, max 3 |
+| `parking_arrival` | the arrival (repeat window, not a day cadence) | at most once every 120 minutes |
 | `lapsed_access` | the earliest visit not yet mentioned | +0, daily, unlimited |
 | `staff_application` | `submitted_at` or `created_at` | +7, every 3, unlimited |
 | `api_token_expiry` | `api_tokens.expires_at` | −14, every 7, max 3 |
@@ -112,6 +113,22 @@ Two pages cover outgoing mail and are built from the shared list parts (`shared/
 Beyond that, **only the handoff counts as a delivery failure.** Once the mail server has the message, recording a failure would hand a delivered message back to the sweep, so the `sent_at` stamp is deliberately the only thing between `deliver_queued` returning and `hand_to_mail_server!` returning. Everything after it is bookkeeping: the mail log entry is best-effort, and the reminder stamps in `record_reminder_deliveries!` raise for the job log rather than marking the message unsent. `ApplicationMailer` keeps the same split — logging a successful send sits outside the rescue, because a failed log write used to report a delivered message as failed, which on the immediate-send path queued an approved copy for the sweep to deliver a second time.
 
 Two windows remain open by design. A worker that dies between the handoff and the `sent_at` write leaves the message looking unattempted, and the sweep sends it again after `UNATTEMPTED_GRACE` — losing mail is judged worse than the rare duplicate. And a reminder stamp that cannot be written leaves the member looking due, so the next reminder tick queues the mail again; the eligibility guards only suppress mail that is still unsent.
+
+## Parking arrival reminder
+
+`parking_arrival` emails a member when they badge in at an outside door with an open permit or ticket. It is queued from `Announcers::ArrivalJob` — the same arrival the announcers run on — and it does not consult whether the member opted in to being announced. A scan older than `AccessLog::STALE_AFTER` (15 minutes) is ignored, so a controller replaying a backlog does not email anyone.
+
+The pace is `reminder_settings.repeat_after_minutes` (120 by default; 0 means every arrival), read from the last send on `reminder_deliveries`. The day-counted columns are unused. A notice issued inside that window is left out, because the issued email has only just gone out, and a notice that already has a clearance request is left out too. One email lists every notice that remains, and each notice gets its own no-login link (`/parking_clear/:token`, valid 7 days) that opens a page with one button. The link itself does not clear anything. A notice flagged as needing staff clearance offers "Request clearance" instead.
+
+Mail is delivered directly rather than through the review queue. The job records the send when it hands the message off. Members hush it from the `parking_arrival` notification category; that does not hush `parking_notices`.
+
+## Training resource updates
+
+`training_resource_updates` tells trainers and trained members when a topic's documents or links change. It is a digest, not a `Reminders::Schedule` sequence: Schedule restarts whenever its anchor moves, and a new batch of changes would look like a new anchor and send immediately. The cap is one digest for the whole installation per `interval_days` (7 by default), counted from the later of `training_resource_changes.notified_at` and the last digest placed in the mail queue. One recipient failing to enqueue does not let everyone else's next edit send the following day. Changes that nobody received stay pending for the next interval. If someone was already told a resource existed and it is removed while those rows are still waiting, the next digest still tells them it was removed. Someone who was never told it existed hears nothing about that add and remove.
+
+Edits made in the app are recorded as they happen, and only while the reminder is enabled, so turning it on does not announce a backlog. A topic assignment on a document that has not been saved yet is not an edit. An add that is edited again before the digest is one line, using the title and the URL or file it has then. Edits from before it was added again are left out, and changing the URL drops excerpts from the previous page. Deleting a document is recorded even when that document was loaded on its own. Linked pages are re-fetched daily. The connection uses the address the guard already accepted, so a name that resolved to a public address cannot reconnect to a private one. `ETag` and `Last-Modified` can skip a download, but a change is the page's text hash, confirmed on the next check, so a page that differs on every fetch never sends mail. A check that has not run for longer than the interval plus half a day starts over from a new baseline, so the daily poll itself is never that gap.
+
+The email names the topic and what changed. It does not name who made the edit; that stays on the change row for admins. Members and trainers share one opt-out, and someone only hears about changes that happened after they were trained or made a trainer, whichever is earlier.
 
 ## Adding a new member email
 

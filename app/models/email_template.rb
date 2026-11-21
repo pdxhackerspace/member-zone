@@ -10,6 +10,11 @@ class EmailTemplate < ApplicationRecord
     '{{reason}}' => 'Reason for action (cancellation, ban, or application rejection emails)',
     '{{app_url}}' => 'Base URL of the application',
     '{{training_topic}}' => 'Name of the training topic (training emails only)',
+    '{{update_count}}' => 'Phrase for how many updates are in the email, e.g. "are 3 updates" ' \
+                          '(training resource updates only)',
+    '{{updated_topics}}' => 'Topics included in the update, as a sentence (training resource updates only)',
+    '{{resource_updates_html}}' => 'HTML list of what changed, grouped by topic (training resource updates only)',
+    '{{resource_updates_text}}' => 'Plain-text list of what changed, grouped by topic (training resource updates only)',
     '{{invitation_url}}' => 'URL for the invitation to create an account (invitation emails only)',
     '{{invitation_expiry}}' => 'When the invitation expires (invitation emails only)',
     '{{invitation_type}}' => 'Type of membership being offered, e.g. Sponsored Member (invitation emails only)',
@@ -67,7 +72,12 @@ class EmailTemplate < ApplicationRecord
     '{{api_token_hint}}' => 'Last four characters of the API token (API token emails only)',
     '{{api_token_holder}}' => 'Member or service account holding the API token (API token emails only)',
     '{{api_token_expires_at}}' => 'Date the API token expires (API token emails only)',
-    '{{api_tokens_url}}' => 'Link to the page where the recipient can extend the token (API token emails only)'
+    '{{api_tokens_url}}' => 'Link to the page where the recipient can extend the token (API token emails only)',
+    '{{notices_html}}' => 'HTML list of open permits and tickets, each with a clear link ' \
+                          '(parking arrival reminder only)',
+    '{{notices_text}}' => 'Plain-text list of open permits and tickets, each with a clear link ' \
+                          '(parking arrival reminder only)',
+    '{{notice_count}}' => 'How many open notices the arrival reminder lists (parking arrival reminder only)'
   }.freeze
 
   TEMPLATE_EDITOR_VARIABLES = {
@@ -105,6 +115,13 @@ class EmailTemplate < ApplicationRecord
       {{recipient_role}}
       {{trainer_names}}
       {{contact_details}}
+    ],
+    'parking_arrival_reminder' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{notice_count}} {{notices_html}} {{notices_text}}
+    ],
+    'training_resources_updated' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{update_count}} {{updated_topics}}
+      {{resource_updates_html}} {{resource_updates_text}} {{profile_url}}
     ]
   }.freeze
 
@@ -680,6 +697,33 @@ class EmailTemplate < ApplicationRecord
         The {{organization_name}} Team
       TEXT
     },
+    'training_resources_updated' => {
+      name: 'Training Resource Updates',
+      description: 'Sent when documents or links change for a topic a member is trained in or trains',
+      subject: '{{organization_name}}: Updates for {{updated_topics}}',
+      body_html: <<~HTML,
+        <h1>Updates for topics you know</h1>
+        <p>Hello {{member_name}},</p>
+        <p>There {{update_count}} for <strong>{{updated_topics}}</strong> at {{organization_name}}.</p>
+        {{resource_updates_html}}
+        <p>You can open these from your profile: <a href="{{profile_url}}">{{profile_url}}</a></p>
+        <p>Best regards,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Updates for topics you know
+
+        Hello {{member_name}},
+
+        There {{update_count}} for {{updated_topics}} at {{organization_name}}.
+
+        {{resource_updates_text}}
+
+        You can open these from your profile: {{profile_url}}
+
+        Best regards,
+        The {{organization_name}} Team
+      TEXT
+    },
     'member_invitation' => {
       name: 'Member Invitation',
       description: 'Sent to invite someone to create a new member account',
@@ -932,6 +976,30 @@ class EmailTemplate < ApplicationRecord
         {{permit_form_url}}
 
         This link works until {{permit_form_expires_at}} and does not sign you in. You can also update the permit from your member profile: {{parking_notice_url}}
+
+        Best regards,
+        The {{organization_name}} Team
+      TEXT
+    },
+    'parking_arrival_reminder' => {
+      name: 'Parking Arrival Reminder',
+      description: 'Sent when a member arrives with an open parking permit or ticket',
+      subject: '{{organization_name}}: Open parking to take care of',
+      body_html: <<~HTML,
+        <h1>Open parking to take care of</h1>
+        <p>Hello {{member_name}},</p>
+        <p>You just arrived, and you still have open parking. Each link below opens that one notice and lets you clear it. The link does not sign you in.</p>
+        {{notices_html}}
+        <p>Best regards,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Open parking to take care of
+
+        Hello {{member_name}},
+
+        You just arrived, and you still have open parking. Each link below opens that one notice and lets you clear it. The link does not sign you in.
+
+        {{notices_text}}
 
         Best regards,
         The {{organization_name}} Team

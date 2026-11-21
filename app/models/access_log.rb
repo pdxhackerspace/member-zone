@@ -3,6 +3,11 @@ class AccessLog < ApplicationRecord
   # enabling a tool isn't arriving anywhere, so neither is ever announced.
   ARRIVAL_ACTIONS = %w[opened unlocked].freeze
 
+  # How long after a scan it is still worth telling someone about. A controller replaying a
+  # backlog must not announce, or email, a person who arrived hours ago. Shared by arrival
+  # announcers and the parking arrival reminder.
+  STALE_AFTER = 15.minutes
+
   belongs_to :user, optional: true
   has_many :announcer_runs, dependent: :nullify
 
@@ -20,5 +25,9 @@ class AccessLog < ApplicationRecord
   # A member coming in through one of the outside doors listed in DefaultSetting.
   def arrival?
     ARRIVAL_ACTIONS.include?(action.to_s.downcase) && DefaultSetting.arrival_location?(location)
+  end
+
+  def fresh?(now: Time.current)
+    logged_at.present? && logged_at > now - STALE_AFTER
   end
 end

@@ -1,0 +1,10 @@
+<h1>Open parking to take care of</h1>
+
+<p>Hello <%= @user.display_name %>,</p>
+
+<p>You just arrived, and you still have open parking. Each link below opens that one notice and lets you clear it. The link does not sign you in.</p>
+
+<%= raw @notices_html %>
+
+<p>Best regards,<br>
+The <%= @organization %> Team</p>
