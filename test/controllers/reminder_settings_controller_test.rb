@@ -27,7 +27,8 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_match 'Stale application reminder', response.body
     assert_select 'input[type=submit][value=Save]', count: 0
     assert_select 'form[data-controller=?]', 'reminder-setting-form'
-    assert_select 'button', text: 'Send now', count: ReminderSetting::CATALOG.size
+    sendable = ReminderSetting::CATALOG.count { |_key, attrs| attrs[:arrival_triggered] != true }
+    assert_select 'button', text: 'Send now', count: sendable
   end
 
   test 'index states each reminder cadence and offers the three fields that set it' do
@@ -59,6 +60,35 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match 'the final notice never goes out', response.body
+  end
+
+  test 'index offers a repeat window for the parking arrival reminder and no send now' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_select 'input#reminder_repeat_after_minutes_parking_arrival[value=?]', '120'
+    assert_select 'input#reminder_start_offset_days_parking_arrival', count: 0
+    assert_match 'On arrival, at most once every 120 minutes', response.body
+    assert_select "form[action='#{send_now_reminder_setting_path('parking_arrival')}']", count: 0
+  end
+
+  test 'update saves the parking arrival repeat window' do
+    patch reminder_setting_url('parking_arrival'), params: {
+      reminder_setting: { enabled: '1', allow_opt_out: '1', repeat_after_minutes: '30' }
+    }
+
+    assert_redirected_to reminder_settings_url
+    arrival = ReminderSetting.find_by!(key: 'parking_arrival')
+    assert arrival.enabled?
+    assert_equal 30, arrival.repeat_after_minutes
+  end
+
+  test 'parking arrival members list names who has an open notice' do
+    get reminder_setting_url('parking_arrival')
+
+    assert_response :success
+    assert_match 'members with open notices', response.body
+    assert_match users(:one).display_name, response.body
   end
 
   test 'update saves a reminder cadence' do

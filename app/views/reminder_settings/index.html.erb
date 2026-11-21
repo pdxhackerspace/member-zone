@@ -31,7 +31,7 @@
                        email_templates: @reminder_email_templates[reminder.key] } do %>
     <div class="text-13">
       <span class="fw-medium text-body"><%= counts[:due].to_i %></span>
-      <span class="text-secondary">would be emailed today</span>
+      <span class="text-secondary"><%= counts[:due_label].presence || 'would be emailed today' %></span>
       <% if counts[:context].present? %>
         <span class="text-secondary">· <%= counts[:context] %></span>
       <% end %>

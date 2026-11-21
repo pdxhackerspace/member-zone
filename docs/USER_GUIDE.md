@@ -16,6 +16,8 @@ Every reminder is timed the same way, by three fields on its card. There is noth
 - **then every — N days** — the gap between reminders after the first.
 - **up to — N reminders** — how many to send in total. Leave it blank for no limit.
 
+The parking arrival reminder is the exception. It has one field, **At most once every N minutes**, because it sends when someone badges in rather than on the daily run, and it has no **Send now**.
+
 Underneath, the card states the cadence back to you in plain English — "Cadence: 5 days after the dues date, then every 7 days, with no limit" — so you can check a change did what you meant before anything goes out.
 
 Two things are worth knowing about how the numbers behave:
@@ -130,6 +132,18 @@ Warns members before a permit or ticket expires, then follows up afterwards unti
 Changing the interval or the maximum changes which days those four emails land on. Raising the maximum to 6, for instance, adds two more follow-ups and pushes the final notice out by two intervals.
 
 Each notice runs its own sequence, so clearing one has no effect on another. Giving a notice a new expiration date starts its sequence over from the warning.
+
+### Parking arrival reminder
+
+Emails a member when they badge in at an outside door and still have an open permit or ticket. Disabled by default. Members can hush it from Notifications; doing so does not stop the expiration reminders above, and it does not stop arrival announcements.
+
+**Timing** is a repeat window in minutes, not the three day fields. Out of the box it is 120 minutes, so a member who comes and goes through more than one door gets one email. Set it to 0 to email every arrival. There is no **Send now**: nobody is due until they actually arrive. The card counts members who currently have open notices, and how many were reminded today.
+
+A notice issued inside the window is left out of the email, because the "issued" message has only just gone out. A notice that already has a clearance request is left out too.
+
+Each notice in the email has its own button. The button opens a page that does not sign the member in; the link itself does not clear anything, because mail programs open links on their own. From that page the member clears the notice, or, when the notice needs staff clearance, asks staff to clear it. The link works for 7 days. **Email copy** is the `Parking Arrival Reminder` template. The list of notices is `{{notices_html}}` in the HTML body and `{{notices_text}}` in the plain-text body — leave both in if you reword it, since the template cannot loop over notices itself.
+
+The same reminder is listed on **Settings → Announcers** as a built-in entry, so that page shows everything that happens when someone arrives. It is not an announcer program and members cannot opt out of the check, only of the email.
 
 ### Blank parking permit reminder
 
@@ -263,6 +277,8 @@ Administrators (and anyone with *Configure arrival announcers*) use **Settings �
 4. **Members who opted in**, below the list of announcers, shows everyone with **Announce arrivals** switched on, including members who ticked no announcer, with the announcers each chose and, if they won't be announced, why (no announcer chosen, inactive membership, "Don't greet me", and so on).
 
 The paragraph members see under **Announce arrivals** is the *Announce arrivals (profile help text)* text fragment. See `docs/announcers.md` for how programs are written.
+
+**Parking arrival reminder** appears on the same page as a built-in entry. It emails members who arrive with an open permit or ticket, including members who have not opted in to being announced. Turn it on, set how often it may repeat, and let members hush it from **Settings → Reminders**. See [Parking arrival reminder](#parking-arrival-reminder).
 
 ## Credentials
 

@@ -6,7 +6,7 @@ Member-facing emails are grouped into **notification categories**. Each category
 
 Members manage optional notices at `/profile/notifications`. Preferences are stored in `notification_opt_outs` (one row per user, category, and channel). Absence of a row means subscribed.
 
-Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. Parking reminders default to mandatory, as does `staff_application`, which goes to reviewers rather than to members.
+Reminder-backed categories (`payment_overdue`, `orientation`, `slack_signup`, `parking_notices`, `parking_arrival`, `application_link`) can be disabled for opt-out on the admin **Reminders** page via `reminder_settings.allow_opt_out`. The scheduled parking expiration reminders default to mandatory, as does `staff_application`, which goes to reviewers rather than to members. The arrival reminder is optional: a member can hush the email they get when they badge in without hushing the expiration sequence.
 
 ## Reminder cadence
 
@@ -28,6 +28,7 @@ The **anchor** is the timestamp a reminder counts from, and each `Reminders::*El
 | `orientation` | `users.membership_approved_at` | +14, every 14, unlimited |
 | `parking_notices` | `parking_notices.expires_at` | −3, every 7, max 4 |
 | `parking_permit_details` | `parking_notices.details_requested_at` | +1, every 2, max 3 |
+| `parking_arrival` | the arrival (repeat window, not a day cadence) | at most once every 120 minutes |
 | `lapsed_access` | the earliest visit not yet mentioned | +0, daily, unlimited |
 | `staff_application` | `submitted_at` or `created_at` | +7, every 3, unlimited |
 | `api_token_expiry` | `api_tokens.expires_at` | −14, every 7, max 3 |
@@ -112,6 +113,14 @@ Two pages cover outgoing mail and are built from the shared list parts (`shared/
 Beyond that, **only the handoff counts as a delivery failure.** Once the mail server has the message, recording a failure would hand a delivered message back to the sweep, so the `sent_at` stamp is deliberately the only thing between `deliver_queued` returning and `hand_to_mail_server!` returning. Everything after it is bookkeeping: the mail log entry is best-effort, and the reminder stamps in `record_reminder_deliveries!` raise for the job log rather than marking the message unsent. `ApplicationMailer` keeps the same split — logging a successful send sits outside the rescue, because a failed log write used to report a delivered message as failed, which on the immediate-send path queued an approved copy for the sweep to deliver a second time.
 
 Two windows remain open by design. A worker that dies between the handoff and the `sent_at` write leaves the message looking unattempted, and the sweep sends it again after `UNATTEMPTED_GRACE` — losing mail is judged worse than the rare duplicate. And a reminder stamp that cannot be written leaves the member looking due, so the next reminder tick queues the mail again; the eligibility guards only suppress mail that is still unsent.
+
+## Parking arrival reminder
+
+`parking_arrival` emails a member when they badge in at an outside door with an open permit or ticket. It is queued from `Announcers::ArrivalJob` — the same arrival the announcers run on — and it does not consult whether the member opted in to being announced. A scan older than `AccessLog::STALE_AFTER` (15 minutes) is ignored, so a controller replaying a backlog does not email anyone.
+
+The pace is `reminder_settings.repeat_after_minutes` (120 by default; 0 means every arrival), read from the last send on `reminder_deliveries`. The day-counted columns are unused. A notice issued inside that window is left out, because the issued email has only just gone out, and a notice that already has a clearance request is left out too. One email lists every notice that remains, and each notice gets its own no-login link (`/parking_clear/:token`, valid 7 days) that opens a page with one button. The link itself does not clear anything. A notice flagged as needing staff clearance offers "Request clearance" instead.
+
+Mail is delivered directly rather than through the review queue. The job records the send when it hands the message off. Members hush it from the `parking_arrival` notification category; that does not hush `parking_notices`.
 
 ## Adding a new member email
 

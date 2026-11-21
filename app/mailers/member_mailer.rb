@@ -249,6 +249,18 @@ class MemberMailer < ApplicationMailer
     send_parking_permit_device_mail('parking_permit_details_reminder', user, opts)
   end
 
+  # Sent the moment a member arrives with open parking. The notice list is already rendered:
+  # a template cannot loop, and the links inside expire, so this cannot wait in the review queue.
+  def parking_arrival_reminder(user, opts = {})
+    @user = user
+    @organization = organization_name
+    extra = opts.to_h.symbolize_keys
+    extra.each { |name, value| instance_variable_set(:"@#{name}", value) }
+    return if send_from_template('parking_arrival_reminder', user, extra)
+
+    mail(to: user.email, subject: "#{@organization}: Open parking to take care of")
+  end
+
   def application_email_verification(email, opts = {})
     @email = email
     @organization = organization_name
