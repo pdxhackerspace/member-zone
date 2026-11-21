@@ -5,6 +5,28 @@
 # table saw without any setting. Everyone else may only when the topic itself opts in,
 # one setting for the list and one for sending a message.
 class TrainingTopicRoster
+  # Active members trained in the topics that share a roster, grouped by topic id.
+  # The catalog list uses this so it can print names without one query per row.
+  def self.active_members_by_topic(topics)
+    topic_ids = Array(topics).select(&:roster_shared?).map(&:id)
+    return {} if topic_ids.empty?
+
+    grouped = Hash.new { |members, topic_id| members[topic_id] = [] }
+    active_trained_in(topic_ids).each do |training|
+      bucket = grouped[training.training_topic_id]
+      bucket << training.trainee unless bucket.include?(training.trainee)
+    end
+    grouped
+  end
+
+  def self.active_trained_in(topic_ids)
+    Training.joins(:trainee).merge(User.active)
+            .where(training_topic_id: topic_ids)
+            .includes(:trainee)
+            .order(User.arel_table[:full_name].asc, User.arel_table[:id].asc)
+  end
+  private_class_method :active_trained_in
+
   def initialize(topic:, viewer:)
     @topic = topic
     @viewer = viewer

@@ -7,6 +7,10 @@ module TrainingCatalogHelper
 
   # One step of indent per ancestor, capped so a deep tree cannot shove the name
   # off a narrow table.
+  def training_contact_detail(members)
+    "This goes to #{members.map(&:display_name).to_sentence}. They can reply to you."
+  end
+
   # Links a trained member or trainer when the viewer may open their profile.
   def training_roster_name(member, roster)
     css = 'text-decoration-none'

@@ -372,7 +372,7 @@ On the topic's edit page (needs *Manage training topics*):
 - **Show trained members.** Anyone who can open the page sees the names of the active members trained in it.
 - **Let members contact them.** Anyone who can open the page gets **Message trained members**, which sends one message to each of those members. Replies come back in Messages.
 
-A topic for the people who run an area is the usual one to turn on. Set Woodshop's stewards as the members trained in *Steward — Woodshop*, turn both settings on there, and any member can open that topic from the training list, see the two stewards, and write to them together. The topic does not also have to be offered for training requests. **Contact** shows on its row in the list when there is someone to message. The names themselves are on the topic's page.
+A topic for the people who run an area is the usual one to turn on. Set Woodshop's stewards as the members trained in *Steward — Woodshop* and turn both settings on there. The training list then shows those names on the topic's row, and **Contact** on that row writes to all of them without opening the topic. The topic does not also have to be offered for training requests. The same names and message are on the topic's page.
 
 Someone trained in a topic can always see, and message, the members trained in that topic's direct subtopics, whether or not those settings are on. A steward trained in *Steward — Woodshop* opens *Table saw* (a subtopic of it) and sees everyone trained on the saw, including members who are no longer active. Holding a topic reaches its own subtopics only, not topics nested further down.
 

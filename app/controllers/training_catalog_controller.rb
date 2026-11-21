@@ -29,6 +29,7 @@ class TrainingCatalogController < AuthenticatedController
     @requestable_topic_ids = @trainable_on_request_topic_ids - @trained_topic_ids
     @linked_topic_ids = linked_catalog_topic_ids
     @contactable_topic_ids = contactable_catalog_topic_ids
+    @roster_members = TrainingTopicRoster.active_members_by_topic(@training_topics.map(&:first))
     @can_record_training = current_user_admin? ? TrainingTopic.exists? : current_user.trainer_capabilities.exists?
   end
 
@@ -54,10 +55,10 @@ class TrainingCatalogController < AuthenticatedController
     ).deliver
 
     if result.error
-      redirect_to training_catalog_topic_path(@training_topic), alert: result.error
+      redirect_to after_contact_path, alert: result.error
     else
       notice = "Message sent to #{result.sent_count} #{'member'.pluralize(result.sent_count)}."
-      redirect_to training_catalog_topic_path(@training_topic), notice: notice
+      redirect_to after_contact_path, notice: notice
     end
   end
 
@@ -190,8 +191,14 @@ class TrainingCatalogController < AuthenticatedController
   end
 
   def training_contact_rate_limited
-    redirect_to training_catalog_topic_path(@training_topic),
-                alert: 'Too many messages. Try again in an hour.'
+    redirect_to after_contact_path, alert: 'Too many messages. Try again in an hour.'
+  end
+
+  # The catalog list sends its own message, and lands back on the list.
+  def after_contact_path
+    return training_catalog_path if params[:return_to] == 'catalog'
+
+    training_catalog_topic_path(@training_topic)
   end
 
   # A privilege here only ever widens what a member sees: every member keeps the topics on

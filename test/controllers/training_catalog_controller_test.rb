@@ -532,14 +532,25 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     )
     TrainingTopic.create!(name: 'Table saw', parent: parent, offered_to_members: true)
     steward = users(:two)
+    private_user = users(:private_profile_user)
     Training.create!(trainee: steward, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+    Training.create!(trainee: private_user, training_topic: parent, trainer: users(:one), trained_at: Time.current)
 
     sign_in_as_member
     get training_catalog_path
 
     assert_response :success
     assert_select "a[href='#{training_catalog_topic_path(parent)}']", text: 'Steward Woodshop'
-    assert_select "a[href='#{training_catalog_topic_path(parent, anchor: 'contact-trained-members')}']", text: /Contact/
+    assert_select "a[href='#{user_path(steward)}']", text: steward.display_name
+    assert_select "a[href='#{user_path(private_user)}']", count: 0
+    assert_match private_user.display_name, response.body
+    assert_select "button[data-contact-url='#{training_catalog_topic_contact_path(parent)}']", text: /Contact/
+
+    assert_difference 'Message.count', 2 do
+      post training_catalog_topic_contact_path(parent),
+           params: { subject: 'Shop', body: 'Who is in today?', return_to: 'catalog' }
+    end
+    assert_redirected_to training_catalog_path
 
     get training_catalog_topic_path(parent)
 
