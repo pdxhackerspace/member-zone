@@ -31,7 +31,7 @@ class TrainingCatalogController < AuthenticatedController
     @trainers = current_user_admin? ? trainers_scope : trainers_scope.active
     @trainees = User.where(id: @training_topic.trainings.select(:trainee_id).distinct)
                     .order(:full_name, :id)
-    @topic_links = @training_topic.links.order(:title)
+    @topic_links = @training_topic.links.includes(:content_snapshot).order(:title)
     @requestable = @training_topic.offered_to_members? &&
                    @training_topic.trainers.active.exists?
     @can_manage_links = can?(:'training.topics.manage') ||

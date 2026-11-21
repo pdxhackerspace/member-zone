@@ -10,6 +10,11 @@ class EmailTemplate < ApplicationRecord
     '{{reason}}' => 'Reason for action (cancellation, ban, or application rejection emails)',
     '{{app_url}}' => 'Base URL of the application',
     '{{training_topic}}' => 'Name of the training topic (training emails only)',
+    '{{update_count}}' => 'Phrase for how many updates are in the email, e.g. "are 3 updates" ' \
+                          '(training resource updates only)',
+    '{{updated_topics}}' => 'Topics included in the update, as a sentence (training resource updates only)',
+    '{{resource_updates_html}}' => 'HTML list of what changed, grouped by topic (training resource updates only)',
+    '{{resource_updates_text}}' => 'Plain-text list of what changed, grouped by topic (training resource updates only)',
     '{{invitation_url}}' => 'URL for the invitation to create an account (invitation emails only)',
     '{{invitation_expiry}}' => 'When the invitation expires (invitation emails only)',
     '{{invitation_type}}' => 'Type of membership being offered, e.g. Sponsored Member (invitation emails only)',
@@ -113,6 +118,10 @@ class EmailTemplate < ApplicationRecord
     ],
     'parking_arrival_reminder' => %w[
       {{member_name}} {{organization_name}} {{date}} {{notice_count}} {{notices_html}} {{notices_text}}
+    ],
+    'training_resources_updated' => %w[
+      {{member_name}} {{organization_name}} {{date}} {{update_count}} {{updated_topics}}
+      {{resource_updates_html}} {{resource_updates_text}} {{profile_url}}
     ]
   }.freeze
 
@@ -683,6 +692,33 @@ class EmailTemplate < ApplicationRecord
         Please remember to follow all safety guidelines and operating procedures. If you have any questions, don't hesitate to ask a trainer or staff member.
 
         Happy making!
+
+        Best regards,
+        The {{organization_name}} Team
+      TEXT
+    },
+    'training_resources_updated' => {
+      name: 'Training Resource Updates',
+      description: 'Sent when documents or links change for a topic a member is trained in or trains',
+      subject: '{{organization_name}}: Updates for {{updated_topics}}',
+      body_html: <<~HTML,
+        <h1>Updates for topics you know</h1>
+        <p>Hello {{member_name}},</p>
+        <p>There {{update_count}} for <strong>{{updated_topics}}</strong> at {{organization_name}}.</p>
+        {{resource_updates_html}}
+        <p>You can open these from your profile: <a href="{{profile_url}}">{{profile_url}}</a></p>
+        <p>Best regards,<br>The {{organization_name}} Team</p>
+      HTML
+      body_text: <<~TEXT
+        Updates for topics you know
+
+        Hello {{member_name}},
+
+        There {{update_count}} for {{updated_topics}} at {{organization_name}}.
+
+        {{resource_updates_text}}
+
+        You can open these from your profile: {{profile_url}}
 
         Best regards,
         The {{organization_name}} Team

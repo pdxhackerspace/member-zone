@@ -536,6 +536,34 @@ class ReminderSettingsControllerTest < ActionDispatch::IntegrationTest
     assert_select 'td', text: 'Front door kiosk'
   end
 
+  test 'training resource updates uses one interval and lists waiting changes' do
+    get reminder_settings_url
+
+    assert_response :success
+    assert_match 'Training resource updates', response.body
+    assert_match 'At most every', response.body
+    assert_select 'input#reminder_interval_days_training_resource_updates'
+    assert_select 'input#reminder_start_offset_days_training_resource_updates', count: 0
+    assert_select 'input#reminder_max_reminders_training_resource_updates', count: 0
+
+    get reminder_setting_url('training_resource_updates')
+
+    assert_response :success
+    assert_match 'No resource changes are waiting', response.body
+    assert_match 'At most every 7 days', response.body
+  end
+
+  test 'updating the training resource interval ignores sequence fields' do
+    patch reminder_setting_url('training_resource_updates'), params: {
+      reminder_setting: { enabled: '0', interval_days: '14', start_offset_days: '3', max_reminders: '2' }
+    }
+
+    setting = ReminderSetting.find_by!(key: 'training_resource_updates')
+    assert_equal 14, setting.interval_days
+    assert_equal 0, setting.start_offset_days
+    assert_nil setting.max_reminders
+  end
+
   private
 
   def sign_in_as_admin

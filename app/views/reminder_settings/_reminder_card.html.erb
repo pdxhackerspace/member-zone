@@ -74,17 +74,19 @@
           </div>
         <% else %>
         <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+          <% unless reminder.digest? %>
+            <div class="d-flex align-items-center gap-2">
+              <%= f.label :start_offset_days, 'First', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_start_offset_days_#{reminder.key}" %>
+              <%= f.number_field :start_offset_days,
+                    in: -ReminderSetting::MAX_START_OFFSET_DAYS..ReminderSetting::MAX_START_OFFSET_DAYS,
+                    class: 'form-control form-control-sm num',
+                    style: 'width: 5rem;',
+                    id: "reminder_start_offset_days_#{reminder.key}" %>
+              <span class="text-13 text-secondary text-nowrap">days from <%= reminder.anchor_description %></span>
+            </div>
+          <% end %>
           <div class="d-flex align-items-center gap-2">
-            <%= f.label :start_offset_days, 'First', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_start_offset_days_#{reminder.key}" %>
-            <%= f.number_field :start_offset_days,
-                  in: -ReminderSetting::MAX_START_OFFSET_DAYS..ReminderSetting::MAX_START_OFFSET_DAYS,
-                  class: 'form-control form-control-sm num',
-                  style: 'width: 5rem;',
-                  id: "reminder_start_offset_days_#{reminder.key}" %>
-            <span class="text-13 text-secondary text-nowrap">days from <%= reminder.anchor_description %></span>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <%= f.label :interval_days, 'then every', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_interval_days_#{reminder.key}" %>
+            <%= f.label :interval_days, reminder.digest? ? 'At most every' : 'then every', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_interval_days_#{reminder.key}" %>
             <%= f.number_field :interval_days,
                   in: 1..ReminderSetting::MAX_INTERVAL_DAYS,
                   class: 'form-control form-control-sm num',
@@ -92,6 +94,7 @@
                   id: "reminder_interval_days_#{reminder.key}" %>
             <span class="text-13 text-secondary text-nowrap"><%= 'day'.pluralize(reminder.interval_days) %></span>
           </div>
+          <% unless reminder.digest? %>
           <div class="d-flex align-items-center gap-2">
             <%= f.label :max_reminders, 'up to', class: 'form-label text-13 text-nowrap mb-0', for: "reminder_max_reminders_#{reminder.key}" %>
             <%= f.number_field :max_reminders,
@@ -108,6 +111,7 @@
               <% end %>
             </span>
           </div>
+          <% end %>
         </div>
         <% end %>
         <% if reminder.key == 'parking_notices' && reminder.unlimited_reminders? %>

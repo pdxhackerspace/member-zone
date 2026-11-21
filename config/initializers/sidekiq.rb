@@ -70,6 +70,15 @@ Sidekiq.configure_server do |config|
     active_job: true
   )
 
+  # Training link content - Daily at 3:40am, before the morning digest, so a page that
+  # changed yesterday is in the change log by the time the digest decides to send.
+  Sidekiq::Cron::Job.create(
+    name: 'Training Link Content Check - Daily at 3:40am',
+    cron: '40 3 * * *',
+    class: 'TrainingResources::LinkContentCheckJob',
+    active_job: true
+  )
+
   # Membership State Tick - Daily at 4am, before the payment syncs and reminders so
   # they see today's states rather than yesterday's.
   Sidekiq::Cron::Job.create(
@@ -140,6 +149,14 @@ Sidekiq.configure_server do |config|
     name: 'API Token Expiry Reminder - Daily at 8:15am',
     cron: '15 8 * * *',
     class: 'ApiTokenExpiryReminderJob',
+    active_job: true
+  )
+
+  # Training Resource Digest - Daily at 8:20am (at most once per the configured interval)
+  Sidekiq::Cron::Job.create(
+    name: 'Training Resource Digest - Daily at 8:20am',
+    cron: '20 8 * * *',
+    class: 'TrainingResources::UpdateDigestJob',
     active_job: true
   )
 

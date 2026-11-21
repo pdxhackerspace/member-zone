@@ -111,6 +111,13 @@ class NotificationCategory
       reminder_key: nil,
       mailer_actions: %w[training_requested]
     },
+    'training_resource_updates' => {
+      name: 'Training document and link updates',
+      description: 'When documents or links change for a topic you are trained in or train.',
+      group: 'Training',
+      reminder_key: 'training_resource_updates',
+      mailer_actions: %w[training_resources_updated]
+    },
     'messages' => {
       name: 'Direct messages',
       description: 'Messages sent to you through Member Zone.',
