@@ -525,6 +525,44 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{training_catalog_topic_path(subtopic)}']", text: subtopic.name
   end
 
+  test 'member can open an unoffered topic that shares its roster and contact it from the list' do
+    parent = TrainingTopic.create!(
+      name: 'Steward Woodshop', offered_to_members: false,
+      trained_members_visible: true, trained_members_contactable: true
+    )
+    TrainingTopic.create!(name: 'Table saw', parent: parent, offered_to_members: true)
+    steward = users(:two)
+    private_user = users(:private_profile_user)
+    Training.create!(trainee: steward, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+    Training.create!(trainee: private_user, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(parent)}']", text: 'Steward Woodshop'
+    assert_select "a[href='#{user_path(steward)}']", text: steward.display_name
+    assert_select "a[href='#{user_path(private_user)}']", count: 0
+    assert_match private_user.display_name, response.body
+    contact = "button[data-contact-url='#{training_catalog_topic_contact_path(parent)}']"
+    assert_select contact, text: /Contact/
+    detail = css_select(contact).first['data-contact-detail']
+    assert_includes detail, steward.display_name
+    assert_includes detail, private_user.display_name
+
+    assert_difference 'Message.count', 2 do
+      post training_catalog_topic_contact_path(parent),
+           params: { subject: 'Shop', body: 'Who is in today?', return_to: 'catalog' }
+    end
+    assert_redirected_to training_catalog_path
+
+    get training_catalog_topic_path(parent)
+
+    assert_response :success
+    assert_select '#trained-members a[href=?]', user_path(steward), text: steward.display_name
+    assert_select '#contact-trained-members'
+  end
+
   test 'member does not see who is trained until the topic allows it' do
     trainee = users(:two)
     Training.create!(trainee: trainee, training_topic: @laser_topic, trainer: users(:one), trained_at: Time.current)
@@ -599,6 +637,24 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_match(/cannot contact/, flash[:alert])
   end
 
+  test 'catalog contact hides names when the topic allows messages but not the list' do
+    topic = TrainingTopic.create!(
+      name: 'Steward Shop', offered_to_members: false, trained_members_contactable: true
+    )
+    trainee = users(:two)
+    Training.create!(trainee: trainee, training_topic: topic, trainer: users(:one), trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_path
+
+    assert_response :success
+    contact = "button[data-contact-url='#{training_catalog_topic_contact_path(topic)}']"
+    assert_select contact, text: /Contact/
+    assert_equal 'This goes to the members trained in this topic. They can reply to you.',
+                 css_select(contact).first['data-contact-detail']
+    assert_no_match(/#{Regexp.escape(trainee.display_name)}/, response.body)
+  end
+
   test 'member messages everyone trained when the topic allows it and is left out of their own copy' do
     @laser_topic.update!(trained_members_contactable: true)
     sign_in_as_member
@@ -634,6 +690,11 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     get training_catalog_path
     assert_response :success
     assert_select "a[href='#{training_catalog_topic_path(child)}']", text: 'Table saw'
+    contact = "button[data-contact-url='#{training_catalog_topic_contact_path(child)}']"
+    assert_select contact, text: /Contact/
+    assert_equal 'This goes to the members trained in this topic. They can reply to you.',
+                 css_select(contact).first['data-contact-detail']
+    assert_no_match(/#{Regexp.escape(trainee.display_name)}/, response.body)
 
     get training_catalog_topic_path(child)
     assert_response :success
