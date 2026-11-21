@@ -114,7 +114,7 @@
                         <i class="bi bi-mortarboard"></i> Request
                       <% end %>
                     <% elsif @contactable_topic_ids.include?(topic.id) %>
-                      <% recipients = Array(@roster_members[topic.id]).reject { |member| member.id == current_user.id } %>
+                      <% recipients = names_for_catalog_contact(topic) %>
                       <button type="button" class="btn btn-sm btn-outline-secondary"
                               data-bs-toggle="modal" data-bs-target="#training-contact-modal"
                               data-action="training-contact#open"

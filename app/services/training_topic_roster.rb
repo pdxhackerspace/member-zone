@@ -5,10 +5,11 @@
 # table saw without any setting. Everyone else may only when the topic itself opts in,
 # one setting for the list and one for sending a message.
 class TrainingTopicRoster
-  # Active members trained in the topics that share a roster, grouped by topic id.
-  # The catalog list uses this so it can print names without one query per row.
+  # Active members trained in topics that show their names, grouped by topic id.
+  # A topic that only allows contact is left out, so the catalog cannot print
+  # people the topic has not agreed to show.
   def self.active_members_by_topic(topics)
-    topic_ids = Array(topics).select(&:roster_shared?).map(&:id)
+    topic_ids = Array(topics).select(&:trained_members_visible?).map(&:id)
     return {} if topic_ids.empty?
 
     grouped = Hash.new { |members, topic_id| members[topic_id] = [] }

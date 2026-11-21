@@ -76,6 +76,17 @@ class TrainingTopicRosterTest < ActiveSupport::TestCase
     assert_includes roster_for(@saw, @steward).members, @private
   end
 
+  test 'catalog names load only for topics that show who is trained' do
+    @saw.update!(trained_members_contactable: true)
+
+    assert_empty TrainingTopicRoster.active_members_by_topic([@saw])
+
+    @saw.update!(trained_members_visible: true)
+    listed = TrainingTopicRoster.active_members_by_topic([@saw])
+
+    assert_equal [@private.id, @trained.id].sort, listed[@saw.id].map(&:id).sort
+  end
+
   test 'recipients leave out the viewer and the sender' do
     @saw.update!(trained_members_contactable: true)
     train(@member, @saw)
