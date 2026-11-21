@@ -94,6 +94,8 @@ Rails.application.routes.draw do
   get '/training/record', to: 'trainings#record', as: :record_training
   post '/training/record', to: 'trainings#create_bulk'
   get '/training/:id',  to: 'training_catalog#show',  as: :training_catalog_topic, constraints: { id: /\d+/ }
+  post '/training/:id/contact', to: 'training_catalog#contact', as: :training_catalog_topic_contact,
+                                constraints: { id: /\d+/ }
   resources :member_parking_permits, only: %i[new create show edit update] do
     collection do
       get :member_search

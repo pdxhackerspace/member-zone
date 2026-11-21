@@ -355,13 +355,30 @@ To take away a trainer capability, use the member's profile (Training and access
 
 ## Topic resources
 
-Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open.
+Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open. Trained members are listed only when the topic allows it, or when you are an administrator or trained in the topic's parent — see [Trained members and contacting them](#trained-members-and-contacting-them).
 
 People who hold *Edit topic resource links* for a topic (Area leads and curators get it through their role, and it reaches that topic's subtopics) can add, edit, and remove links right there. **Edit** opens the link in place, and **Remove link** is under the ⋯ menu. People who can manage the topic's documents (trainers for it, or holders of *Manage topic documents*) get **Add document** and an **Edit** button on each document. Changes bring you back to the topic page.
 
 When training resource updates are enabled, each link also says when its page was last checked, when the contents last changed, or that the page can't be read. Members who cannot edit the links do not see that.
 
 Stewards and curators can reach every topic they look after, even ones not offered to members: a topic shows up in the catalog, and its page opens, for anyone who holds *Edit topic resource links*, *Manage topic documents*, *Edit topic descriptions*, or *Create subtopics* for it (or for its parent topic). The same people get the **Edit** button at the top of the topic page, which opens the topic's settings limited to what their role covers.
+
+## Trained members and contacting them
+
+A topic can let members see who is trained in it, and message those people, from its page in the training catalog. Both are off until someone turns them on.
+
+On the topic's edit page (needs *Manage training topics*):
+
+- **Show trained members.** Anyone who can open the page sees the names of the active members trained in it.
+- **Let members contact them.** Anyone who can open the page gets **Message trained members**, which sends one message to each of those members. Replies come back in Messages.
+
+A topic for the people who run an area is the usual one to turn on. Set Woodshop's stewards as the members trained in *Steward — Woodshop*, turn both settings on there, and any member can see the two stewards and write to them together.
+
+Someone trained in a topic can always see, and message, the members trained in that topic's direct subtopics, whether or not those settings are on. A steward trained in *Steward — Woodshop* opens *Table saw* (a subtopic of it) and sees everyone trained on the saw, including members who are no longer active. Holding a topic reaches its own subtopics only, not topics nested further down.
+
+A name is a link to that member's profile when their profile is visible to other members or to the public. Administrators always get the link. A private profile shows as a name with no link. Trainers follow the same rule.
+
+The message goes to active members and skips the person sending it. Members who are no longer active are left out of the message, and out of the list other members see.
 
 ## Membership states
 

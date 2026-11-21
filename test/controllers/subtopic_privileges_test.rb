@@ -67,6 +67,22 @@ class SubtopicPrivilegesTest < ActionDispatch::IntegrationTest
     assert_equal @parent, TrainingTopic.find_by(name: 'Freshly added').parent
   end
 
+  test 'an area lead cannot publish a subtopic roster while creating it' do
+    lead = sign_in_as_plain_member
+    grant_privileges(lead, 'training.subtopics.create', member_source: 'can_train', topic: @parent)
+
+    post training_topics_path, params: {
+      training_topic: {
+        name: 'Listed by a lead', parent_id: @parent.id,
+        trained_members_visible: '1', trained_members_contactable: '1'
+      }
+    }
+
+    topic = TrainingTopic.find_by!(name: 'Listed by a lead')
+    assert_not topic.trained_members_visible?
+    assert_not topic.trained_members_contactable?
+  end
+
   test 'an area lead cannot create a top level topic' do
     lead = sign_in_as_plain_member
     grant_privileges(lead, 'training.subtopics.create', member_source: 'can_train', topic: @parent)

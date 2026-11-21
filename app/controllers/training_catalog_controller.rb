@@ -1,13 +1,18 @@
 # Member-facing catalog of training topics.
 #
 # Admins see every topic. Non-admins see topics offered to members, any whose edit page they
-# may open (stewards and curators), and any they are already trained in. Each topic has a detail
-# page showing trainers, trainees, and training materials (links + documents).
+# may open (stewards and curators), any they are already trained in, and the direct subtopics
+# of those. Each topic has a detail page showing trainers, the members trained in it when the
+# viewer is allowed to see them, and training materials (links + documents).
 # From the detail page, both admins and non-admins can request training
-# for any topic that is offered to members and has at least one trainer.
+# for any topic that is offered to members and has at least one trainer, and can message the
+# trained members when the topic allows it.
 class TrainingCatalogController < AuthenticatedController
-  before_action :set_training_topic, only: :show
-  before_action :authorize_topic_visibility!, only: :show
+  before_action :set_training_topic, only: %i[show contact]
+  before_action :authorize_topic_visibility!, only: %i[show contact]
+  rate_limit to: 10, within: 1.hour, only: :contact, name: 'training-topic-contact',
+             store: RateLimiting.store, by: -> { true_user&.id },
+             with: -> { training_contact_rate_limited }
 
   def index
     ordered = ordered_visible_topics
@@ -27,10 +32,11 @@ class TrainingCatalogController < AuthenticatedController
   end
 
   def show
+    @roster = TrainingTopicRoster.new(topic: @training_topic, viewer: current_user)
     trainers_scope = @training_topic.trainers.order(:full_name, :id)
     @trainers = current_user_admin? ? trainers_scope : trainers_scope.active
-    @trainees = User.where(id: @training_topic.trainings.select(:trainee_id).distinct)
-                    .order(:full_name, :id)
+    @trainees = @roster.members
+    @contact_recipient_count = @roster.recipients(except: true_user).count
     @topic_links = @training_topic.links.includes(:content_snapshot).order(:title)
     @requestable = @training_topic.offered_to_members? &&
                    @training_topic.trainers.active.exists?
@@ -38,6 +44,20 @@ class TrainingCatalogController < AuthenticatedController
                         can?(:'training.topics.manage_links', topic: @training_topic)
     @can_manage_documents = can_manage_topic_documents?(@training_topic)
     @topic_documents = visible_documents_for(@training_topic)
+  end
+
+  def contact
+    result = TrainingTopicContact.new(
+      topic: @training_topic, viewer: current_user, sender: true_user,
+      subject: params[:subject], body: params[:body]
+    ).deliver
+
+    if result.error
+      redirect_to training_catalog_topic_path(@training_topic), alert: result.error
+    else
+      notice = "Message sent to #{result.sent_count} #{'member'.pluralize(result.sent_count)}."
+      redirect_to training_catalog_topic_path(@training_topic), notice: notice
+    end
   end
 
   private
@@ -113,13 +133,14 @@ class TrainingCatalogController < AuthenticatedController
 
   # Nil means every topic is linkable: admins, and anyone who may view the whole catalog.
   # Otherwise a name links when a member can request the topic, the viewer is trained in
-  # it, or the viewer may open its page.
+  # it or its parent, or the viewer may open its page.
   def linked_catalog_topic_ids
     return if current_user_admin? || can?(:'training.catalog.view_all')
 
     @trainable_on_request_topic_ids |
       @trained_topic_ids |
-      current_user.topics_with_page_access.pluck(:id).to_set
+      current_user.topics_with_page_access.pluck(:id).to_set |
+      TrainingTopic.where(parent_id: @trained_topic_ids.to_a).pluck(:id).to_set
   end
 
   def needs_trainers?(topic)
@@ -133,17 +154,29 @@ class TrainingCatalogController < AuthenticatedController
   end
 
   def authorize_topic_visibility!
-    return if current_user_admin? || can?(:'training.catalog.view_all')
-    return if @training_topic.offered_to_members?
-    return if current_user.may_open_topic_page?(@training_topic)
-    return if Training.exists?(trainee: current_user, training_topic: @training_topic)
+    return if topic_visible_to_current_user?
 
     redirect_to training_catalog_path, alert: 'That training topic is not available.'
   end
 
+  def topic_visible_to_current_user?
+    return true if current_user_admin? || can?(:'training.catalog.view_all')
+    return true if @training_topic.offered_to_members?
+    return true if current_user.may_open_topic_page?(@training_topic)
+    return true if Training.exists?(trainee: current_user, training_topic: @training_topic)
+
+    @training_topic.parent_held_by?(current_user)
+  end
+
+  def training_contact_rate_limited
+    redirect_to training_catalog_topic_path(@training_topic),
+                alert: 'Too many messages. Try again in an hour.'
+  end
+
   # A privilege here only ever widens what a member sees: every member keeps the topics on
   # offer, training.catalog.view_all adds the ones that are not, a steward or curator also
-  # sees the unoffered topics whose page they may edit, and a member sees topics they hold.
+  # sees the unoffered topics whose page they may edit, a member sees topics they hold, and
+  # holding a topic reveals its direct subtopics.
   def visible_topics
     return TrainingTopic.all if current_user_admin? || can?(:'training.catalog.view_all')
 
@@ -151,6 +184,7 @@ class TrainingCatalogController < AuthenticatedController
     TrainingTopic.offered_for_members
                  .or(TrainingTopic.where(id: current_user.topics_with_page_access.select(:id)))
                  .or(TrainingTopic.where(id: held_ids))
+                 .or(TrainingTopic.where(parent_id: held_ids))
   end
 
   # Mirrors DocumentsController#manageable_topic_ids, which decides what the links lead to.

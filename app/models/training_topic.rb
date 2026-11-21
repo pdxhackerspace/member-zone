@@ -20,6 +20,8 @@ class TrainingTopic < ApplicationRecord
 
   validates :name, presence: true, uniqueness: true
   validates :offered_to_members, inclusion: { in: [true, false] }
+  validates :trained_members_visible, inclusion: { in: [true, false] }
+  validates :trained_members_contactable, inclusion: { in: [true, false] }
   validate :parent_is_not_self
   validate :parent_is_not_a_descendant
 
@@ -99,6 +101,15 @@ class TrainingTopic < ApplicationRecord
 
   def subtopic?
     parent_id.present?
+  end
+
+  # A member trained in this topic's direct parent runs the area it belongs to, so they
+  # can see and contact everyone trained here. Reach stops after one level: holding the
+  # grandparent does not.
+  def parent_held_by?(user)
+    return false if user.nil? || parent_id.blank?
+
+    Training.exists?(trainee_id: user.id, training_topic_id: parent_id)
   end
 
   # Topics that may be chosen as this topic's parent: anything but itself and its own

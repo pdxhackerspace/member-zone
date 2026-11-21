@@ -525,6 +525,128 @@ class TrainingCatalogControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{training_catalog_topic_path(subtopic)}']", text: subtopic.name
   end
 
+  test 'member does not see who is trained until the topic allows it' do
+    trainee = users(:two)
+    Training.create!(trainee: trainee, training_topic: @laser_topic, trainer: users(:one), trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select '#trained-members', text: /1 member trained/
+    assert_no_match(/#{Regexp.escape(trainee.display_name)}/, response.body)
+    assert_select '#contact-trained-members', count: 0
+  end
+
+  test 'member sees trained names and links shared profiles when the topic allows it' do
+    shared = users(:two)
+    private_user = users(:private_profile_user)
+    @laser_topic.update!(trained_members_visible: true, trained_members_contactable: true)
+    Training.create!(trainee: shared, training_topic: @laser_topic, trainer: users(:one), trained_at: Time.current)
+    Training.create!(trainee: private_user, training_topic: @laser_topic, trainer: users(:one),
+                     trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select '#trained-members a[href=?]', user_path(shared), text: shared.display_name
+    assert_select '#trained-members a[href=?]', user_path(private_user), count: 0
+    assert_select '#trained-members', text: /#{Regexp.escape(private_user.display_name)}/
+    assert_select "form[action='#{training_catalog_topic_contact_path(@laser_topic)}']"
+  end
+
+  test 'admin gets a profile link even when the profile is private and the topic has not opted in' do
+    private_user = users(:private_profile_user)
+    Training.create!(trainee: private_user, training_topic: @laser_topic, trainer: users(:one),
+                     trained_at: Time.current)
+
+    sign_in_as_admin
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_select '#trained-members a[href=?]', user_path(private_user), text: private_user.display_name
+  end
+
+  test 'a trainer with a private profile is not a link for a member' do
+    trainer = users(:private_profile_user)
+    TrainerCapability.create!(user: trainer, training_topic: @laser_topic)
+
+    sign_in_as_member
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_response :success
+    assert_match trainer.display_name, response.body
+    assert_select "a[href='#{user_path(trainer)}']", count: 0
+
+    sign_in_as_admin
+    get training_catalog_topic_path(@laser_topic)
+
+    assert_select "a[href='#{user_path(trainer)}']", text: trainer.display_name
+  end
+
+  test 'member cannot message trained members until the topic allows it' do
+    Training.create!(trainee: users(:two), training_topic: @laser_topic, trainer: users(:one),
+                     trained_at: Time.current)
+
+    sign_in_as_member
+
+    assert_no_difference 'Message.count' do
+      post training_catalog_topic_contact_path(@laser_topic), params: { subject: 'Hi', body: 'Question' }
+    end
+
+    assert_redirected_to training_catalog_topic_path(@laser_topic)
+    assert_match(/cannot contact/, flash[:alert])
+  end
+
+  test 'member messages everyone trained when the topic allows it and is left out of their own copy' do
+    @laser_topic.update!(trained_members_contactable: true)
+    sign_in_as_member
+    Training.create!(trainee: users(:two), training_topic: @laser_topic, trainer: users(:one),
+                     trained_at: Time.current)
+    Training.create!(trainee: signed_in_member, training_topic: @laser_topic, trainer: users(:one),
+                     trained_at: Time.current)
+
+    assert_difference 'Message.count', 1 do
+      post training_catalog_topic_contact_path(@laser_topic),
+           params: { subject: 'Shop hours', body: 'When are you in?' }
+    end
+
+    assert_redirected_to training_catalog_topic_path(@laser_topic)
+    assert_equal 'Message sent to 1 member.', flash[:notice]
+    message = Message.order(:id).last
+    assert_equal users(:two).id, message.recipient_id
+    assert_equal signed_in_member.id, message.sender_id
+  end
+
+  test 'a member trained in the parent sees and can message an unoffered subtopic' do
+    parent = TrainingTopic.create!(name: 'Steward Woodshop', offered_to_members: true)
+    child = TrainingTopic.create!(name: 'Table saw', parent: parent, offered_to_members: false)
+    trainee = users(:private_profile_user)
+    Training.create!(trainee: trainee, training_topic: child, trainer: users(:one), trained_at: Time.current)
+
+    sign_in_as_member
+    get training_catalog_topic_path(child)
+    assert_redirected_to training_catalog_path
+
+    Training.create!(trainee: signed_in_member, training_topic: parent, trainer: users(:one), trained_at: Time.current)
+
+    get training_catalog_path
+    assert_response :success
+    assert_select "a[href='#{training_catalog_topic_path(child)}']", text: 'Table saw'
+
+    get training_catalog_topic_path(child)
+    assert_response :success
+    assert_select '#trained-members', text: /#{Regexp.escape(trainee.display_name)}/
+    assert_select "#trained-members a[href='#{user_path(trainee)}']", count: 0
+
+    assert_difference 'Message.count', 1 do
+      post training_catalog_topic_contact_path(child), params: { subject: 'Saw', body: 'Who is next?' }
+    end
+
+    assert_equal trainee.id, Message.order(:id).last.recipient_id
+  end
+
   test 'show returns friendly error for unknown topic' do
     sign_in_as_admin
     get training_catalog_topic_path(id: 999_999_999)
