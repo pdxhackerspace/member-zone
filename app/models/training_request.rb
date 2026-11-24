@@ -1,5 +1,8 @@
 class TrainingRequest < ApplicationRecord
-  STATUSES = %w[pending responded].freeze
+  # pending: still on every trainer's dashboard, whether or not someone has replied.
+  # responded: training was recorded. The member can acknowledge that notice.
+  # closed: a trainer dismissed it without recording training.
+  STATUSES = %w[pending responded closed].freeze
 
   belongs_to :user
   belongs_to :training_topic
@@ -15,13 +18,27 @@ class TrainingRequest < ApplicationRecord
 
   scope :pending, -> { where(status: 'pending') }
   scope :responded, -> { where(status: 'responded') }
+  scope :closed, -> { where(status: 'closed') }
   scope :not_dismissed, -> { where(dismissed_at: nil) }
   scope :dismissed, -> { where.not(dismissed_at: nil) }
   scope :newest_first, -> { order(created_at: :desc) }
 
-  # Requests the member has had responded to but has not yet dismissed. These drive the
-  # "training completed" notifications the member sees on their dashboard.
+  # Still waiting on a trainer. A reply does not remove a request; recording the
+  # training or dismissing it does, and either one drops it for every trainer of the topic.
+  scope :open_for_trainers, -> { pending }
+
+  # Training was recorded and the member has not dismissed the notice. A reply alone
+  # does not land here.
   scope :awaiting_member_acknowledgement, -> { responded.not_dismissed }
+
+  # Open requests for topics this person can train, newest within each topic.
+  def self.for_trainer_dashboard(user)
+    open_for_trainers
+      .where(training_topic_id: user.training_topics.select(:id))
+      .joins(:training_topic)
+      .includes(:training_topic, :user, :responded_by)
+      .order(Arel.sql('training_topics.name ASC, training_requests.created_at DESC'))
+  end
 
   def pending?
     status == 'pending'
@@ -31,12 +48,36 @@ class TrainingRequest < ApplicationRecord
     status == 'responded'
   end
 
+  def closed?
+    status == 'closed'
+  end
+
   def dismissed?
     dismissed_at.present?
   end
 
+  def replied?
+    responded_at.present?
+  end
+
+  # Training was recorded. This is what takes the request off the trainer dashboards
+  # and shows the member a "training completed" notice.
   def respond!(responder)
     update!(status: 'responded', responded_by: responder, responded_at: Time.current)
+  end
+
+  # Someone answered the member. The request stays open for every trainer of the topic.
+  def record_reply!(responder)
+    return unless pending?
+
+    update!(responded_by: responder, responded_at: Time.current)
+  end
+
+  # Take the request off every trainer's dashboard without recording training.
+  def dismiss_for_trainers!
+    return unless pending?
+
+    update!(status: 'closed')
   end
 
   def dismiss!

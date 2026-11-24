@@ -36,7 +36,9 @@ class TrainingRequestResponderTest < ActiveSupport::TestCase
     quiet_copy = Message.find_by!(recipient: users(:no_email))
     assert_equal @sender, quiet_copy.sender
     assert_nil Message.find_by(recipient: @sender)
-    assert_equal 'responded', @request.reload.status
+    @request.reload
+    assert @request.pending?
+    assert @request.replied?
     assert_equal @sender, @request.responded_by
   end
 
