@@ -137,14 +137,27 @@
                       <% else %>
                         <div class="text-secondary text-12 mt-1">Contact details were not shared.</div>
                       <% end %>
+                      <% if request.replied? %>
+                        <div class="text-secondary text-12 mt-1">
+                          Response sent <%= time_ago_in_words(request.responded_at) %> ago
+                          <% if request.responded_by.present? %>
+                            by <%= request.responded_by.display_name %>
+                          <% end %>
+                        </div>
+                      <% end %>
                     </div>
-                    <div class="d-flex gap-2 flex-shrink-0">
+                    <div class="d-flex gap-2 flex-shrink-0 flex-wrap justify-content-end">
                       <%= button_to 'Mark as trained', mark_trained_training_request_path(request),
                             method: :post,
                             class: 'btn btn-sm btn-outline-secondary',
                             form: { class: 'd-inline',
                                     data: { turbo_confirm: "Record training for #{request.user.display_name} in #{topic.name}?" } } %>
                       <%= link_to 'Respond', edit_training_request_path(request), class: 'btn btn-sm btn-outline-secondary' %>
+                      <%= button_to 'Dismiss', close_training_request_path(request),
+                            method: :post,
+                            class: 'btn btn-sm btn-outline-secondary',
+                            form: { class: 'd-inline',
+                                    data: { turbo_confirm: "Dismiss this request for every trainer? #{request.user.display_name} will not be marked as trained." } } %>
                       <% if request.share_contact_info? && request.user.email.present? %>
                         <%= link_to 'Email', "mailto:#{request.user.email}", class: 'btn btn-sm btn-outline-secondary' %>
                       <% end %>

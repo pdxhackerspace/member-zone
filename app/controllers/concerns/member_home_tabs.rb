@@ -37,14 +37,8 @@ module MemberHomeTabs
   def set_self_service_training_data
     @member_requestable_topics = TrainingTopic.available_for_member_requests
 
-    trainer_topic_ids = @home_user.training_topics.select(:id)
-    ordering = 'training_topics.name ASC, training_requests.created_at DESC'
-    trainer_requests = TrainingRequest.pending
-                                      .where(training_topic_id: trainer_topic_ids)
-                                      .joins(:training_topic)
-                                      .includes(:training_topic, :user)
-                                      .order(ordering)
-    @trainer_training_requests_by_topic = trainer_requests.group_by(&:training_topic)
+    @trainer_training_requests_by_topic = TrainingRequest.for_trainer_dashboard(@home_user)
+                                                         .group_by(&:training_topic)
   end
 
   def set_member_dashboard_data

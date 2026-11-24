@@ -353,6 +353,15 @@ When an administrator names someone else as the trainer, that person gets a mess
 
 To take away a trainer capability, use the member's profile (Training and access) or the topic's page.
 
+## Training requests
+
+A member's request shows on the dashboard of every trainer for that topic, under **Training requests for you**.
+
+Replying does not remove it. The request stays there for every trainer of the topic, with a line naming who already replied, until one of two things happens:
+
+- **Mark as trained** records the training. The request then leaves every trainer's dashboard, and the member sees it under Training as completed.
+- **Dismiss** removes it without recording training. It leaves every trainer's dashboard. The member is not marked as trained and can request the topic again.
+
 ## Topic resources
 
 Each topic's page in the training catalog ends with **Resources**, after Trainers and Trained members: the topic's links and the documents you are allowed to open. Trained members are listed only when the topic allows it, or when you are an administrator or trained in the topic's parent — see [Trained members and contacting them](#trained-members-and-contacting-them).

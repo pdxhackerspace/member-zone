@@ -204,7 +204,7 @@ class ImpersonationPrivilegesTest < ActionDispatch::IntegrationTest
       training_request: { response_body: 'Happy to help — find me on Tuesday.' }
     }
 
-    assert_predicate request.reload, :responded?
+    assert_predicate request.reload, :pending?
     assert_equal admin, request.responded_by
     assert_equal admin, Message.order(:created_at).last.sender
   end

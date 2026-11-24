@@ -53,6 +53,79 @@ class TrainingRequestTest < ActiveSupport::TestCase
     assert_not_includes TrainingRequest.dismissed, active
   end
 
+  test 'a reply keeps the request on every trainer dashboard for the topic' do
+    request = training_requests(:pending_laser_request)
+    topic = request.training_topic
+    trainer = users(:one)
+    other = users(:two)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: other, training_topic: topic)
+
+    request.record_reply!(trainer)
+
+    assert request.pending?
+    assert request.replied?
+    assert_equal trainer, request.responded_by
+    assert_includes TrainingRequest.for_trainer_dashboard(trainer), request
+    assert_includes TrainingRequest.for_trainer_dashboard(other), request
+    assert_not_includes TrainingRequest.for_trainer_dashboard(users(:three)), request
+    assert_not_includes TrainingRequest.awaiting_member_acknowledgement, request
+  end
+
+  test 'a reply does not change a request that is no longer open' do
+    request = training_requests(:responded_woodworking_request)
+    original_responder = request.responded_by
+
+    request.record_reply!(users(:one))
+
+    assert_equal 'responded', request.reload.status
+    assert_equal original_responder, request.responded_by
+  end
+
+  test 'dismiss_for_trainers! removes the request for every trainer without completing it' do
+    request = training_requests(:pending_laser_request)
+    topic = request.training_topic
+    trainer = users(:one)
+    other = users(:two)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: other, training_topic: topic)
+    request.record_reply!(trainer)
+
+    request.dismiss_for_trainers!
+    request.dismiss_for_trainers!
+
+    assert request.closed?
+    assert_not_includes TrainingRequest.for_trainer_dashboard(trainer), request
+    assert_not_includes TrainingRequest.for_trainer_dashboard(other), request
+    assert_not_includes TrainingRequest.awaiting_member_acknowledgement, request
+
+    replacement = TrainingRequest.new(
+      user: request.user,
+      training_topic: topic,
+      share_contact_info: true,
+      status: 'pending'
+    )
+    assert replacement.valid?
+  end
+
+  test 'recording training takes a replied request off the trainer dashboard' do
+    request = training_requests(:pending_laser_request)
+    trainer = users(:one)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: request.training_topic)
+    request.record_reply!(trainer)
+
+    Training.create!(
+      trainee: request.user,
+      trainer: trainer,
+      training_topic: request.training_topic,
+      trained_at: Time.current
+    )
+
+    assert request.reload.responded?
+    assert_not_includes TrainingRequest.for_trainer_dashboard(trainer), request
+    assert_includes TrainingRequest.awaiting_member_acknowledgement, request
+  end
+
   test 'awaiting_member_acknowledgement returns responded requests that are not dismissed' do
     responded = training_requests(:responded_woodworking_request)
     pending = training_requests(:pending_laser_request)

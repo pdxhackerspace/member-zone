@@ -19,7 +19,9 @@ class TrainingRequestResponder
     return failure(message) unless message.persisted?
 
     copied = copy_to_other_trainers
-    request.respond!(sender)
+    # A reply records who answered. It does not close the request: every trainer for the
+    # topic keeps seeing it until the member is trained or someone dismisses it.
+    request.record_reply!(sender)
     Result.new(success: true, error: nil, notice: notice_for(copied))
   end
 

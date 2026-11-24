@@ -45,6 +45,13 @@
         <% end %>
       </div>
       <%= f.submit 'Send Response', class: 'btn btn-primary' %>
+      <p class="text-secondary text-12 mt-2 mb-0">
+        Sending a response leaves this request on every trainer's dashboard until the member is trained or someone dismisses it.
+      </p>
     <% end %>
+    <%= button_to 'Dismiss request', close_training_request_path(@training_request),
+          method: :post,
+          class: 'btn btn-outline-secondary mt-3',
+          form: { data: { turbo_confirm: "Dismiss this request for every trainer? #{@requester.display_name} will not be marked as trained." } } %>
   </div>
 </div>

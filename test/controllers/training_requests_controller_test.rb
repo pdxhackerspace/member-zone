@@ -153,6 +153,8 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select 'input[type=checkbox][name=?][checked]', 'training_request[notify_other_trainers]'
     assert_match 'Also send this response to the other trainers', response.body
+    assert_match 'leaves this request on every trainer', response.body
+    assert_select 'form[action=?]', close_training_request_path(training_requests(:pending_laser_request))
   end
 
   test 'response form names the other trainers who will receive a copy' do
@@ -189,7 +191,8 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
     end
 
     request.reload
-    assert_equal 'responded', request.status
+    assert request.pending?
+    assert request.replied?
     assert_equal trainer, request.responded_by
     assert_not_nil request.responded_at
     assert_equal 'Response sent to member.', flash[:notice]
@@ -247,7 +250,7 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_nil Message.find_by(recipient: users(:one))
     assert_equal 'Response sent to member.', flash[:notice]
-    assert_equal 'responded', request.reload.status
+    assert request.reload.pending?
     assert_equal trainer, request.responded_by
   end
 
@@ -312,6 +315,88 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'pending', request.reload.status
   end
 
+  test 'replying leaves the request on the responding trainer dashboard' do
+    trainer, _other, request = laser_trainers
+    reply_to_laser_request
+
+    assert request.reload.pending?
+    get user_path(trainer)
+    assert_response :success
+    assert_match 'Training requests for you', response.body
+    assert_match 'Response sent', response.body
+    assert_select 'form[action=?]', close_training_request_path(request)
+  end
+
+  test 'a reply stays on the dashboard of the other trainers for the topic' do
+    trainer, other, request = laser_trainers
+    reply_to_laser_request
+
+    sign_in_other_trainer
+    get user_path(other)
+    assert_response :success
+    assert_match 'Training requests for you', response.body
+    assert_match trainer.display_name, response.body
+    assert_select 'form[action=?]', close_training_request_path(request)
+  end
+
+  test 'dismissing a request removes it for every trainer without recording training' do
+    trainer, other, request = laser_trainers
+
+    sign_in_other_trainer
+    assert_no_difference 'Training.count' do
+      post close_training_request_path(request)
+    end
+
+    assert request.reload.closed?
+    assert_not_includes TrainingRequest.awaiting_member_acknowledgement, request
+    get user_path(other)
+    assert_no_match(/Training requests for you/, response.body)
+
+    sign_in_as_trainer
+    get user_path(trainer)
+    assert_no_match(/Training requests for you/, response.body)
+  end
+
+  test 'marking a request trained removes it from the trainer dashboard' do
+    trainer = sign_in_as_trainer
+    topic = training_topics(:laser_cutting)
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    request = training_requests(:pending_laser_request)
+    request.record_reply!(trainer)
+
+    post mark_trained_training_request_path(request)
+
+    assert request.reload.responded?
+    get user_path(trainer)
+    assert_response :success
+    assert_no_match(/Training requests for you/, response.body)
+  end
+
+  test 'member cannot dismiss an open training request from the trainer queue' do
+    sign_in_as_member
+    request = training_requests(:pending_laser_request)
+
+    post close_training_request_path(request)
+
+    assert request.reload.pending?
+    assert_nil request.dismissed_at
+  end
+
+  test 'member cannot acknowledge a request that is still open' do
+    sign_in_as_member
+    member = User.find_by!(authentik_id: "local:#{local_accounts(:regular_member).id}")
+    request = member.training_requests.create!(
+      training_topic: training_topics(:electronics),
+      share_contact_info: false,
+      status: 'pending'
+    )
+
+    post dismiss_training_request_path(request)
+
+    assert_nil request.reload.dismissed_at
+    assert_equal 'That update is not ready to dismiss.', flash[:alert]
+  end
+
   test 'member can dismiss their own completed training request' do
     sign_in_as_member
     member = User.find_by(authentik_id: "local:#{local_accounts(:regular_member).id}")
@@ -362,6 +447,35 @@ class TrainingRequestsControllerTest < ActionDispatch::IntegrationTest
       session: { email: local_accounts(:trainer_account).email, password: 'trainerpassword123' }
     }
     User.find_by(authentik_id: "local:#{local_accounts(:trainer_account).id}")
+  end
+
+  def laser_trainers
+    topic = training_topics(:laser_cutting)
+    trainer = sign_in_as_trainer
+    other = sign_in_other_trainer
+    TrainerCapability.find_or_create_by!(user: trainer, training_topic: topic)
+    TrainerCapability.find_or_create_by!(user: other, training_topic: topic)
+    [trainer, other, training_requests(:pending_laser_request)]
+  end
+
+  def reply_to_laser_request
+    sign_in_as_trainer
+    patch training_request_path(training_requests(:pending_laser_request)), params: {
+      training_request: { response_body: 'Let us schedule this.', notify_other_trainers: '0' }
+    }
+  end
+
+  def sign_in_other_trainer
+    account = LocalAccount.provision!(
+      email: 'other-trainer@example.com',
+      password: 'othertrainer123',
+      full_name: 'Other Trainer',
+      admin: false
+    )
+    post local_login_path, params: {
+      session: { email: account.email, password: 'othertrainer123' }
+    }
+    User.find_by!(authentik_id: "local:#{account.id}")
   end
 
   def sign_in_as_admin
