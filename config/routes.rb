@@ -86,6 +86,7 @@ Rails.application.routes.draw do
     member do
       post :mark_trained
       post :dismiss
+      post :close
     end
   end
 

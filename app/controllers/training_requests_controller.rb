@@ -1,6 +1,6 @@
 class TrainingRequestsController < AuthenticatedController
-  before_action :set_training_request, only: %i[edit update mark_trained dismiss]
-  before_action :authorize_responder!, only: %i[edit update mark_trained]
+  before_action :set_training_request, only: %i[edit update mark_trained dismiss close]
+  before_action :authorize_responder!, only: %i[edit update mark_trained close]
   before_action :require_conferral_for_mark_trained!, only: %i[mark_trained]
   before_action :authorize_requester!, only: %i[dismiss]
 
@@ -99,9 +99,27 @@ class TrainingRequestsController < AuthenticatedController
 
   # Member dismisses a completed training request so it stops showing on their dashboard.
   def dismiss
+    unless @training_request.responded?
+      redirect_back_or_to user_path(current_user, tab: :training_history),
+                          alert: 'That update is not ready to dismiss.'
+      return
+    end
+
     @training_request.dismiss!
     redirect_back_or_to user_path(current_user, tab: :training_history),
                         notice: 'Training update dismissed.'
+  end
+
+  # A trainer takes the request off every trainer's dashboard without recording training.
+  # Replying does not do this.
+  def close
+    unless @training_request.pending?
+      redirect_back_or_to user_path(current_user), alert: 'That request is no longer open.'
+      return
+    end
+
+    @training_request.dismiss_for_trainers!
+    redirect_back_or_to user_path(current_user), notice: 'Training request dismissed.'
   end
 
   private
